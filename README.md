@@ -41,6 +41,75 @@ npm run icons      # regenerate extension icons
 - **`src/shared/`** — types, the popup↔worker messaging contract, storage wrapper, constants,
   formatting.
 
+### Component diagram
+
+```mermaid
+flowchart TB
+    user([User])
+
+    subgraph ext["Lantern Extension (MV3)"]
+        subgraph popup["Popup — src/popup/"]
+            ui["React UI<br/>Onboarding · Unlock · Assets<br/>Activity · Send · Scan"]
+        end
+        subgraph worker["Service Worker — src/background/"]
+            session["Unlocked session<br/>in-memory Keypair<br/>sign · submit · auto-lock"]
+        end
+        subgraph core["Core — src/core/"]
+            crypto["crypto/ — AES-GCM vault"]
+            wallet["wallet/ — SEP-0005"]
+            stellar["stellar/ — client + tx"]
+            history["history/ — display model"]
+            scan["scan/ — tx scan engine"]
+        end
+        shared["shared/ — types · messaging · storage · format"]
+    end
+
+    storage[("chrome.storage<br/>encrypted vault only")]
+    horizon["Horizon / RPC<br/>+ Friendbot"]
+    network(("Stellar Network"))
+
+    user --> ui
+    ui <-->|"messaging contract"| session
+    ui --> shared
+    session --> shared
+    session --> crypto
+    session --> wallet
+    session --> stellar
+    session --> history
+    session --> scan
+    crypto <--> storage
+    stellar --> horizon
+    horizon --> network
+```
+
+### Sequence — unlock & send a payment
+
+```mermaid
+sequenceDiagram
+    actor U as User
+    participant P as Popup (UI)
+    participant W as Service Worker
+    participant V as core/crypto (vault)
+    participant S as core/stellar
+    participant H as Horizon / RPC
+
+    U->>P: Enter password (Unlock)
+    P->>W: UNLOCK { password }
+    W->>V: decrypt vault
+    V-->>W: Keypair (held in memory)
+    W-->>P: UNLOCKED (no secret leaves worker)
+
+    U->>P: Enter destination + amount, confirm
+    P->>W: SIGN_AND_SUBMIT { tx params }
+    W->>S: build transaction
+    S-->>W: unsigned XDR
+    W->>W: sign with in-memory Keypair
+    W->>H: submit signed XDR
+    H-->>W: result (hash / error)
+    W-->>P: result
+    P-->>U: success + updated balance
+```
+
 ## Security notes
 
 - Only the **encrypted** vault (AES-GCM, PBKDF2 ≥ 600k iterations) is persisted; the decrypted
@@ -84,6 +153,37 @@ that explains *what the user is actually about to authorize* in plain language a
 The goal is a "second pair of eyes" at signing time that turns opaque XDR into an informed
 decision, without taking custody or blocking the user from proceeding.
 
+#### Sequence — scan before signing
+
+```mermaid
+sequenceDiagram
+    actor U as User
+    participant P as Popup (UI)
+    participant W as Service Worker
+    participant SC as Scan Engine
+    participant LO as Local heuristics<br/>(decode · reputation lists)
+    participant AI as AI analysis<br/>(opt-in, cloud)
+
+    U->>P: Initiate / paste transaction
+    P->>W: REVIEW { xdr }
+    W->>SC: scan(xdr)
+    SC->>LO: decode ops, check addresses/assets
+    LO-->>SC: intent summary + heuristic flags
+    opt User opted into cloud analysis
+        SC->>AI: minimal request context
+        AI-->>SC: risk assessment + rationale
+    end
+    SC-->>W: verdict { summary, risk, warnings }
+    W-->>P: render scan result
+    P-->>U: plain-language review + risk callout
+    alt User confirms
+        U->>P: Approve
+        P->>W: SIGN_AND_SUBMIT
+    else User cancels
+        U->>P: Reject (nothing signed)
+    end
+```
+
 ### Mini-app browser for Stellar dApps
 
 Lantern will host an in-wallet **mini-app browser** so Stellar dApps can run inside a trusted,
@@ -105,6 +205,69 @@ travel with the user.
   with metadata, verification badges, and clear network/permission expectations before launch.
 - **Seamless UX** — connect once, switch accounts and networks without re-pasting addresses, and
   keep history and balances in sync across the wallet and the apps the user runs.
+
+#### Architecture — mini-app container
+
+```mermaid
+flowchart TB
+    subgraph ext["Lantern Extension"]
+        direction TB
+        subgraph sandbox["Sandboxed mini-app frame"]
+            dapp["Stellar dApp<br/>(isolated, no vault access)"]
+        end
+        broker["Connection broker<br/>capability-scoped wallet API<br/>(SEP-0043 / Wallet Standard)"]
+        perms["Per-app permissions<br/>network · accounts · limits · ops"]
+        scan["AI security-scan layer"]
+        worker["Service Worker<br/>in-memory Keypair · sign · submit"]
+    end
+    dir["Curated dApp directory<br/>verification badges"]
+    rpc["Soroban RPC / Horizon"]
+    network(("Stellar Network"))
+
+    dir -.launch.-> sandbox
+    dapp <-->|"request: connect / getPublicKey / signTx"| broker
+    broker --> perms
+    broker --> scan
+    scan --> worker
+    worker --> rpc
+    rpc --> network
+```
+
+#### Sequence — mini-app requests a signature
+
+```mermaid
+sequenceDiagram
+    actor U as User
+    participant D as Mini-app (sandbox)
+    participant B as Connection broker
+    participant PM as Permissions
+    participant SC as Scan Engine
+    participant W as Service Worker
+    participant H as Soroban RPC / Horizon
+
+    D->>B: connect()
+    B->>PM: check / prompt for grant
+    PM-->>B: scoped permission (revocable)
+    B-->>D: public key
+
+    D->>B: signTransaction(xdr)
+    B->>PM: within granted scope?
+    PM-->>B: allowed
+    B->>SC: scan(xdr)
+    SC-->>B: verdict { summary, risk }
+    B->>U: review + risk callout
+    alt User approves
+        U-->>B: approve
+        B->>W: sign with in-memory Keypair
+        W->>H: submit
+        H-->>W: result
+        W-->>B: result
+        B-->>D: signed result / hash
+    else User rejects
+        U-->>B: reject
+        B-->>D: error (nothing signed)
+    end
+```
 
 Together these make Lantern a place to *use* Stellar safely, not just store it — programmable
 surface for dApps, with an AI safety net between the user and every signature.
