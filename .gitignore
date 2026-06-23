@@ -1,0 +1,11 @@
+node_modules
+dist
+*.local
+.DS_Store
+.vite
+
+# Internal specs, brand, and implementation plans
+SPEC.md
+BRAND.md
+*-spec.md
+*-plan.md
