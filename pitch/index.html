@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lantern — Investor Pitch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#0b1326; --container-lowest:#060e20; --container-low:#131b2e;
+    --container:#171f33; --container-high:#222a3d; --container-highest:#2d3449;
+    --primary:#ffe4af; --primary-container:#ffc107; --amber:#fabd00;
+    --secondary:#ffb77a; --secondary-container:#ff8f00;
+    --tertiary:#cdecff; --tertiary-container:#84d5ff;
+    --on-surface:#dae2fd; --on-variant:#d4c5ab; --outline:#9c8f78; --outline-variant:#4f4632;
+    --error:#ffb4ab; --error-container:#93000a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--container-lowest);color:var(--on-surface);font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  .mono{font-family:"Roboto Mono",ui-monospace,monospace}
+
+  .deck{display:flex;flex-direction:column;align-items:center;gap:28px;padding:40px 16px 80px}
+  .slide{
+    position:relative;width:100%;max-width:1100px;aspect-ratio:16/9;
+    background:radial-gradient(120% 120% at 100% 0%, #131b2e 0%, #0b1326 55%, #060e20 100%);
+    border:1px solid var(--outline-variant);border-radius:16px;overflow:hidden;
+    padding:56px 64px;display:flex;flex-direction:column;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);
+  }
+  .slide::after{content:"";position:absolute;inset:0;border-radius:16px;pointer-events:none;
+    box-shadow:inset 0 1px 0 rgba(218,226,253,.06)}
+  .tag{position:absolute;top:26px;right:30px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--outline)}
+  .kicker{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--amber);font-weight:600;margin-bottom:18px}
+  h1{font-size:62px;line-height:1.02;letter-spacing:-.02em;font-weight:800;color:#fff}
+  h2{font-size:40px;line-height:1.08;letter-spacing:-.015em;font-weight:700;color:#fff;margin-bottom:8px}
+  h3{font-size:19px;font-weight:600;color:#fff}
+  p{font-size:17px;line-height:1.55;color:var(--on-surface)}
+  .muted{color:var(--on-variant)}
+  .amber{color:var(--amber)}
+  .pageno{position:absolute;bottom:22px;right:30px;font-size:11px;color:var(--outline)}
+  .footmark{position:absolute;bottom:22px;left:34px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--outline);display:flex;gap:8px;align-items:center}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--amber);box-shadow:0 0 10px 2px rgba(250,189,0,.7)}
+
+  /* Lantern orb */
+  .orb{border-radius:50%;background:radial-gradient(circle at 50% 42%, #fff3d2 0%, var(--primary-container) 34%, var(--amber) 60%, #b07d00 100%);
+       box-shadow:0 0 50px 8px rgba(250,189,0,.45), 0 0 120px 30px rgba(255,143,0,.18)}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px;flex:1;align-content:center}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .card{background:linear-gradient(180deg,var(--container) 0%, var(--container-low) 100%);
+        border:1px solid var(--outline-variant);border-radius:14px;padding:22px}
+  .card h3{margin-bottom:6px}
+  .card p{font-size:14.5px;color:var(--on-variant)}
+  .icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:12px;
+        background:rgba(250,189,0,.12);border:1px solid rgba(250,189,0,.3)}
+
+  .pill{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;border:1px solid}
+  .pill.warn{color:var(--secondary);border-color:rgba(255,143,0,.4);background:rgba(255,143,0,.1)}
+  .pill.bad{color:var(--error);border-color:rgba(255,80,80,.4);background:rgba(147,0,10,.25)}
+  .pill.ok{color:#a6e3b8;border-color:rgba(120,220,150,.35);background:rgba(40,120,70,.18)}
+  .pill.info{color:var(--tertiary);border-color:rgba(132,213,255,.35);background:rgba(132,213,255,.08)}
+
+  ul.clean{list-style:none;display:flex;flex-direction:column;gap:14px}
+  ul.clean li{display:flex;gap:12px;font-size:17px;line-height:1.45}
+  ul.clean li::before{content:"";flex:0 0 9px;height:9px;margin-top:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px 1px rgba(250,189,0,.6)}
+
+  .stat{display:flex;flex-direction:column;gap:2px}
+  .stat .big{font-size:44px;font-weight:800;color:#fff;letter-spacing:-.02em}
+  .stat .lbl{font-size:13px;color:var(--on-variant)}
+
+  /* Phone mock */
+  .phone{width:300px;border-radius:26px;border:1px solid var(--outline-variant);background:var(--bg);
+         padding:16px;box-shadow:0 24px 60px rgba(0,0,0,.55)}
+  .phone .bar{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--on-variant);margin-bottom:12px}
+  .scanrow{display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border-radius:11px;background:var(--container);border:1px solid var(--outline-variant);margin-bottom:9px}
+  .scanrow .si{font-size:18px;line-height:1}
+  .scanrow b{color:#fff;font-size:13.5px;font-weight:600}
+  .scanrow small{display:block;color:var(--on-variant);font-size:12px;margin-top:2px;line-height:1.4}
+  .verdict{display:flex;align-items:center;gap:10px;padding:12px;border-radius:11px;margin-bottom:12px;
+           background:rgba(255,143,0,.1);border:1px solid rgba(255,143,0,.4)}
+  .verdict .ring{width:34px;height:34px;border-radius:50%;border:3px solid var(--secondary);display:flex;align-items:center;justify-content:center;font-size:16px}
+
+  .btnrow{display:flex;gap:9px;margin-top:4px}
+  .btn{flex:1;text-align:center;font-size:13px;font-weight:600;padding:11px;border-radius:10px}
+  .btn.primary{background:var(--primary-container);color:#3f2e00;box-shadow:0 4px 14px rgba(255,193,7,.3)}
+  .btn.ghost{border:1px solid var(--outline);color:var(--on-variant)}
+
+  /* mini-app grid */
+  .apps{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+  .app{background:var(--container);border:1px solid var(--outline-variant);border-radius:13px;padding:13px;text-align:center}
+  .app .logo{width:42px;height:42px;border-radius:12px;margin:0 auto 9px;display:flex;align-items:center;justify-content:center;font-size:20px;
+             background:linear-gradient(135deg,#222a3d,#131b2e);border:1px solid var(--outline-variant)}
+  .app b{font-size:12.5px;color:#fff;display:block}
+  .app .badge{font-size:10px;color:#a6e3b8;margin-top:3px}
+
+  .flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .node{font-size:12.5px;font-weight:600;padding:9px 13px;border-radius:10px;background:var(--container-high);border:1px solid var(--outline-variant);color:#fff}
+  .node.scan{background:rgba(250,189,0,.13);border-color:rgba(250,189,0,.45);color:var(--primary)}
+  .arrow{color:var(--outline);font-size:16px}
+
+  .lead{font-size:20px;line-height:1.5;color:var(--on-surface);max-width:760px}
+  .ask-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:30px;flex:1;align-items:center}
+  .useblock{display:flex;flex-direction:column;gap:12px}
+  .useblock .row{display:flex;justify-content:space-between;font-size:15px;padding:11px 0;border-bottom:1px solid var(--outline-variant)}
+  .useblock .row b{color:#fff;font-weight:600}
+  .contact{display:inline-flex;align-items:center;gap:10px;margin-top:8px;font-size:16px;color:var(--primary);font-weight:600}
+
+  .founder{display:flex;gap:26px;align-items:center;flex:1}
+  .avatar{width:130px;height:130px;border-radius:50%;flex:0 0 130px;
+          background:radial-gradient(circle at 50% 40%,#fff3d2,#fabd00 55%,#8a6200);
+          display:flex;align-items:center;justify-content:center;font-size:46px;font-weight:800;color:#3f2e00;
+          box-shadow:0 0 40px 4px rgba(250,189,0,.35)}
+  .creds{display:flex;flex-direction:column;gap:11px}
+  .creds li{display:flex;gap:11px;font-size:16.5px;line-height:1.4}
+  .creds li::before{content:"";flex:0 0 9px;height:9px;margin-top:7px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px rgba(250,189,0,.6)}
+
+  @media print{
+    body{background:#fff}
+    .deck{gap:0;padding:0}
+    .slide{max-width:none;width:100%;height:100vh;aspect-ratio:auto;border-radius:0;border:none;page-break-after:always;box-shadow:none}
+  }
+</style>
+</head>
+<body>
+<div class="deck">
+
+  <!-- 1 · COVER -->
+  <section class="slide" style="justify-content:center;align-items:flex-start">
+    <span class="tag">Investor Deck · 2026</span>
+    <div style="display:flex;align-items:center;gap:26px;margin-bottom:30px">
+      <div class="orb" style="width:96px;height:96px"></div>
+      <div>
+        <h1>Lantern</h1>
+        <p class="amber" style="font-size:22px;font-weight:600;margin-top:8px">See what you sign.</p>
+      </div>
+    </div>
+    <p class="lead muted">A non-custodial Stellar wallet with an <span class="amber">AI safety net</span> between you and every signature — turning opaque transactions into plain-language decisions.</p>
+    <div class="footmark"><span class="dot"></span> Lantern · Stellar Wallet</div>
+    <span class="pageno">01</span>
+  </section>
+
+  <!-- 2 · PROBLEM -->
+  <section class="slide">
+    <span class="tag">Lantern</span>
+    <div class="kicker">The Problem</div>
+    <h2>Self-custody asks users to sign things they can't read.</h2>
+    <div class="grid3" style="margin-top:30px;flex:1;align-content:center">
+      <div class="card">
+        <div class="icon">🔒</div>
+        <h3>Opaque signatures</h3>
+        <p>Wallets show raw XDR. Users approve trustline changes, signer removals, account merges & Soroban calls without knowing the impact.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🎣</div>
+        <h3>Scams thrive on confusion</h3>
+        <p>Phishing dApps, look-alike asset codes, unlimited token allowances and drained reserves — all hidden behind "Approve".</p>
+      </div>
+      <div class="card">
+        <div class="icon">⚖️</div>
+        <h3>No good option</h3>
+        <p>Custodial = give up your keys. Non-custodial = fly blind. Nobody keeps keys on-device <em>and</em> explains the risk.</p>
+      </div>
+    </div>
+    <div class="footmark"><span class="dot"></span> Lantern</div>
+    <span class="pageno">02</span>
+  </section>
+
+  <!-- 3 · SOLUTION -->
+  <section class="slide">
+    <span class="tag">Lantern</span>
+    <div class="kicker">The Solution</div>
+    <h2>A wallet that explains every signature — before you make it.</h2>
+    <div class="grid2" style="margin-top:18px">
+      <ul class="clean">
+        <li><span><b style="color:#fff">Non-custodial by design.</b> <span class="muted">Keys never leave the device — AES-GCM vault, PBKDF2 ≥ 600k, decrypted key lives only in worker memory.</span></span></li>
+        <li><span><b style="color:#fff">AI security scans.</b> <span class="muted">Decode any transaction, summarize intent in plain English, flag irreversible & high-risk actions before signing.</span></span></li>
+        <li><span><b style="color:#fff">In-wallet mini-app browser.</b> <span class="muted">Run Stellar dApps in a sandboxed, permissioned container — every request routed through the scanner.</span></span></li>
+      </ul>
+      <div class="card" style="display:flex;flex-direction:column;justify-content:center;gap:14px;background:radial-gradient(120% 120% at 0 0,#1a2236,#0b1326)">
+        <div class="orb" style="width:54px;height:54px"></div>
+        <h3 style="font-size:22px">"A second pair of eyes at signing time."</h3>
+        <p class="muted">Lantern doesn't take custody and never blocks you — it makes sure you understand what you're authorizing.</p>
+      </div>
+    </div>
+    <div class="footmark"><span class="dot"></span> Lantern</div>
+    <span class="pageno">03</span>
+  </section>
+
+  <!-- 4 · AI SCANNER (visual) -->
+  <section class="slide">
+    <span class="tag">Lantern</span>
+    <div class="kicker">Product · Spotlight</div>
+    <h2>AI Security Scanner</h2>
+    <p class="muted" style="margin-bottom:14px">Opaque XDR in → an informed decision out.</p>
+    <div style="display:flex;gap:40px;flex:1;align-items:center">
+      <div class="phone">
+        <div class="bar"><span>Lantern · Review</span><span class="pill bad" style="font-size:10px;padding:3px 8px">TESTNET</span></div>
+        <div class="verdict">
+          <div class="ring">!</div>
+          <div><b style="color:#fff;font-size:14px">High-impact transaction</b><small class="muted" style="font-size:11.5px">3 operations · 2 warnings</small></div>
+        </div>
+        <div class="scanrow"><span class="si">💸</span><div><b>Payment · 1,500 XLM</b><small>To GDRP…X7QF — destination never seen before.</small></div></div>
+        <div class="scanrow"><span class="si">🔑</span><div><b>Remove signer</b><small>⚠ Irreversible. Lowers account control.</small></div></div>
+        <div class="scanrow"><span class="si">♾️</span><div><b>Unlimited token allowance</b><small>⚠ Contract can move this asset without limit.</small></div></div>
+        <div class="btnrow"><div class="btn ghost">Reject</div><div class="btn primary">Approve</div></div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:14px">
+        <div class="card"><h3>🧠 Transaction intent analysis</h3><p>Decodes payments, trustlines, offers, merges & <span class="mono">setOptions</span> into human terms.</p></div>
+        <div class="card"><h3>📜 Soroban contract scanning</h3><p>Inspects called contracts, args & auth entries — flags unlimited allowances and unknown authorizers.</p></div>
+        <div style="display:flex;gap:11px">
+          <div class="card" style="flex:1"><h3 style="font-size:16px">🛡️ Address reputation</h3><p>Scam lists & homoglyph detection.</p></div>
+          <div class="card" style="flex:1"><h3 style="font-size:16px">🌐 Origin checks</h3><p>Catches spoofed dApp prompts.</p></div>
+        </div>
+        <div style="display:flex;gap:9px;flex-wrap:wrap">
+          <span class="pill ok">On-device first</span>
+          <span class="pill info">Opt-in cloud AI</span>
+          <span class="pill warn">Never sees secret keys</span>
+        </div>
+      </div>
+    </div>
+    <div class="footmark"><span class="dot"></span> Lantern</div>
+    <span class="pageno">04</span>
+  </section>
+
+  <!-- 5 · MINI-APP BROWSER (visual) -->
+  <section class="slide">
+    <span class="tag">Lantern</span>
+    <div class="kicker">Product · Spotlight</div>
+    <h2>Mini-App Browser for Stellar dApps</h2>
+    <p class="muted" style="margin-bottom:14px">A trusted, permissioned home for the Stellar ecosystem — your identity & signing context travel with you.</p>
+    <div style="display:flex;gap:38px;flex:1;align-items:center">
+      <div class="phone">
+        <div class="bar"><span>Discover</span><span class="pill info" style="font-size:10px;padding:3px 8px">Verified ✓</span></div>
+        <div class="apps">
+          <div class="app"><div class="logo">🪙</div><b>StellarX</b><span class="badge">✓ Verified</span></div>
+          <div class="app"><div class="logo">🌊</div><b>Aquarius</b><span class="badge">✓ Verified</span></div>
+          <div class="app"><div class="logo">🏦</div><b>Anchor</b><span class="badge">✓ Verified</span></div>
+          <div class="app"><div class="logo">🖼️</div><b>Litemint</b><span class="badge">✓ Verified</span></div>
+          <div class="app"><div class="logo">💱</div><b>Soroswap</b><span class="badge">✓ Verified</span></div>
+          <div class="app"><div class="logo">➕</div><b>Browse</b><span class="badge" style="color:var(--on-variant)">Directory</span></div>
+        </div>
+        <div style="margin-top:11px;background:var(--container);border:1px solid var(--outline-variant);border-radius:11px;padding:11px">
+          <small class="muted" style="font-size:11px;letter-spacing:.08em">PERMISSIONS · SOROSWAP</small>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px">
+            <span class="pill info" style="font-size:10.5px;padding:3px 8px">Mainnet</span>
+            <span class="pill ok" style="font-size:10.5px;padding:3px 8px">1 account</span>
+            <span class="pill warn" style="font-size:10.5px;padding:3px 8px">≤ 250 XLM</span>
+          </div>
+        </div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:14px">
+        <div class="card"><h3>📦 Sandboxed runtime</h3><p>dApps load in an isolated frame with zero access to the vault — all chain calls go through a brokered, capability-scoped API.</p></div>
+        <div class="card"><h3>🎛️ Per-app permissions</h3><p>Scoped & revocable: which network, which accounts, spend limits & allowed operations — reviewable in one place.</p></div>
+        <div class="card" style="background:radial-gradient(120% 120% at 100% 0,#1a2236,#0b1326)">
+          <h3 style="margin-bottom:12px">🔗 Every request runs through the scanner</h3>
+          <div class="flow">
+            <span class="node">dApp</span><span class="arrow">→</span>
+            <span class="node">Broker</span><span class="arrow">→</span>
+            <span class="node scan">AI Scan</span><span class="arrow">→</span>
+            <span class="node">Sign</span>
+          </div>
+          <p class="muted" style="margin-top:10px;font-size:13px">Aligned with SEP-0043 / Wallet Standard & Soroban RPC — existing dApps integrate with minimal changes.</p>
+        </div>
+      </div>
+    </div>
+    <div class="footmark"><span class="dot"></span> Lantern</div>
+    <span class="pageno">05</span>
+  </section>
+
+  <!-- 6 · WHY NOW / MARKET -->
+  <section class="slide">
+    <span class="tag">Lantern</span>
+    <div class="kicker">Why Now</div>
+    <h2>Stellar is scaling into smart contracts — and risk is scaling with it.</h2>
+    <div class="grid3" style="margin-top:26px">
+      <div class="card"><div class="stat"><span class="big amber">Soroban</span><span class="lbl">Smart contracts live on mainnet — far more ways for users to sign something they don't understand.</span></div></div>
+      <div class="card"><div class="stat"><span class="big amber">$Bns</span><span class="lbl">Lost annually to wallet phishing & malicious approvals across crypto — the #1 attack surface is the signature.</span></div></div>
+      <div class="card"><div class="stat"><span class="big amber">SEP-0043</span><span class="lbl">Emerging wallet standards make a safety-first, interoperable wallet the natural integration point for dApps.</span></div></div>
+    </div>
+    <p class="lead muted" style="margin-top:28px">Wallets compete on UX today. The next wave competes on <span class="amber">trust</span>. Lantern is built for it from day one.</p>
+    <div class="footmark"><span class="dot"></span> Lantern</div>
+    <span class="pageno">06</span>
+  </section>
+
+  <!-- 7 · TRACTION / MODEL -->
+  <section class="slide">
+    <span class="tag">Lantern</span>
+    <div class="kicker">Where We Are · How We Win</div>
+    <h2>A shipping wallet today, a trust layer tomorrow.</h2>
+    <div class="grid2" style="margin-top:14px">
+      <div>
+        <h3 style="margin-bottom:14px;font-size:16px;letter-spacing:.06em;text-transform:uppercase;color:var(--amber)">Built &amp; working</h3>
+        <ul class="clean">
+          <li><span class="muted">MV3 Chrome extension — create/import, send, balances, history</span></li>
+          <li><span class="muted">Encrypted on-device vault, SEP-0005 HD wallet, Testnet/Mainnet</span></li>
+          <li><span class="muted">Scan engine + messaging architecture scaffolded for AI review</span></li>
+        </ul>
+      </div>
+      <div>
+        <h3 style="margin-bottom:14px;font-size:16px;letter-spacing:.06em;text-transform:uppercase;color:var(--amber)">Business model</h3>
+        <ul class="clean">
+          <li><span class="muted"><b style="color:#fff">Free wallet</b> — grow the trusted install base.</span></li>
+          <li><span class="muted"><b style="color:#fff">Premium scans</b> — advanced cloud AI analysis for power users & teams.</span></li>
+          <li><span class="muted"><b style="color:#fff">Ecosystem</b> — verified dApp directory listings & B2B safety API for anchors/dApps.</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footmark"><span class="dot"></span> Lantern</div>
+    <span class="pageno">07</span>
+  </section>
+
+  <!-- 8 · TEAM -->
+  <section class="slide">
+    <span class="tag">Lantern</span>
+    <div class="kicker">Team</div>
+    <h2>Founder</h2>
+    <div class="founder">
+      <div class="avatar">MN</div>
+      <div>
+        <h3 style="font-size:28px;margin-bottom:4px">Mark Hugh Neri</h3>
+        <p class="amber" style="font-weight:600;margin-bottom:18px">Founder</p>
+        <ul class="creds">
+          <li><span><b style="color:#fff">15+ years</b> in software development — <span class="muted">specialized in Blockchain &amp; AI</span></span></li>
+          <li><span><b style="color:#fff">CTO / Co-founder, The Blocklabs Inc</b> — <span class="muted">pioneering blockchain education in the Philippines since 2017</span></span></li>
+          <li><span><b style="color:#fff">Multiple global &amp; local hackathon winner</b></span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footmark"><span class="dot"></span> Lantern</div>
+    <span class="pageno">08</span>
+  </section>
+
+  <!-- 9 · THE ASK -->
+  <section class="slide" style="background:radial-gradient(120% 120% at 0 100%, #1a2236 0%, #0b1326 55%, #060e20 100%)">
+    <span class="tag">Lantern</span>
+    <div class="kicker">The Ask</div>
+    <h2>Raising a pre-seed / angel round.</h2>
+    <div class="ask-grid">
+      <div class="useblock">
+        <p class="muted" style="margin-bottom:6px">Funding the path from working wallet to live AI safety layer &amp; mini-app browser. Use of funds:</p>
+        <div class="row"><span>🧠 Ship the AI security scanner</span><b>40%</b></div>
+        <div class="row"><span>📦 Mini-app browser &amp; dApp directory</span><b>30%</b></div>
+        <div class="row"><span>🔍 Security audits &amp; mainnet hardening</span><b>20%</b></div>
+        <div class="row"><span>📣 Growth &amp; ecosystem partnerships</span><b>10%</b></div>
+      </div>
+      <div class="card" style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:14px;background:radial-gradient(120% 120% at 50% 0,#1a2236,#0b1326)">
+        <div class="orb" style="width:64px;height:64px"></div>
+        <h3 style="font-size:24px">Light up Stellar safely.</h3>
+        <p class="muted" style="font-size:14px">Join us in building the trust layer for self-custody.</p>
+        <a class="contact" href="mailto:hello@artisam.xyz">✉️ hello@artisam.xyz</a>
+      </div>
+    </div>
+    <div class="footmark"><span class="dot"></span> Lantern · See what you sign.</div>
+    <span class="pageno">09</span>
+  </section>
+
+</div>
+</body>
+</html>
