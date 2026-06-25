@@ -10,6 +10,7 @@ import { Unlock } from './screens/Unlock';
 import { Assets } from './screens/Assets';
 import { Activity } from './screens/Activity';
 import { Send } from './screens/Send';
+import { MiniApps } from './screens/MiniApps';
 import { Scan } from './screens/Scan';
 
 function Splash() {
@@ -70,6 +71,7 @@ export function App() {
             <Assets address={address} network={network} onSend={() => setTab('send')} />
           )}
           {tab === 'activity' && <Activity address={address} network={network} />}
+          {tab === 'apps' && <MiniApps address={address} network={network} />}
           {tab === 'send' && (
             <Send address={address} network={network} onDone={() => setTab('activity')} />
           )}
