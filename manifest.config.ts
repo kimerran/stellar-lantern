@@ -34,6 +34,10 @@ export default defineManifest({
     'https://friendbot.stellar.org/*',
   ],
   content_security_policy: {
-    extension_pages: "script-src 'self'; object-src 'self';",
+    // frame-src 'self' allows the bundled mini-apps (Apps tab); `https:` is a
+    // DEMO-ONLY concession so the in-app browser's URL bar can embed remote
+    // dApps. The real build should drop `https:` and broker dApps through a
+    // vetted directory instead of allowing arbitrary framing.
+    extension_pages: "script-src 'self'; object-src 'self'; frame-src 'self' https:;",
   },
 });

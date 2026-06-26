@@ -36,7 +36,11 @@ export function Scan({ onBack }: { onBack: () => void }) {
   return (
     <div className="flex h-full flex-col bg-background">
       <header className="flex h-14 shrink-0 items-center gap-2 bg-surface-container-low px-4">
-        <button onClick={onBack} className="text-on-surface-variant hover:text-on-surface active:scale-95">
+        <button
+          onClick={onBack}
+          aria-label="Back"
+          className="-ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-variant hover:text-on-surface active:scale-95"
+        >
           <Icon name="arrow_back" size={22} />
         </button>
         <span className="text-title-md text-on-surface">Security</span>

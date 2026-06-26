@@ -10,6 +10,8 @@ interface AppBarProps {
   onLock: () => void;
   onCopyAddress: () => void;
   onOpenScan: () => void;
+  /** When provided (popup mode), shows an "open in full tab" button. */
+  onExpand?: () => void;
 }
 
 // Top app bar (BRAND §4.3): avatar, truncated mono address, network/status icon.
@@ -20,47 +22,53 @@ export function AppBar({
   onLock,
   onCopyAddress,
   onOpenScan,
+  onExpand,
 }: AppBarProps) {
+  const actions = [
+    ...(onExpand
+      ? [{ onClick: onExpand, icon: 'open_in_full', label: 'Open in full tab', hover: 'hover:text-on-surface' }]
+      : []),
+    { onClick: onOpenScan, icon: 'security', label: 'Security & scam check', hover: 'hover:text-primary-container' },
+    { onClick: onLock, icon: 'lock', label: 'Lock wallet', hover: 'hover:text-on-surface' },
+  ];
+
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 bg-surface-container-low px-4">
-      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-container/20">
+    <header className="flex h-14 shrink-0 items-center gap-2 bg-surface-container-low px-2">
+      <div className="ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-container/20">
         <Icon name="lightbulb" filled className="text-primary-container" size={20} />
       </div>
 
       <button
         onClick={onCopyAddress}
-        className="flex items-center gap-1.5 text-on-surface transition-colors hover:text-primary"
+        className="flex min-w-0 min-h-[44px] shrink items-center gap-1.5 rounded-lg px-2 text-on-surface transition-colors hover:bg-surface-variant active:scale-95"
+        aria-label={`Copy address ${truncateAddress(address, 4, 4)}`}
         title="Copy address"
       >
-        <span className="font-mono text-label-md">{truncateAddress(address, 4, 4)}</span>
-        <Icon name="content_copy" size={16} className="text-on-surface-variant" />
+        <span className="truncate font-mono text-label-md">{truncateAddress(address, 4, 4)}</span>
+        <Icon name="content_copy" size={16} className="shrink-0 text-on-surface-variant" />
       </button>
 
-      <div className="ml-auto flex items-center gap-2">
-        <button onClick={onToggleNetwork} title="Switch network" className="active:scale-95">
-          <NetworkBadge network={network} />
-        </button>
+      <div className="ml-auto flex shrink-0 items-center gap-0.5">
+        {/* The network badge is itself the toggle (was duplicated with a sensors icon). */}
         <button
           onClick={onToggleNetwork}
+          aria-label={`Network: ${network}. Switch network`}
           title="Switch network"
-          className="text-on-surface-variant transition-colors hover:text-on-surface active:scale-95"
+          className="flex min-h-[44px] items-center rounded-lg px-1.5 transition-colors hover:bg-surface-variant active:scale-95"
         >
-          <Icon name="sensors" size={22} />
+          <NetworkBadge network={network} />
         </button>
-        <button
-          onClick={onOpenScan}
-          title="Security & scam check"
-          className="text-on-surface-variant transition-colors hover:text-primary-container active:scale-95"
-        >
-          <Icon name="security" size={20} />
-        </button>
-        <button
-          onClick={onLock}
-          title="Lock wallet"
-          className="text-on-surface-variant transition-colors hover:text-on-surface active:scale-95"
-        >
-          <Icon name="lock" size={20} />
-        </button>
+        {actions.map(({ onClick, icon, label, hover }) => (
+          <button
+            key={icon}
+            onClick={onClick}
+            aria-label={label}
+            title={label}
+            className={`flex h-11 w-11 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-variant active:scale-95 ${hover}`}
+          >
+            <Icon name={icon} size={20} />
+          </button>
+        ))}
       </div>
     </header>
   );

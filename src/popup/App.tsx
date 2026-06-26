@@ -10,8 +10,8 @@ import { Unlock } from './screens/Unlock';
 import { Assets } from './screens/Assets';
 import { Activity } from './screens/Activity';
 import { Send } from './screens/Send';
-import { MiniApps } from './screens/MiniApps';
 import { Scan } from './screens/Scan';
+import { Apps } from './screens/Apps';
 
 function Splash() {
   return (
@@ -47,6 +47,18 @@ export function App() {
     void navigator.clipboard.writeText(address);
   };
 
+  // Already in a full tab? Then don't offer "expand" again.
+  const isExpanded = new URLSearchParams(window.location.search).has('expanded');
+  const openExpanded = () => {
+    const url = chrome.runtime.getURL('index.html?expanded=1');
+    if (chrome.tabs?.create) {
+      void chrome.tabs.create({ url });
+      window.close(); // close the popup once the tab opens
+    } else {
+      window.open(url, '_blank', 'noopener');
+    }
+  };
+
   // Full-screen Security overlay (paste-to-check + warning previews).
   if (scanOpen) {
     return <Scan onBack={() => setScanOpen(false)} />;
@@ -61,6 +73,7 @@ export function App() {
         onLock={lock}
         onCopyAddress={copyAddress}
         onOpenScan={() => setScanOpen(true)}
+        onExpand={isExpanded ? undefined : openExpanded}
       />
 
       <main className="no-scrollbar relative flex-1 overflow-y-auto">
@@ -71,10 +84,10 @@ export function App() {
             <Assets address={address} network={network} onSend={() => setTab('send')} />
           )}
           {tab === 'activity' && <Activity address={address} network={network} />}
-          {tab === 'apps' && <MiniApps address={address} network={network} />}
           {tab === 'send' && (
             <Send address={address} network={network} onDone={() => setTab('activity')} />
           )}
+          {tab === 'apps' && <Apps address={address} />}
         </div>
       </main>
 
