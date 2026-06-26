@@ -11,7 +11,8 @@
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "test": "vitest run",
     "test:watch": "vitest",
-    "icons": "node scripts/gen-icons.mjs"
+    "icons": "node scripts/gen-icons.mjs",
+    "package": "npm run build && node scripts/package.mjs"
   },
   "dependencies": {
     "@noble/hashes": "1.8.0",

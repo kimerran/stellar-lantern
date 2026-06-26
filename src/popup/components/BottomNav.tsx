@@ -1,12 +1,12 @@
 import { Icon } from './Icon';
 
-export type Tab = 'assets' | 'activity' | 'apps' | 'send';
+export type Tab = 'assets' | 'activity' | 'send' | 'apps';
 
 const ITEMS: { tab: Tab; label: string; icon: string }[] = [
   { tab: 'assets', label: 'Assets', icon: 'account_balance_wallet' },
   { tab: 'activity', label: 'Activity', icon: 'history' },
-  { tab: 'apps', label: 'Apps', icon: 'apps' },
   { tab: 'send', label: 'Send', icon: 'send' },
+  { tab: 'apps', label: 'Apps', icon: 'grid_view' },
 ];
 
 // Bottom nav (BRAND §4.3 / §6.6). Active item = amber pill with glow + filled icon.

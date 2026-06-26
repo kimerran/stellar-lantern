@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lumen Notes</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        background: #181511; color: #f4ede2; padding: 16px;
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; font-size: 14px;
+      }
+      .top { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+      .logo {
+        width: 32px; height: 32px; border-radius: 10px; background: #2c251d;
+        display: grid; place-items: center; font-size: 17px;
+      }
+      .title { font-weight: 600; font-size: 15px; }
+      .pill {
+        margin-left: auto; font-size: 11px; color: #b6a892; background: #2c251d;
+        border: 1px solid #3a3127; padding: 4px 8px; border-radius: 999px;
+        max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      textarea {
+        width: 100%; min-height: 180px; resize: none; border-radius: 14px;
+        border: 1px solid #3a3127; background: #221d17; color: #f4ede2;
+        padding: 12px; font-size: 14px; font-family: inherit; line-height: 1.5;
+      }
+      textarea:focus { outline: none; border-color: #ffc24b; }
+      button {
+        width: 100%; margin-top: 12px; border: 0; border-radius: 12px; padding: 13px;
+        background: #ffc24b; color: #2a1d00; font-weight: 700; font-size: 15px; cursor: pointer;
+      }
+      .saved { color: #7ad19b; font-size: 13px; text-align: center; margin-top: 10px; min-height: 18px; }
+      .foot { color: #b6a892; font-size: 11px; text-align: center; margin-top: 14px; }
+    </style>
+  </head>
+  <body>
+    <div class="top">
+      <div class="logo">📝</div>
+      <div class="title">Lumen Notes</div>
+      <div class="pill" id="conn">Not connected</div>
+    </div>
+    <textarea id="note" placeholder="Jot something down…"></textarea>
+    <button id="saveBtn">Save note</button>
+    <p class="saved" id="saved"></p>
+    <p class="foot">Demo stub mini-app · running inside Lantern</p>
+    <script src="./app.js"></script>
+  </body>
+</html>

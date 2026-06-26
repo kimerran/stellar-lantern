@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { sendMessage } from '@shared/messages';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
-import { Icon } from '../components/Icon';
 
 export function Unlock({ onUnlocked, onReset }: { onUnlocked: () => void; onReset: () => void }) {
   const [password, setPassword] = useState('');
@@ -27,8 +26,9 @@ export function Unlock({ onUnlocked, onReset }: { onUnlocked: () => void; onRese
   return (
     <div className="grid-bg flex h-full flex-col bg-background px-5 py-6">
       <div className="flex flex-1 flex-col items-center justify-center text-center">
-        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary-container/15">
-          <Icon name="lightbulb" filled size={44} className="animate-subtle-glow text-primary-container" />
+        <div className="mb-6 h-24 w-24 overflow-hidden rounded-[26px] shadow-[0_0_28px_rgba(255,193,7,0.18)]">
+          {/* Scaled slightly to crop the logo's white margin onto the navy field. */}
+          <img src="logo.jpg" alt="Lantern" className="h-full w-full scale-[1.12] object-cover" />
         </div>
         <h1 className="text-title-md text-on-surface">Welcome back</h1>
         <p className="mt-1 text-label-md text-on-surface-variant">Enter your password to unlock.</p>

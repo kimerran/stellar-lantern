@@ -59,14 +59,18 @@ export function Assets({ address, network, onSend }: Props) {
   return (
     <div className="space-y-4 pt-2">
       {/* Available balance block */}
-      <section className="rounded-2xl bg-surface-container p-5 text-center shadow-layer-1">
+      <section className="rounded-2xl bg-surface-container px-4 py-5 text-center shadow-layer-1">
         <p className="text-label-sm uppercase tracking-wide text-on-surface-variant">Available Balance</p>
         {loading ? (
           <Shimmer className="mx-auto mt-3 h-12 w-40" />
         ) : (
-          <p className="mt-2 text-display-lg text-primary glow-amber-text">
+          <p
+            className={`mt-2 flex items-baseline justify-center gap-1.5 whitespace-nowrap font-bold tracking-tight text-primary glow-amber-text ${balanceSizeClass(
+              native ? formatAmount(native.balance) : '0',
+            )}`}
+          >
             {native ? formatAmount(native.balance) : '0'}
-            <span className="ml-2 align-baseline text-title-md text-on-surface-variant">XLM</span>
+            <span className="text-title-md font-semibold text-on-surface-variant">XLM</span>
           </p>
         )}
         <div className="mt-4 flex justify-center gap-2">
@@ -79,7 +83,11 @@ export function Assets({ address, network, onSend }: Props) {
         </div>
       </section>
 
-      {error && <p className="text-center text-label-md text-error">{error}</p>}
+      {error && (
+        <p role="alert" className="text-center text-label-md text-error">
+          {error}
+        </p>
+      )}
 
       {/* Unfunded account states (SPEC §5) */}
       {!loading && state && !state.funded && (
@@ -130,6 +138,16 @@ export function Assets({ address, network, onSend }: Props) {
       )}
     </div>
   );
+}
+
+// Shrink the hero balance by length so long values (e.g. 9,998.99999 XLM) stay
+// on one line within the popup width instead of overflowing.
+function balanceSizeClass(formatted: string): string {
+  const n = formatted.length;
+  if (n <= 8) return 'text-[48px] leading-[54px]';
+  if (n <= 11) return 'text-[38px] leading-[44px]';
+  if (n <= 14) return 'text-[30px] leading-[36px]';
+  return 'text-[24px] leading-[30px]';
 }
 
 function AssetRow({ code, balance, subtitle }: { code: string; balance: string; subtitle: string }) {
