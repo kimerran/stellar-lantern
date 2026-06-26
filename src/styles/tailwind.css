@@ -25,6 +25,42 @@
     height: 600px;
   }
 
+  /* Expanded mode (opened in a full browser tab via ?expanded): present the same
+     360-wide wallet as a centered card on a dark backdrop. */
+  html.expanded,
+  html.expanded body {
+    width: 100%;
+    height: auto;
+    min-height: 100vh;
+  }
+  html.expanded body {
+    overflow: auto;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background-color: theme('colors.surface-container-lowest');
+  }
+  html.expanded #root {
+    width: 400px;
+    height: 760px;
+    max-height: calc(100vh - 48px);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+    /* A transform makes #root the containing block for the app's fixed overlays
+       (Apps browser, Security), so they stay inside the card, not the whole tab. */
+    transform: translateZ(0);
+  }
+
+  /* Visible keyboard focus for every interactive element (a11y: focus-states).
+     :where() keeps specificity at 0 so components can still opt out; only shows
+     for keyboard nav, not mouse/touch. Inputs keep their own amber focus glow. */
+  :where(button, a, select, textarea, [role='button'], [tabindex]):focus-visible {
+    outline: 2px solid theme('colors.primary.container');
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
   /* Material Symbols Outlined (BRAND §5). */
   .material-symbols-outlined {
     font-family: 'Material Symbols Outlined';
@@ -84,5 +120,18 @@
 
   .glow-amber-text {
     text-shadow: 0 0 10px rgba(255, 193, 7, 0.3);
+  }
+}
+
+/* Respect prefers-reduced-motion (a11y): near-instant transitions, no looping
+   glow/shimmer/spin for users who opt out of motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

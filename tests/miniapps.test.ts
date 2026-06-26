@@ -1,62 +1,63 @@
 import { describe, it, expect } from 'vitest';
-import { Networks } from '@stellar/stellar-sdk';
-import { MINI_APPS, getMiniApp } from '@core/miniapps/directory';
-import { buildTransferXdr } from '@core/stellar/tx';
-import { scan, DEMO_FLAGGED_ADDRESSES } from '@core/scan/engine';
+import {
+  MINI_APPS,
+  findMiniApp,
+  miniAppSrc,
+  normalizeUrl,
+  displayOrigin,
+} from '@core/miniapps/directory';
 
-// The mini-app browser is a demo mock, but its data and the broker→scan wiring
-// it depends on are exercised here so the demo can't silently regress.
 describe('mini-app directory', () => {
-  it('features blockhub.academy as a verified app', () => {
-    const app = getMiniApp('blockhub-academy');
-    expect(app).toBeDefined();
-    expect(app!.origin).toBe('https://blockhub.academy');
-    expect(app!.verified).toBe(true);
-    expect(app!.featured).toBe(true);
+  it('has unique ids and well-formed bundled paths', () => {
+    const ids = MINI_APPS.map((a) => a.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const app of MINI_APPS) {
+      expect(app.path).toMatch(/^miniapps\/[\w-]+\/index\.html$/);
+      expect(app.path).toContain(app.id);
+    }
   });
 
-  it('every directory entry has a launchable https origin', () => {
-    for (const app of MINI_APPS) {
-      expect(app.origin).toMatch(/^https:\/\//);
-      expect(app.permissions.networks.length).toBeGreaterThan(0);
-    }
+  it('looks up apps by id', () => {
+    expect(findMiniApp('stardust-faucet')?.name).toBe('Stardust Faucet');
+    expect(findMiniApp('does-not-exist')).toBeUndefined();
+  });
+
+  it('passes the wallet address to a bundled app as a url param', () => {
+    const app = MINI_APPS[0]!;
+    const src = miniAppSrc(app, 'GABC123');
+    expect(src).toBe(`${app.path}?addr=GABC123`);
+    expect(miniAppSrc(app)).toBe(app.path);
   });
 });
 
-describe('mini-app signature requests are scanned', () => {
-  const me = 'GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H';
-  const flagged = [...DEMO_FLAGGED_ADDRESSES][0]!;
-
-  function requestXdr(destination: string, amount: string) {
-    return buildTransferXdr({
-      sourceAccountId: me,
-      sourceSequence: '0',
-      networkPassphrase: Networks.TESTNET,
-      baseFee: '100',
-      destination,
-      destinationFunded: true,
-      asset: { isNative: true },
-      amount,
-    });
-  }
-
-  it('blocks a request that pays a reported address', () => {
-    const v = scan({
-      xdr: requestXdr(flagged, '4500'),
-      networkPassphrase: Networks.TESTNET,
-      context: { network: 'TESTNET', fromAddress: me, destinationFunded: true, origin: 'https://blockhub.academy' },
-    });
-    expect(v.risk).toBe('high');
-    expect(v.action).toBe('block_confirm');
-    expect(v.reasons.some((r) => r.code === 'reported_address')).toBe(true);
+describe('normalizeUrl', () => {
+  it('adds https:// when no scheme is given', () => {
+    expect(normalizeUrl('stellar.org')).toBe('https://stellar.org/');
   });
 
-  it('allows an ordinary request', () => {
-    const v = scan({
-      xdr: requestXdr(me, '25'),
-      networkPassphrase: Networks.TESTNET,
-      context: { network: 'TESTNET', fromAddress: me, destinationFunded: true, origin: 'https://blockhub.academy' },
-    });
-    expect(v.action).toBe('allow');
+  it('keeps an explicit https url', () => {
+    expect(normalizeUrl('https://example.com/path')).toBe('https://example.com/path');
+  });
+
+  it('trims surrounding whitespace', () => {
+    expect(normalizeUrl('  example.com  ')).toBe('https://example.com/');
+  });
+
+  it('rejects empty / junk / non-web schemes', () => {
+    expect(normalizeUrl('')).toBeNull();
+    expect(normalizeUrl('   ')).toBeNull();
+    expect(normalizeUrl('notaurl')).toBeNull(); // no dot in host
+    expect(normalizeUrl('javascript:alert(1)')).toBeNull();
+    expect(normalizeUrl('chrome://settings')).toBeNull();
+    expect(normalizeUrl('file:///etc/passwd')).toBeNull();
+  });
+});
+
+describe('displayOrigin', () => {
+  it('shows the host for a valid url', () => {
+    expect(displayOrigin('https://example.com/a/b?c=1')).toBe('example.com');
+  });
+  it('falls back to the raw string when unparseable', () => {
+    expect(displayOrigin('not a url')).toBe('not a url');
   });
 });

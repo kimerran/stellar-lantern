@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lantern — Securely light your path to the decentralized web</title>
+    <meta
+      name="description"
+      content="Lantern is a non-custodial Stellar wallet for Chrome with an AI security layer that screens every transaction before you sign. Beta."
+    />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,1,0&display=block"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!-- ───────── Navbar ───────── -->
+    <header class="nav">
+      <div class="wrap nav-inner">
+        <a class="brand" href="#top">
+          <img src="logo.jpg" alt="Lantern logo" />
+          Lantern
+        </a>
+        <nav class="nav-links" id="nav-links">
+          <a href="#features">Features</a>
+          <a href="#install">Install</a>
+          <a href="Lantern_Pitch_Deck.pdf" target="_blank" rel="noopener">Pitch Deck</a>
+          <a href="#contact">Contact</a>
+        </nav>
+        <a class="btn btn-primary" href="https://drive.google.com/drive/folders/1xNiN2ws0Uqfysv_fii0ZSfBd1116Woa4?usp=sharing" target="_blank" rel="noopener">
+          <span class="material-symbols-outlined">download</span> Download
+        </a>
+        <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu">
+          <span class="material-symbols-outlined">menu</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ───────── Hero ───────── -->
+    <main id="top">
+      <section class="hero">
+        <div class="wrap hero-grid">
+          <div>
+            <h1 class="display reveal-load d2">
+              Securely light your path to the <span class="amber-text">decentralized web</span>.
+            </h1>
+            <p class="lede reveal-load d3">
+              Lantern is a Stellar wallet with an AI security layer that screens every transaction
+              before you sign — so scams never make it past the glow.
+            </p>
+            <div class="hero-cta reveal-load d4">
+              <a class="btn btn-primary" href="https://drive.google.com/drive/folders/1xNiN2ws0Uqfysv_fii0ZSfBd1116Woa4?usp=sharing" target="_blank" rel="noopener">
+                <span class="material-symbols-outlined">download</span> Download the Chrome Extension
+              </a>
+              <a class="btn btn-ghost" href="#install">
+                <span class="material-symbols-outlined">menu_book</span> How to install
+              </a>
+            </div>
+            <p class="hero-note reveal-load d5">
+              <span class="material-symbols-outlined">science</span>
+              Public Beta — installs in under a minute via Developer Mode.
+            </p>
+          </div>
+
+          <!-- Hero visual — the wallet running in Chrome -->
+          <div class="hero-visual reveal-load d3">
+            <img src="wallet-phone.png" alt="The Lantern wallet running in Chrome, showing an XLM balance" />
+          </div>
+        </div>
+      </section>
+
+      <!-- ───────── Features ───────── -->
+      <section id="features">
+        <div class="wrap">
+          <div class="section-head reveal">
+            <span class="eyebrow">Why Lantern</span>
+            <h2>Your keys. Your coins. <span class="amber-text">An AI watching your back.</span></h2>
+            <p>Everything a Stellar wallet should do — plus a safety net between you and every signature.</p>
+          </div>
+
+          <div class="features">
+            <article class="feature reveal">
+              <div class="chip"><span class="material-symbols-outlined">key</span></div>
+              <h3>Non-custodial</h3>
+              <p>Your private keys are encrypted and never leave your device. No accounts, no middlemen.</p>
+            </article>
+            <article class="feature reveal">
+              <div class="chip"><span class="material-symbols-outlined">security</span></div>
+              <h3>AI scam shield</h3>
+              <p>Every transaction is screened before you sign, with clear risk warnings in plain language.</p>
+            </article>
+            <article class="feature reveal">
+              <div class="chip"><span class="material-symbols-outlined">content_paste_search</span></div>
+              <h3>Paste-to-check</h3>
+              <p>Drop in a suspicious message and Lantern flags scam patterns instantly, on-device.</p>
+            </article>
+            <article class="feature reveal">
+              <div class="chip"><span class="material-symbols-outlined">grid_view</span></div>
+              <h3>Mini-app browser</h3>
+              <p>Explore Stellar dApps inside a sandboxed frame — your keys stay out of reach.</p>
+            </article>
+            <article class="feature reveal">
+              <div class="chip"><span class="material-symbols-outlined">send</span></div>
+              <h3>Send in seconds</h3>
+              <p>Move XLM and assets with live fees, balances, and a clean review step every time.</p>
+            </article>
+            <article class="feature reveal">
+              <div class="chip"><span class="material-symbols-outlined">open_in_full</span></div>
+              <h3>Popup or full screen</h3>
+              <p>Use it as a quick popup, or expand the whole wallet into a full browser tab.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ───────── Showcase ───────── -->
+      <section>
+        <div class="wrap showcase-grid">
+          <div class="reveal">
+            <span class="eyebrow">The safety net</span>
+            <h2 style="font-size: clamp(1.8rem, 3.4vw, 2.6rem); margin: 14px 0 4px;">
+              See the risk <span class="amber-text">before</span> you sign.
+            </h2>
+            <ul>
+              <li><span class="material-symbols-outlined">verified_user</span> Reported-address &amp; drainer detection</li>
+              <li><span class="material-symbols-outlined">warning</span> Plain-language warnings, not raw hex</li>
+              <li><span class="material-symbols-outlined">block</span> High-risk transactions gated behind a confirm step</li>
+              <li><span class="material-symbols-outlined">lock</span> Advisory only — Lantern never signs or sends for you</li>
+            </ul>
+          </div>
+          <!-- Showcase visual — the lantern lighting the Stellar network -->
+          <div class="showcase-visual reveal">
+            <img src="lantern.jpg" alt="The Lantern lighting up a network of Stellar nodes" />
+          </div>
+        </div>
+      </section>
+
+      <!-- ───────── Install (Beta) ───────── -->
+      <section id="install" class="install">
+        <div class="wrap">
+          <div class="section-head reveal">
+            <span class="beta-tag"><span class="material-symbols-outlined" style="font-size:14px">science</span> Beta install</span>
+            <h2 style="margin-top:16px">Install the Beta in 5 steps</h2>
+            <p>Lantern isn't on the Chrome Web Store yet. You can load it directly in Developer Mode — it takes about a minute.</p>
+          </div>
+
+          <div class="steps">
+            <div class="step reveal">
+              <div class="num">1</div>
+              <div>
+                <h4>Download &amp; unzip</h4>
+                <p>Grab the extension package from our Drive and unzip it to a folder you'll remember.</p>
+              </div>
+            </div>
+            <div class="step reveal">
+              <div class="num">2</div>
+              <div>
+                <h4>Open Chrome extensions</h4>
+                <p>Go to <code>chrome://extensions</code> in your address bar.</p>
+              </div>
+            </div>
+            <div class="step reveal">
+              <div class="num">3</div>
+              <div>
+                <h4>Enable Developer Mode</h4>
+                <p>Flip the <strong>Developer mode</strong> switch in the top-right corner.</p>
+              </div>
+            </div>
+            <div class="step reveal">
+              <div class="num">4</div>
+              <div>
+                <h4>Load unpacked</h4>
+                <p>Click <strong>Load unpacked</strong> and select the unzipped <code>dist</code> folder.</p>
+              </div>
+            </div>
+            <div class="step reveal">
+              <div class="num">5</div>
+              <div>
+                <h4>Pin &amp; open</h4>
+                <p>Pin Lantern to your toolbar, click the lantern, and create or import a wallet.</p>
+              </div>
+            </div>
+            <div class="step reveal" style="border-color: rgba(255,193,7,0.3); background: rgba(255,193,7,0.05);">
+              <div class="num"><span class="material-symbols-outlined" style="font-size:18px">tips_and_updates</span></div>
+              <div>
+                <h4>Heads up</h4>
+                <p>As a Beta, start on <strong>Testnet</strong> and use the built-in Friendbot to fund a test account before mainnet.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="install-cta reveal">
+            <a class="btn btn-primary" href="https://drive.google.com/drive/folders/1xNiN2ws0Uqfysv_fii0ZSfBd1116Woa4?usp=sharing" target="_blank" rel="noopener">
+              <span class="material-symbols-outlined">download</span> Download the Chrome Extension
+            </a>
+            <span class="muted" style="font-size:0.9rem">Works on Chrome &amp; Edge (Chromium).</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ───────── Contact ───────── -->
+      <section id="contact" class="contact">
+        <div class="wrap">
+          <div class="contact-card reveal">
+            <span class="material-symbols-outlined big">mail</span>
+            <h2>Get in touch</h2>
+            <p>Questions, bug reports, or partnership ideas? We'd love to hear from you.</p>
+            <a class="email-link" href="mailto:hello@artisam.xyz">
+              <span class="material-symbols-outlined">alternate_email</span> hello@artisam.xyz
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ───────── Footer ───────── -->
+    <footer>
+      <div class="wrap">
+        <div class="footer-grid">
+          <div class="footer-brand">
+            <a class="brand" href="#top"><img src="logo.jpg" alt="Lantern logo" /> Lantern</a>
+            <p>A non-custodial Stellar wallet with an AI security layer. Built by Artisam Labs.</p>
+          </div>
+          <div class="footer-col">
+            <h5>Product</h5>
+            <a href="https://drive.google.com/drive/folders/1xNiN2ws0Uqfysv_fii0ZSfBd1116Woa4?usp=sharing" target="_blank" rel="noopener">
+              <span class="material-symbols-outlined">download</span> Download Chrome extension
+            </a>
+            <a href="#features"><span class="material-symbols-outlined">bolt</span> Features</a>
+            <a href="#install"><span class="material-symbols-outlined">menu_book</span> Install guide</a>
+          </div>
+          <div class="footer-col">
+            <h5>Company</h5>
+            <a href="https://artisam.xyz" target="_blank" rel="noopener">
+              <span class="material-symbols-outlined">apartment</span> Artisam Labs
+            </a>
+            <a href="Lantern_Pitch_Deck.pdf" target="_blank" rel="noopener">
+              <span class="material-symbols-outlined">slideshow</span> Pitch deck
+            </a>
+            <a href="mailto:hello@artisam.xyz"><span class="material-symbols-outlined">mail</span> Contact us</a>
+          </div>
+          <div class="footer-col">
+            <h5>Legal</h5>
+            <a href="privacy-policy.html"><span class="material-symbols-outlined">shield</span> Privacy policy</a>
+            <a href="terms-of-use.html"><span class="material-symbols-outlined">gavel</span> Terms of use</a>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <span>© 2026 Artisam Labs. Lantern is in Beta. Not financial advice.</span>
+          <span>
+            <a href="privacy-policy.html">Privacy</a> ·
+            <a href="terms-of-use.html">Terms</a> ·
+            <a href="https://artisam.xyz" target="_blank" rel="noopener">artisam.xyz</a>
+          </span>
+        </div>
+      </div>
+    </footer>
+
+    <!-- ───────── Cookie consent ───────── -->
+    <div class="cookie" id="cookie" role="dialog" aria-label="Cookie consent" aria-live="polite">
+      <h4><span class="material-symbols-outlined">cookie</span> Cookies</h4>
+      <p>
+        We use minimal cookies to remember your preferences and understand traffic. See our
+        <a href="privacy-policy.html">Privacy Policy</a>.
+      </p>
+      <div class="cookie-actions">
+        <button class="btn btn-ghost" id="cookie-decline">Decline</button>
+        <button class="btn btn-primary" id="cookie-accept">Accept</button>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

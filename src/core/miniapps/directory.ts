@@ -1,85 +1,84 @@
-import type { NetworkId } from '@shared/constants';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MOCK mini-app directory (roadmap: "Mini-app browser for Stellar dApps").
+// Curated mini-app directory + URL helpers for the in-app browser (Apps tab).
 //
-// A curated, statically-seeded list of Stellar dApps the in-wallet browser can
-// launch. The real build would fetch this from a vetted, verifiable registry
-// with on-chain/issuer attestations; here it's a hand-seeded constant so the
-// demo is deterministic and offline.
-// ─────────────────────────────────────────────────────────────────────────────
+// MOCK / demo surface: bundled mini-apps are self-contained static pages under
+// public/miniapps/<id>/. There is no real wallet bridge yet — the host passes
+// the wallet address in as a URL param so the sample apps can look "connected".
+// Swapping in the real connection broker (spec — README "Mini-app browser")
+// doesn't touch this module's shape.
+
+export type MiniAppCategory = 'DeFi' | 'Payments' | 'NFTs' | 'Tools';
 
 export interface MiniApp {
   id: string;
   name: string;
-  origin: string; // launch URL / origin
-  category: string;
   tagline: string;
-  icon: string; // Material Symbols glyph name
+  category: MiniAppCategory;
+  icon: string; // Material Symbols name
+  /** Path relative to the extension root, e.g. miniapps/stardust-faucet/index.html */
+  path: string;
+  /** Curated/verified in the demo directory (shows a badge). */
   verified: boolean;
-  featured?: boolean;
-  // Default scoped permissions a user would grant on connect (demo values).
-  permissions: {
-    networks: NetworkId[];
-    accounts: number;
-    spendCapXlm?: number;
-  };
 }
 
 export const MINI_APPS: MiniApp[] = [
   {
-    id: 'blockhub-academy',
-    name: 'BlockHub Academy',
-    origin: 'https://blockhub.academy',
-    category: 'Education',
-    tagline: 'Learn blockchain & earn on-chain credentials.',
-    icon: 'school',
+    id: 'stardust-faucet',
+    name: 'Stardust Faucet',
+    tagline: 'Claim testnet XLM and watch the safety check in action.',
+    category: 'Tools',
+    icon: 'water_drop',
+    path: 'miniapps/stardust-faucet/index.html',
     verified: true,
-    featured: true,
-    permissions: { networks: ['TESTNET'], accounts: 1, spendCapXlm: 100 },
   },
   {
-    id: 'stellarx',
-    name: 'StellarX',
-    origin: 'https://www.stellarx.com',
-    category: 'DeFi',
-    tagline: 'Trade on the Stellar DEX with zero fees.',
-    icon: 'monetization_on',
-    verified: true,
-    permissions: { networks: ['PUBLIC'], accounts: 1, spendCapXlm: 250 },
-  },
-  {
-    id: 'aquarius',
-    name: 'Aquarius',
-    origin: 'https://aqua.network',
-    category: 'DeFi',
-    tagline: 'Liquidity management & market incentives.',
-    icon: 'waves',
-    verified: true,
-    permissions: { networks: ['PUBLIC'], accounts: 1, spendCapXlm: 250 },
-  },
-  {
-    id: 'litemint',
-    name: 'Litemint',
-    origin: 'https://litemint.com',
-    category: 'NFTs',
-    tagline: 'Buy, sell & auction NFTs on Stellar.',
-    icon: 'image',
-    verified: true,
-    permissions: { networks: ['PUBLIC'], accounts: 1, spendCapXlm: 100 },
-  },
-  {
-    id: 'soroswap',
-    name: 'Soroswap',
-    origin: 'https://soroswap.finance',
-    category: 'DeFi',
-    tagline: 'The AMM & aggregator for Soroban.',
-    icon: 'swap_horiz',
-    verified: true,
-    permissions: { networks: ['PUBLIC', 'TESTNET'], accounts: 1, spendCapXlm: 250 },
+    id: 'lumen-notes',
+    name: 'Lumen Notes',
+    tagline: 'A tiny on-chain-style notepad. Demo stub.',
+    category: 'Tools',
+    icon: 'sticky_note_2',
+    path: 'miniapps/lumen-notes/index.html',
+    verified: false,
   },
 ];
 
-export function getMiniApp(id: string): MiniApp | undefined {
+export function findMiniApp(id: string): MiniApp | undefined {
   return MINI_APPS.find((a) => a.id === id);
+}
+
+// Build the iframe src for a bundled mini-app, passing the wallet address as a
+// query param (a URL param, not a live bridge — keeps the demo "visual only").
+export function miniAppSrc(app: MiniApp, address?: string): string {
+  return address ? `${app.path}?addr=${encodeURIComponent(address)}` : app.path;
+}
+
+// Normalize whatever the user typed into the URL bar into a safe, frameable
+// https(s) URL — or null if it isn't a usable web URL. Rejects non-web schemes
+// (javascript:, chrome:, file:, …) so the URL bar can't be used to escape the
+// browser surface.
+export function normalizeUrl(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+
+  let url: URL;
+  try {
+    url = new URL(withScheme);
+  } catch {
+    return null;
+  }
+
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+  if (!url.hostname.includes('.')) return null; // needs a real-ish host
+
+  return url.href;
+}
+
+// Short, human display of a URL's origin for the browser chrome bar.
+export function displayOrigin(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
 }

@@ -251,7 +251,8 @@ export function Send({ address, network, onDone }: Props) {
           </p>
         </div>
 
-        {/* Scan result */}
+        {/* Scan result — announced to screen readers when it resolves. */}
+        <div aria-live="polite" aria-atomic="true">
         {scanning ? (
           <div className="flex items-center gap-2 rounded-2xl border border-outline-variant/40 bg-surface-container p-3.5">
             <Icon name="security" size={18} className="animate-pulse text-on-surface-variant" />
@@ -276,6 +277,7 @@ export function Send({ address, network, onDone }: Props) {
             />
           )
         ) : null}
+        </div>
 
         <Card className="space-y-3">
           <ReviewRow label="To" value={truncateAddress(review.destination, 6, 6)} mono />
@@ -300,7 +302,11 @@ export function Send({ address, network, onDone }: Props) {
           </div>
         )}
 
-        {error && <p className="text-center text-label-md text-error">{error}</p>}
+        {error && (
+        <p role="alert" className="text-center text-label-md text-error">
+          {error}
+        </p>
+      )}
 
         <Button
           fullWidth
@@ -337,6 +343,7 @@ export function Send({ address, network, onDone }: Props) {
             />
           </div>
           <button
+            aria-label="Scan QR code (coming soon)"
             title="Scan QR (coming soon)"
             disabled
             className="mb-0.5 flex h-12 w-12 items-center justify-center rounded-lg border border-outline-variant text-outline opacity-50"
@@ -348,9 +355,12 @@ export function Send({ address, network, onDone }: Props) {
 
       {/* Asset selector */}
       <div>
-        <span className="mb-2 block text-label-sm uppercase tracking-wide text-on-surface-variant">Asset</span>
+        <label htmlFor="send-asset" className="mb-2 block text-label-sm uppercase tracking-wide text-on-surface-variant">
+          Asset
+        </label>
         <div className="relative">
           <select
+            id="send-asset"
             value={assetKey}
             onChange={(e) => setAssetKey(e.target.value)}
             className="w-full appearance-none rounded-full border border-outline-variant bg-surface-variant px-4 py-2.5 font-mono text-label-md text-on-surface focus:border-primary-container focus:outline-none"
@@ -372,13 +382,16 @@ export function Send({ address, network, onDone }: Props) {
       {/* Amount */}
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-label-sm uppercase tracking-wide text-on-surface-variant">Amount</span>
+          <label htmlFor="send-amount" className="text-label-sm uppercase tracking-wide text-on-surface-variant">
+            Amount
+          </label>
           <span className="text-label-sm text-on-surface-variant">
             Spendable: {formatAmount(spendable)} {selected?.code ?? 'XLM'}
           </span>
         </div>
         <div className="flex items-center gap-2 rounded-lg border border-outline-variant bg-surface-container-high px-3 py-2 focus-within:border-primary-container focus-within:shadow-focus-amber">
           <input
+            id="send-amount"
             inputMode="decimal"
             placeholder="0.00"
             value={amount}
@@ -403,7 +416,11 @@ export function Send({ address, network, onDone }: Props) {
         error={memo && memoByteLength(memo) > MAX_MEMO_BYTES ? 'Memo too long.' : undefined}
       />
 
-      {error && <p className="text-center text-label-md text-error">{error}</p>}
+      {error && (
+        <p role="alert" className="text-center text-label-md text-error">
+          {error}
+        </p>
+      )}
 
       <Button fullWidth onClick={toReview} loading={building} trailingIcon="arrow_forward">
         Review
