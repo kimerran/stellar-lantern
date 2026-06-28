@@ -29,5 +29,13 @@
       "@popup/*": ["src/popup/*"]
     }
   },
-  "include": ["src", "tests", "vite.config.ts", "tailwind.config.ts", "manifest.config.ts"]
+  "include": [
+    "src",
+    "tests",
+    "vite.config.ts",
+    "vite.config.mobile.ts",
+    "capacitor.config.ts",
+    "tailwind.config.ts",
+    "manifest.config.ts"
+  ]
 }

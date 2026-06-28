@@ -37,7 +37,22 @@ export type ResponseMap = {
 
 export type ResponseFor<R extends Request> = Result<ResponseMap[R['type']]>;
 
-// Typed wrapper around chrome.runtime.sendMessage used by the popup.
+// Transport the popup uses to reach the wallet handler. Default = chrome.runtime
+// (the MV3 service worker). On Android there is no worker, so the mobile entry
+// injects an in-process transport via setMessageTransport() that calls the same
+// dispatch() directly. Mirrors the storage seam.
+export type MessageTransport = (req: Request) => Promise<Result<unknown>>;
+
+const chromeTransport: MessageTransport = (req) =>
+  chrome.runtime.sendMessage(req) as Promise<Result<unknown>>;
+
+let transport: MessageTransport = chromeTransport;
+
+export function setMessageTransport(next: MessageTransport): void {
+  transport = next;
+}
+
+// Typed wrapper the popup calls for every cross-context request.
 export async function sendMessage<R extends Request>(req: R): Promise<ResponseFor<R>> {
-  return (await chrome.runtime.sendMessage(req)) as ResponseFor<R>;
+  return (await transport(req)) as ResponseFor<R>;
 }

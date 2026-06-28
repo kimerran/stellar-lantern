@@ -1,8 +1,18 @@
 node_modules
 dist
+dist-mobile
 *.local
 .DS_Store
 .vite
+
+# Capacitor / Android build artifacts (the android/ project itself is committed)
+android/app/build
+android/build
+android/.gradle
+android/local.properties
+android/app/src/main/assets/public
+android/app/src/main/res/xml/config.xml
+.env
 
 # Internal specs, brand, and implementation plans
 SPEC.md

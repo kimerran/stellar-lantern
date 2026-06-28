@@ -4,9 +4,12 @@ How to install and smoke-test a Lantern debug APK on Android. The Android build
 wraps the existing React app with [Capacitor](https://capacitorjs.com/) (see
 issue #4); `src/core/**` is reused unchanged, so behaviour matches the extension.
 
-> ⚠️ **Status:** the Capacitor Android project is being scaffolded. Until it lands,
-> CI skips the APK build and there is no APK to install yet. The steps below are
-> the target workflow and double as the reviewer checklist.
+> ℹ️ **Status:** the Capacitor Android project (`android/`) and the `build:mobile`
+> target are in place, so CI now builds a debug APK on each PR. The wallet UI and
+> core logic run on Android via the storage/messaging seams (no service worker).
+> Runtime behaviour on a device/emulator still needs hands-on verification — that's
+> what this checklist is for. The **native per-dApp WebView + broker** for the
+> mini-app browser is the remaining piece (tracked in #4).
 
 ---
 
