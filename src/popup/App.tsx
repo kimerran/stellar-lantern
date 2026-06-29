@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useWallet } from './hooks/useWallet';
 import { useSettings } from './hooks/useSettings';
 import { NETWORKS } from '@shared/constants';
+import { isNativePlatform } from '@shared/kv';
 import { AppBar } from './components/AppBar';
 import { BottomNav, type Tab } from './components/BottomNav';
 import { Icon } from './components/Icon';
@@ -73,7 +74,7 @@ export function App() {
         onLock={lock}
         onCopyAddress={copyAddress}
         onOpenScan={() => setScanOpen(true)}
-        onExpand={isExpanded ? undefined : openExpanded}
+        onExpand={isExpanded || isNativePlatform() ? undefined : openExpanded}
       />
 
       <main className="no-scrollbar relative flex-1 overflow-y-auto">
