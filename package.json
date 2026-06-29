@@ -12,9 +12,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "icons": "node scripts/gen-icons.mjs",
-    "package": "npm run build && node scripts/package.mjs"
+    "package": "npm run build && node scripts/package.mjs",
+    "build:mobile": "tsc --noEmit && vite build --config vite.config.mobile.ts",
+    "cap:sync": "npx cap sync android"
   },
   "dependencies": {
+    "@capacitor/core": "^8.4.1",
+    "@capacitor/preferences": "^8.0.1",
     "@noble/hashes": "1.8.0",
     "@stellar/stellar-sdk": "15.1.0",
     "bip39": "3.1.0",
@@ -22,6 +26,8 @@
     "react-dom": "18.3.1"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
     "@crxjs/vite-plugin": "2.6.1",
     "@types/chrome": "0.0.270",
     "@types/node": "22.10.2",
