@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { __setKV, type KV } from '@shared/kv';
 import { getVault, setVault, clearVault, getSettings, setSettings } from '@shared/storage';
 import type { StoredVault } from '@shared/types';
@@ -20,6 +20,33 @@ const VAULT: StoredVault = {
     iterations: 600000, ciphertext: 'Y2lwaGVy',
   },
 };
+
+describe('chromeKV backward-compat: object-valued chrome.storage → JSON string', () => {
+  afterEach(() => {
+    delete (globalThis as any).chrome;
+    __setKV(null);
+  });
+
+  it('rehydrates a legacy object-shaped vault written by an old extension install', async () => {
+    // Ensure native path is NOT taken (no Capacitor global).
+    delete (globalThis as any).Capacitor;
+    // Reset the kv cache so getKV() re-runs platform detection.
+    __setKV(null);
+
+    // Mock chrome.storage.local.get returning an object (not a string).
+    (globalThis as any).chrome = {
+      storage: {
+        local: {
+          get: async (key: string) => ({ [key]: VAULT }),
+        },
+      },
+    };
+
+    // getVault() calls getKV() → chromeKV.get → JSON.stringify(object) →
+    // storage.ts parse<StoredVault>(JSON.stringify(VAULT)) → deep-equals VAULT.
+    expect(await getVault()).toEqual(VAULT);
+  });
+});
 
 describe('storage over the kv port', () => {
   beforeEach(() => __setKV(memoryKV()));
