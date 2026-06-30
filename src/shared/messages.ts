@@ -1,3 +1,5 @@
+import { isNativePlatform } from './kv';
+
 // The single messaging contract between the popup and the background worker.
 // All cross-context calls go through this discriminated union (AGENT §5).
 
@@ -37,7 +39,13 @@ export type ResponseMap = {
 
 export type ResponseFor<R extends Request> = Result<ResponseMap[R['type']]>;
 
-// Typed wrapper around chrome.runtime.sendMessage used by the popup.
+// On the extension, messages go to the background worker. On native there is no
+// worker — load the in-process handler lazily so its wallet logic is split into
+// a chunk the extension popup bundle never loads.
 export async function sendMessage<R extends Request>(req: R): Promise<ResponseFor<R>> {
+  if (isNativePlatform()) {
+    const { handle } = await import('@core/session/handler');
+    return (await handle(req)) as ResponseFor<R>;
+  }
   return (await chrome.runtime.sendMessage(req)) as ResponseFor<R>;
 }
