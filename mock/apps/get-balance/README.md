@@ -41,11 +41,25 @@ Defaults to **Testnet** (`horizon-testnet.stellar.org`). Pass `?network=PUBLIC` 
 Mainnet, or have the wallet bridge supply it. On Testnet, fund the account via
 [Friendbot](https://laboratory.stellar.org/#account-creator?network=test) first.
 
-## Wallet bridge contract (proposed — Part B of #10)
+## Wallet functions demonstrated
 
-When Lantern implements the bridge, this app expects:
+- **Connect** — read-only, returns the public key + network (with user approval).
+- **Balances** — XLM plus any other assets (trustlines), live-refreshable.
+- **Fund (Friendbot)** — on Testnet, fund an unfunded account in one tap.
+- **Send via Lantern** — submit a payment *intent*; Lantern builds, **AI-scans**,
+  has the user approve, signs, and submits — the key never leaves the wallet.
 
-- App → host: `postMessage({ type: 'lantern:getPublicKey' })`
-- host → App (after user approval): `postMessage({ type: 'lantern:publicKey', publicKey: 'G…', network: 'TESTNET' | 'PUBLIC' })`
+## Wallet bridge contract (Lantern)
 
-Until then, the `?addr=` param / manual entry paths keep the demo working.
+**Connect (read-only):**
+- App → host: `{ type: 'lantern:getPublicKey' }`
+- host → App: `{ type: 'lantern:connecting' }` (ack) → after approval →
+  `{ type: 'lantern:publicKey', publicKey, network }` (or `{ type: 'lantern:connectRejected' }`)
+
+**Sign & submit a payment:**
+- App → host: `{ type: 'lantern:signAndSubmit', intent: { destination, amount, memo? } }`
+- host → App: `{ type: 'lantern:signing' }` (ack) → after review/approval →
+  `{ type: 'lantern:txResult', hash }` (or `lantern:txRejected` / `{ type: 'lantern:txError', error }`)
+
+The app sends only an **intent** — Lantern constructs and scans the transaction.
+The `?addr=` param / manual entry paths keep balance lookups working standalone.
