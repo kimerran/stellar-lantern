@@ -1,5 +1,6 @@
 node_modules
 dist
+dist-mobile
 *.local
 .DS_Store
 .vite
