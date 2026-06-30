@@ -4,7 +4,9 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { fileURLToPath, URL } from 'node:url';
 
 // Plain-web build for Capacitor. Mirrors vite.config.ts but drops the CRX/MV3
-// plugin and manifest — the Android shell wraps the bundle from `dist/`.
+// plugin and manifest — the Android shell wraps the bundle from `dist-mobile/`.
+// Kept separate from the extension's `dist/` so the two builds never clobber
+// each other (e.g. a loaded unpacked extension stays intact across build:mobile).
 export default defineConfig({
   plugins: [
     react(),
@@ -18,7 +20,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: 'dist',
+    outDir: 'dist-mobile',
     target: 'esnext',
     sourcemap: true,
   },
