@@ -7,6 +7,7 @@ Format: `- YYYY-MM-DD — <summary> (#PR, closes #issue)`
 
 ## Shipped
 
+- 2026-06-30 — Mini-app bridge v2: issued (non-native) **asset payments** + read-only **sign-message** auth (`lantern:signMessage` → domain-separated `SIGN_MESSAGE`), with the intent logic extracted to a unit-tested `core/miniapps/bridge.ts`. Mock dApp gains an asset selector + Sign-message panel. (#13)
 - 2026-06-30 — Mini-app `signAndSubmit` bridge: a connected dApp sends a payment **intent**; Lantern builds, AI-scans, has the user approve, signs & submits, returns the tx hash. Richer Get Balance mock dApp (send, all assets, Friendbot fund). (#12)
 - 2026-06-30 — Read-only wallet **connect bridge** (`lantern:getPublicKey` → approval → public key + network) + deployable Get Balance mock dApp. (#11, closes #10)
 - 2026-06-30 — Android layout: fill the device viewport (`100dvh`) + safe-area insets + status-bar overlay so the UI isn't a fixed 360×600 box. (#8, closes #7)

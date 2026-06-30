@@ -56,10 +56,14 @@ Mainnet, or have the wallet bridge supply it. On Testnet, fund the account via
 - host → App: `{ type: 'lantern:connecting' }` (ack) → after approval →
   `{ type: 'lantern:publicKey', publicKey, network }` (or `{ type: 'lantern:connectRejected' }`)
 
-**Sign & submit a payment:**
-- App → host: `{ type: 'lantern:signAndSubmit', intent: { destination, amount, memo? } }`
+**Sign & submit a payment** (XLM or an issued asset):
+- App → host: `{ type: 'lantern:signAndSubmit', intent: { destination, amount, memo?, asset?: { code, issuer } } }`
 - host → App: `{ type: 'lantern:signing' }` (ack) → after review/approval →
   `{ type: 'lantern:txResult', hash }` (or `lantern:txRejected` / `{ type: 'lantern:txError', error }`)
+
+**Sign a message** (read-only proof of ownership; no funds move):
+- App → host: `{ type: 'lantern:signMessage', message }`
+- host → App: `{ type: 'lantern:messageSigned', signature, publicKey }` (or `{ type: 'lantern:signRejected', error? }`)
 
 The app sends only an **intent** — Lantern constructs and scans the transaction.
 The `?addr=` param / manual entry paths keep balance lookups working standalone.

@@ -12,7 +12,12 @@ import { formatAmount, truncateAddress } from '@shared/format';
 import { sendMessage } from '@shared/messages';
 import { getServer, destinationFunded } from '@core/stellar/client';
 import { buildTransferXdr } from '@core/stellar/tx';
-import { isValidPublicKey } from '@core/wallet/wallet';
+import {
+  validatePaymentIntent,
+  toAssetRef,
+  intentAssetCode,
+  type PaymentIntent,
+} from '@core/miniapps/bridge';
 import { scan } from '@core/scan/engine';
 import type { ScanVerdict } from '@core/scan/types';
 import { Icon } from '../components/Icon';
@@ -32,12 +37,6 @@ type Open =
   | { kind: 'app'; app: MiniApp; src: string; title: string; origin: string }
   | { kind: 'url'; src: string; title: string; origin: string };
 
-// A payment a mini-app asks Lantern to make on the user's behalf (XLM only for now).
-interface PaymentIntent {
-  destination: string;
-  amount: string;
-  memo?: string;
-}
 
 export function Apps({ address, network }: { address: string; network: NetworkId }) {
   const [open, setOpen] = useState<Open | null>(null);
@@ -192,21 +191,26 @@ function Browser({
   }
 
   // Build + scan a dApp payment intent, then surface it for review.
-  async function prepareSign(intent: PaymentIntent) {
-    if (!isValidPublicKey(intent.destination)) {
-      postToApp({ type: 'lantern:txError', error: 'Invalid destination address.' });
+  async function prepareSign(rawIntent: unknown) {
+    const validated = validatePaymentIntent(rawIntent);
+    if (!validated.ok) {
+      postToApp({ type: 'lantern:txError', error: validated.error });
       return;
     }
-    const amt = Number(intent.amount);
-    if (!Number.isFinite(amt) || amt <= 0) {
-      postToApp({ type: 'lantern:txError', error: 'Invalid amount.' });
-      return;
-    }
+    const intent = validated.value;
     postToApp({ type: 'lantern:signing' }); // ack so the dApp waits for review
     try {
       const cfg = NETWORKS[network];
       const server = getServer(cfg);
       const destFunded = await destinationFunded(cfg, intent.destination);
+      // A non-native asset can't fund a brand-new account (mirrors Send.tsx).
+      if (intent.asset && !destFunded) {
+        postToApp({
+          type: 'lantern:txError',
+          error: 'The destination account does not exist and cannot receive this asset.',
+        });
+        return;
+      }
       const source = await server.loadAccount(address);
       let baseFee = BASE_FEE;
       try {
@@ -222,9 +226,9 @@ function Browser({
         baseFee,
         destination: intent.destination,
         destinationFunded: destFunded,
-        asset: { isNative: true },
+        asset: toAssetRef(intent),
         amount: intent.amount,
-        memo: intent.memo?.trim() || undefined,
+        memo: intent.memo,
       });
       const verdict = scan({
         xdr,
@@ -239,12 +243,26 @@ function Browser({
     }
   }
 
+  // A pending sign-message request (read-only proof of ownership; no funds).
+  const [msgReq, setMsgReq] = useState<string | null>(null);
+  async function approveSignMessage() {
+    if (msgReq == null) return;
+    const res = await sendMessage({ type: 'SIGN_MESSAGE', message: msgReq });
+    if (res.ok) postToApp({ type: 'lantern:messageSigned', signature: res.data.signature, publicKey: address });
+    else postToApp({ type: 'lantern:signRejected', error: res.error });
+    setMsgReq(null);
+  }
+  function rejectSignMessage() {
+    postToApp({ type: 'lantern:signRejected' });
+    setMsgReq(null);
+  }
+
   useEffect(() => {
     granted.current = false; // re-prompt per opened app
     function onMessage(e: MessageEvent) {
       const win = frameRef.current?.contentWindow;
       if (!win || e.source !== win) return; // only our embedded app
-      const data = e.data as { type?: string; intent?: PaymentIntent } | null;
+      const data = e.data as { type?: string; intent?: unknown; message?: unknown } | null;
       if (data?.type === 'lantern:getPublicKey') {
         postToApp({ type: 'lantern:connecting' }); // ack → dApp waits for approval
         if (granted.current) sendPublicKey();
@@ -254,7 +272,13 @@ function Browser({
           postToApp({ type: 'lantern:txError', error: 'Connect the wallet first.' });
           return;
         }
-        if (data.intent) void prepareSign(data.intent);
+        void prepareSign(data.intent);
+      } else if (data?.type === 'lantern:signMessage') {
+        if (!granted.current) {
+          postToApp({ type: 'lantern:signRejected', error: 'Connect the wallet first.' });
+          return;
+        }
+        if (typeof data.message === 'string') setMsgReq(data.message);
       }
     }
     window.addEventListener('message', onMessage);
@@ -462,7 +486,7 @@ function Browser({
             </div>
             <div className="rounded-xl bg-surface-container-high p-3 text-center">
               <p className={`text-headline-lg-mobile ${isHigh ? 'text-on-surface-variant' : 'text-primary glow-amber-text'}`}>
-                {formatAmount(signReq.intent.amount)} XLM
+                {formatAmount(signReq.intent.amount)} {intentAssetCode(signReq.intent)}
               </p>
               <p className="mt-1 font-mono text-label-sm text-on-surface-variant">
                 to {truncateAddress(signReq.intent.destination, 5, 5)}
@@ -521,6 +545,39 @@ function Browser({
           </div>
         );
       })()}
+
+      {/* Sign-message approval — prove ownership; no funds move. */}
+      {msgReq !== null && (
+        <div className="absolute inset-x-0 bottom-0 z-20 space-y-3 rounded-t-2xl border-t border-outline-variant/40 bg-surface-container p-4 shadow-layer-1">
+          <div className="flex items-center gap-2">
+            <Icon name="draw" size={18} className="text-primary-container" />
+            <span className="text-title-sm text-on-surface">
+              <span className="font-semibold">{open.title}</span> wants you to sign a message
+            </span>
+          </div>
+          <p className="max-h-24 overflow-y-auto whitespace-pre-wrap break-words rounded-xl bg-surface-container-high p-3 text-label-md text-on-surface">
+            {msgReq}
+          </p>
+          <p className="text-label-sm text-on-surface-variant">
+            Signing proves you control <span className="font-mono">{truncateAddress(address, 4, 4)}</span>. It moves
+            no funds and reveals no secret.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={rejectSignMessage}
+              className="flex-1 rounded-full border border-outline px-4 py-2.5 text-label-md font-semibold text-on-surface-variant active:scale-95"
+            >
+              Reject
+            </button>
+            <button
+              onClick={approveSignMessage}
+              className="flex-1 rounded-full bg-primary-container px-4 py-2.5 text-label-md font-semibold text-on-primary-container shadow-primary active:scale-95"
+            >
+              Sign
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

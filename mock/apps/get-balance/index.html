@@ -118,13 +118,26 @@
     <p class="muted" style="margin-bottom:12px">Lantern reviews (AI security scan) and signs every payment — your key never leaves the wallet.</p>
     <input id="sendTo" placeholder="Destination G…" autocapitalize="off" autocorrect="off" spellcheck="false" />
     <div style="height:8px"></div>
-    <input id="sendAmt" inputmode="decimal" placeholder="Amount (XLM)" />
+    <input id="sendAmt" inputmode="decimal" placeholder="Amount" />
+    <div style="height:8px"></div>
+    <input id="sendAsset" placeholder="Asset — blank = XLM, or CODE:ISSUER" autocapitalize="off" autocorrect="off" spellcheck="false" />
     <div style="height:8px"></div>
     <input id="sendMemo" maxlength="28" placeholder="Memo (optional)" style="font-family:inherit" />
     <div style="height:12px"></div>
     <button class="btn-primary" id="sendBtn">Send via Lantern</button>
     <div class="err hide" id="sendErr" style="margin-top:10px"></div>
     <div class="hide" id="sendOk" style="margin-top:12px;font-size:13px;color:var(--ok);text-align:center"></div>
+  </div>
+
+  <!-- Sign message via Lantern (proof of ownership) -->
+  <div class="card hide" id="signCard">
+    <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:4px">Sign a message</div>
+    <p class="muted" style="margin-bottom:12px">Prove you control this wallet — no funds move, no secret is revealed.</p>
+    <input id="signMsg" placeholder="Message to sign" value="Sign in to this demo dApp" />
+    <div style="height:12px"></div>
+    <button class="btn-primary" id="signBtn">Sign message</button>
+    <div class="err hide" id="signErr" style="margin-top:10px"></div>
+    <div class="hide" id="signOk" style="margin-top:12px;font-size:12px;color:var(--ok);word-break:break-all;text-align:center"></div>
   </div>
 
   <footer>
@@ -242,6 +255,7 @@ async function showBalance(addr) {
   $('connectCard').classList.add('hide');
   $('balanceCard').classList.remove('hide');
   $('sendCard').classList.remove('hide');
+  $('signCard').classList.remove('hide');
   $('addrShort').textContent = short(addr);
   $('balErr').classList.add('hide');
   $('fundBtn').classList.add('hide');
@@ -282,6 +296,7 @@ function disconnect() {
   currentAddr = null;
   $('balanceCard').classList.add('hide');
   $('sendCard').classList.add('hide');
+  $('signCard').classList.add('hide');
   $('connectCard').classList.remove('hide');
   $('manualBox').classList.add('hide');
 }
@@ -314,11 +329,18 @@ async function doSend() {
   const destination = $('sendTo').value.trim();
   const amount = $('sendAmt').value.trim();
   const memo = $('sendMemo').value.trim();
+  const assetRaw = $('sendAsset').value.trim();
   if (!isValidG(destination)) return showSendErr('Enter a valid destination (G…, 56 chars).');
   if (!(Number(amount) > 0)) return showSendErr('Enter an amount greater than zero.');
+  let asset;
+  if (assetRaw) {
+    const [code, issuer] = assetRaw.split(':');
+    if (!code || !isValidG((issuer || '').trim())) return showSendErr('Asset must be CODE:ISSUER (issuer is a G… key).');
+    asset = { code: code.trim(), issuer: issuer.trim() };
+  }
   $('sendBtn').disabled = true;
   $('sendBtn').innerHTML = '<span class="spin"></span> Review in Lantern…';
-  const res = await sendViaLantern({ destination, amount, memo: memo || undefined });
+  const res = await sendViaLantern({ destination, amount, memo: memo || undefined, asset });
   $('sendBtn').disabled = false;
   $('sendBtn').textContent = 'Send via Lantern';
   if (res.ok) {
@@ -332,10 +354,44 @@ async function doSend() {
 }
 function showSendErr(m) { $('sendErr').textContent = m; $('sendErr').classList.remove('hide'); }
 
+// ── Sign message via Lantern ─────────────────────────────────────────────────
+//   App → { lantern:signMessage, message } → host approval →
+//   { lantern:messageSigned, signature, publicKey } | { lantern:signRejected }
+function signMessageViaLantern(message, timeoutMs = 4000) {
+  return new Promise((resolve) => {
+    let settled = false, timer;
+    function finish(v) { if (settled) return; settled = true; clearTimeout(timer); window.removeEventListener('message', onMsg); resolve(v); }
+    function onMsg(e) {
+      const d = e.data || {};
+      if (!d || typeof d !== 'object') return;
+      if (d.type === 'lantern:messageSigned' && typeof d.signature === 'string') finish({ ok: true, signature: d.signature });
+      if (d.type === 'lantern:signRejected') finish({ ok: false, error: d.error || 'Rejected in Lantern.' });
+    }
+    window.addEventListener('message', onMsg);
+    try { window.parent.postMessage({ type: 'lantern:signMessage', message }, '*'); } catch (_) {}
+    timer = setTimeout(() => finish({ ok: false, error: 'No response from Lantern.' }), timeoutMs);
+  });
+}
+
+async function doSignMessage() {
+  $('signErr').classList.add('hide');
+  $('signOk').classList.add('hide');
+  const message = $('signMsg').value.trim();
+  if (!message) { $('signErr').textContent = 'Enter a message to sign.'; $('signErr').classList.remove('hide'); return; }
+  $('signBtn').disabled = true;
+  $('signBtn').innerHTML = '<span class="spin"></span> Approve in Lantern…';
+  const res = await signMessageViaLantern(message);
+  $('signBtn').disabled = false;
+  $('signBtn').textContent = 'Sign message';
+  if (res.ok) { $('signOk').textContent = 'Signature: ' + res.signature; $('signOk').classList.remove('hide'); }
+  else { $('signErr').textContent = res.error; $('signErr').classList.remove('hide'); }
+}
+
 $('connectBtn').addEventListener('click', connect);
 $('refreshBtn').addEventListener('click', () => currentAddr && showBalance(currentAddr));
 $('disconnectBtn').addEventListener('click', disconnect);
 $('sendBtn').addEventListener('click', doSend);
+$('signBtn').addEventListener('click', doSignMessage);
 $('fundBtn').addEventListener('click', async () => {
   if (!currentAddr) return;
   $('fundBtn').disabled = true;
