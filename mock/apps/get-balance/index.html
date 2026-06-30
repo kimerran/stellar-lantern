@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Get Balance — Lantern demo dApp</title>
+<style>
+  :root{
+    --bg:#0b1326; --low:#131b2e; --sc:#171f33; --sch:#222a3d;
+    --primc:#ffc107; --amber:#fabd00; --on-primc:#3f2e00;
+    --os:#dae2fd; --osv:#d4c5ab; --outline:#9c8f78; --ov:#4f4632;
+    --tert:#cdecff; --tertc:#84d5ff; --err:#ffb4ab; --ok:#a6e3b8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{min-height:100dvh;background:var(--bg);color:var(--os);
+    font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+  body{display:flex;flex-direction:column;align-items:center;padding:24px 18px;
+    padding-top:max(24px,env(safe-area-inset-top));padding-bottom:max(24px,env(safe-area-inset-bottom))}
+  .mono{font-family:ui-monospace,"Roboto Mono",SFMono-Regular,Menlo,monospace}
+  .wrap{width:100%;max-width:420px;display:flex;flex-direction:column;gap:16px}
+
+  header{display:flex;align-items:center;gap:12px}
+  .logo{width:42px;height:42px;border-radius:50%;flex:none;
+    background:radial-gradient(circle at 50% 40%,#fff3d2,var(--amber) 60%,#b07d00);
+    box-shadow:0 0 24px 2px rgba(250,189,0,.4)}
+  header h1{font-size:18px;font-weight:700;color:#fff}
+  header p{font-size:12.5px;color:var(--osv)}
+  .net{margin-left:auto;font-size:11px;font-weight:700;letter-spacing:.06em;padding:4px 10px;border-radius:999px;
+    color:var(--tert);background:rgba(132,213,255,.08);border:1px solid rgba(132,213,255,.4)}
+
+  .card{background:var(--sc);border:1px solid var(--ov);border-radius:16px;padding:20px;
+    box-shadow:0 2px 10px rgba(0,0,0,.35)}
+  .muted{color:var(--osv);font-size:13.5px;line-height:1.5}
+
+  .balance{text-align:center;padding:8px 0}
+  .balance .label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--osv)}
+  .balance .amt{margin-top:6px;font-size:40px;font-weight:700;color:var(--primc);
+    text-shadow:0 0 14px rgba(255,193,7,.35);font-family:ui-monospace,monospace;word-break:break-all}
+  .balance .amt small{font-size:18px;color:var(--os);font-weight:600}
+
+  .addr{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;
+    font-size:13px;color:var(--os)}
+  .addr .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
+
+  button{font:inherit;cursor:pointer;border:none;border-radius:999px;font-weight:600}
+  .btn-primary{width:100%;padding:14px;background:var(--primc);color:var(--on-primc);font-size:15px;
+    box-shadow:0 4px 14px rgba(255,193,7,.3)}
+  .btn-primary:active{transform:scale(.99)}
+  .btn-ghost{padding:9px 14px;background:transparent;color:var(--osv);border:1px solid var(--outline);font-size:13px}
+  .row{display:flex;gap:10px}
+
+  input{width:100%;border-radius:10px;border:1px solid var(--ov);background:var(--sch);color:var(--os);
+    padding:11px 12px;font-size:13px;font-family:ui-monospace,monospace}
+  input:focus{outline:none;border-color:var(--primc)}
+  .hide{display:none}
+  .err{color:var(--err);font-size:13px;text-align:center}
+  .spin{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,193,7,.3);
+    border-top-color:var(--primc);border-radius:50%;animation:s .7s linear infinite;vertical-align:-2px}
+  @keyframes s{to{transform:rotate(360deg)}}
+  footer{font-size:11.5px;color:var(--outline);text-align:center;margin-top:4px}
+  footer code{color:var(--osv)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"></div>
+    <div>
+      <h1>Get Balance</h1>
+      <p>A demo dApp for Lantern</p>
+    </div>
+    <span class="net" id="netBadge">TESTNET</span>
+  </header>
+
+  <!-- Disconnected -->
+  <div class="card" id="connectCard">
+    <p class="muted">Connect your Lantern wallet to read your XLM balance. This demo only requests your
+      <strong>public key</strong> — it never asks to sign anything.</p>
+    <div style="height:16px"></div>
+    <button class="btn-primary" id="connectBtn">Connect Lantern</button>
+    <div class="err hide" id="connectErr" style="margin-top:12px"></div>
+
+    <!-- Manual fallback (shown if no wallet bridge / address available) -->
+    <div class="hide" id="manualBox" style="margin-top:16px">
+      <p class="muted" style="margin-bottom:8px">Couldn't reach a Lantern wallet automatically. Paste a Stellar
+        public key to look up its balance:</p>
+      <input id="manualAddr" placeholder="G…" autocapitalize="off" autocorrect="off" spellcheck="false" />
+      <div style="height:10px"></div>
+      <button class="btn-primary" id="manualBtn">Look up balance</button>
+    </div>
+  </div>
+
+  <!-- Connected -->
+  <div class="card hide" id="balanceCard">
+    <div class="balance">
+      <div class="label">Available balance</div>
+      <div class="amt" id="amt">—</div>
+    </div>
+    <div class="addr"><span class="dot"></span><span class="mono" id="addrShort">G…</span></div>
+    <div class="err hide" id="balErr" style="margin-top:10px"></div>
+    <div style="height:16px"></div>
+    <div class="row">
+      <button class="btn-ghost" id="refreshBtn" style="flex:1">Refresh</button>
+      <button class="btn-ghost" id="disconnectBtn" style="flex:1">Disconnect</button>
+    </div>
+  </div>
+
+  <footer>
+    Reads balance from Horizon · <code id="horizonLbl">horizon-testnet.stellar.org</code><br/>
+    Running inside Lantern's mini-app browser
+  </footer>
+</div>
+
+<script>
+// ── Config ───────────────────────────────────────────────────────────────────
+const HORIZON = {
+  TESTNET: 'https://horizon-testnet.stellar.org',
+  PUBLIC:  'https://horizon.stellar.org',
+};
+const params = new URLSearchParams(location.search);
+// Network can be passed by the host (?network=PUBLIC|TESTNET); default Testnet.
+let network = (params.get('network') || 'TESTNET').toUpperCase() === 'PUBLIC' ? 'PUBLIC' : 'TESTNET';
+
+// ── Lantern connect ──────────────────────────────────────────────────────────
+// Tries, in order:
+//   1. ?addr= URL param (Lantern injects this for bundled apps today),
+//   2. a postMessage handshake (forward-compatible with the real wallet bridge),
+//   3. manual address entry (so the demo works even standalone).
+//
+// Bridge contract (proposed — see issue #10): the app posts
+//   { type: 'lantern:getPublicKey' }
+// to its parent, and Lantern replies (after a user approval) with
+//   { type: 'lantern:publicKey', publicKey: 'G…', network: 'TESTNET' | 'PUBLIC' }
+function requestViaBridge(timeoutMs = 1500) {
+  return new Promise((resolve) => {
+    let done = false;
+    function onMsg(e) {
+      const d = e.data || {};
+      if (d && d.type === 'lantern:publicKey' && typeof d.publicKey === 'string') {
+        done = true;
+        window.removeEventListener('message', onMsg);
+        if (d.network) network = String(d.network).toUpperCase() === 'PUBLIC' ? 'PUBLIC' : 'TESTNET';
+        resolve(d.publicKey);
+      }
+    }
+    window.addEventListener('message', onMsg);
+    try { window.parent && window.parent.postMessage({ type: 'lantern:getPublicKey' }, '*'); } catch (_) {}
+    setTimeout(() => { if (!done) { window.removeEventListener('message', onMsg); resolve(null); } }, timeoutMs);
+  });
+}
+
+async function resolveAddress() {
+  const fromUrl = params.get('addr');
+  if (fromUrl && isValidG(fromUrl)) return fromUrl;
+  return await requestViaBridge();
+}
+
+function isValidG(a) { return typeof a === 'string' && /^G[A-Z2-7]{55}$/.test(a.trim()); }
+
+// ── Balance ──────────────────────────────────────────────────────────────────
+async function fetchXlm(addr) {
+  const res = await fetch(`${HORIZON[network]}/accounts/${encodeURIComponent(addr)}`);
+  if (res.status === 404) return { funded: false, xlm: '0' };
+  if (!res.ok) throw new Error(`Horizon error ${res.status}`);
+  const data = await res.json();
+  const native = (data.balances || []).find((b) => b.asset_type === 'native');
+  return { funded: true, xlm: native ? native.balance : '0' };
+}
+
+// ── UI ───────────────────────────────────────────────────────────────────────
+const $ = (id) => document.getElementById(id);
+let currentAddr = null;
+
+function short(a) { return a.length > 12 ? `${a.slice(0, 5)}…${a.slice(-5)}` : a; }
+function fmt(x) {
+  const n = Number(x);
+  return Number.isFinite(n) ? n.toLocaleString('en-US', { maximumFractionDigits: 7 }) : x;
+}
+function syncNetworkLabels() {
+  $('netBadge').textContent = network === 'PUBLIC' ? 'MAINNET' : 'TESTNET';
+  $('horizonLbl').textContent = HORIZON[network].replace('https://', '');
+}
+
+async function showBalance(addr) {
+  currentAddr = addr;
+  $('connectCard').classList.add('hide');
+  $('balanceCard').classList.remove('hide');
+  $('addrShort').textContent = short(addr);
+  $('balErr').classList.add('hide');
+  $('amt').innerHTML = '<span class="spin"></span>';
+  syncNetworkLabels();
+  try {
+    const { funded, xlm } = await fetchXlm(addr);
+    $('amt').innerHTML = `${fmt(xlm)} <small>XLM</small>`;
+    if (!funded) {
+      $('balErr').textContent = 'Account not funded yet (0 XLM). On Testnet, fund it via Friendbot.';
+      $('balErr').classList.remove('hide');
+    }
+  } catch (e) {
+    $('amt').innerHTML = '— <small>XLM</small>';
+    $('balErr').textContent = e.message || 'Could not load balance.';
+    $('balErr').classList.remove('hide');
+  }
+}
+
+async function connect() {
+  $('connectErr').classList.add('hide');
+  $('connectBtn').innerHTML = '<span class="spin"></span> Connecting…';
+  $('connectBtn').disabled = true;
+  const addr = await resolveAddress();
+  $('connectBtn').innerHTML = 'Connect Lantern';
+  $('connectBtn').disabled = false;
+  if (addr && isValidG(addr)) {
+    showBalance(addr.trim());
+  } else {
+    // Offer manual entry as a fallback.
+    $('manualBox').classList.remove('hide');
+  }
+}
+
+function disconnect() {
+  currentAddr = null;
+  $('balanceCard').classList.add('hide');
+  $('connectCard').classList.remove('hide');
+  $('manualBox').classList.add('hide');
+}
+
+$('connectBtn').addEventListener('click', connect);
+$('refreshBtn').addEventListener('click', () => currentAddr && showBalance(currentAddr));
+$('disconnectBtn').addEventListener('click', disconnect);
+$('manualBtn').addEventListener('click', () => {
+  const a = $('manualAddr').value.trim();
+  if (isValidG(a)) { showBalance(a); }
+  else {
+    $('connectErr').textContent = 'That doesn’t look like a Stellar public key (starts with G, 56 chars).';
+    $('connectErr').classList.remove('hide');
+  }
+});
+
+syncNetworkLabels();
+// If the host already injected an address, connect automatically on load.
+if (params.get('addr') && isValidG(params.get('addr'))) connect();
+</script>
+</body>
+</html>
