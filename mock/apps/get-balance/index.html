@@ -98,11 +98,33 @@
     </div>
     <div class="addr"><span class="dot"></span><span class="mono" id="addrShort">G…</span></div>
     <div class="err hide" id="balErr" style="margin-top:10px"></div>
+
+    <!-- All assets (trustlines) -->
+    <div id="assets" class="hide" style="margin-top:14px"></div>
+
+    <!-- Fund via Friendbot (Testnet, unfunded) -->
+    <button class="btn-primary hide" id="fundBtn" style="margin-top:14px">Fund with Friendbot (Testnet)</button>
+
     <div style="height:16px"></div>
     <div class="row">
       <button class="btn-ghost" id="refreshBtn" style="flex:1">Refresh</button>
       <button class="btn-ghost" id="disconnectBtn" style="flex:1">Disconnect</button>
     </div>
+  </div>
+
+  <!-- Send via Lantern -->
+  <div class="card hide" id="sendCard">
+    <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:4px">Send XLM via Lantern</div>
+    <p class="muted" style="margin-bottom:12px">Lantern reviews (AI security scan) and signs every payment — your key never leaves the wallet.</p>
+    <input id="sendTo" placeholder="Destination G…" autocapitalize="off" autocorrect="off" spellcheck="false" />
+    <div style="height:8px"></div>
+    <input id="sendAmt" inputmode="decimal" placeholder="Amount (XLM)" />
+    <div style="height:8px"></div>
+    <input id="sendMemo" maxlength="28" placeholder="Memo (optional)" style="font-family:inherit" />
+    <div style="height:12px"></div>
+    <button class="btn-primary" id="sendBtn">Send via Lantern</button>
+    <div class="err hide" id="sendErr" style="margin-top:10px"></div>
+    <div class="hide" id="sendOk" style="margin-top:12px;font-size:13px;color:var(--ok);text-align:center"></div>
   </div>
 
   <footer>
@@ -169,14 +191,23 @@ async function resolveAddress() {
 
 function isValidG(a) { return typeof a === 'string' && /^G[A-Z2-7]{55}$/.test(a.trim()); }
 
-// ── Balance ──────────────────────────────────────────────────────────────────
-async function fetchXlm(addr) {
+// ── Account / balances ───────────────────────────────────────────────────────
+async function fetchAccount(addr) {
   const res = await fetch(`${HORIZON[network]}/accounts/${encodeURIComponent(addr)}`);
-  if (res.status === 404) return { funded: false, xlm: '0' };
+  if (res.status === 404) return { funded: false, xlm: '0', assets: [] };
   if (!res.ok) throw new Error(`Horizon error ${res.status}`);
   const data = await res.json();
-  const native = (data.balances || []).find((b) => b.asset_type === 'native');
-  return { funded: true, xlm: native ? native.balance : '0' };
+  const all = data.balances || [];
+  const native = all.find((b) => b.asset_type === 'native');
+  const assets = all
+    .filter((b) => b.asset_type !== 'native')
+    .map((b) => ({ code: b.asset_code, balance: b.balance }));
+  return { funded: true, xlm: native ? native.balance : '0', assets };
+}
+
+async function fundFriendbot(addr) {
+  const res = await fetch(`https://friendbot.stellar.org/?addr=${encodeURIComponent(addr)}`);
+  if (!res.ok) throw new Error('Friendbot funding failed');
 }
 
 // ── UI ───────────────────────────────────────────────────────────────────────
@@ -193,20 +224,37 @@ function syncNetworkLabels() {
   $('horizonLbl').textContent = HORIZON[network].replace('https://', '');
 }
 
+function renderAssets(assets) {
+  const box = $('assets');
+  if (!assets.length) { box.classList.add('hide'); box.innerHTML = ''; return; }
+  box.classList.remove('hide');
+  box.innerHTML =
+    '<div class="label" style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--osv);margin-bottom:6px">Other assets</div>' +
+    assets.map((a) =>
+      `<div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--ov)">
+         <span style="color:var(--os)">${a.code}</span>
+         <span class="mono" style="color:var(--osv)">${fmt(a.balance)}</span>
+       </div>`).join('');
+}
+
 async function showBalance(addr) {
   currentAddr = addr;
   $('connectCard').classList.add('hide');
   $('balanceCard').classList.remove('hide');
+  $('sendCard').classList.remove('hide');
   $('addrShort').textContent = short(addr);
   $('balErr').classList.add('hide');
+  $('fundBtn').classList.add('hide');
   $('amt').innerHTML = '<span class="spin"></span>';
   syncNetworkLabels();
   try {
-    const { funded, xlm } = await fetchXlm(addr);
+    const { funded, xlm, assets } = await fetchAccount(addr);
     $('amt').innerHTML = `${fmt(xlm)} <small>XLM</small>`;
+    renderAssets(assets);
     if (!funded) {
-      $('balErr').textContent = 'Account not funded yet (0 XLM). On Testnet, fund it via Friendbot.';
+      $('balErr').textContent = 'Account not funded yet (0 XLM).';
       $('balErr').classList.remove('hide');
+      if (network === 'TESTNET') $('fundBtn').classList.remove('hide'); // offer Friendbot
     }
   } catch (e) {
     $('amt').innerHTML = '— <small>XLM</small>';
@@ -233,13 +281,70 @@ async function connect() {
 function disconnect() {
   currentAddr = null;
   $('balanceCard').classList.add('hide');
+  $('sendCard').classList.add('hide');
   $('connectCard').classList.remove('hide');
   $('manualBox').classList.add('hide');
 }
 
+// ── Send via Lantern ─────────────────────────────────────────────────────────
+// Posts an *intent* — Lantern builds, scans, signs and submits, then replies:
+//   { type: 'lantern:signing' }     ack (Lantern is reviewing)
+//   { type: 'lantern:txResult', hash } | 'lantern:txRejected' | { 'lantern:txError', error }
+function sendViaLantern(intent, timeoutMs = 4000) {
+  return new Promise((resolve) => {
+    let settled = false, timer;
+    function finish(v) { if (settled) return; settled = true; clearTimeout(timer); window.removeEventListener('message', onMsg); resolve(v); }
+    function onMsg(e) {
+      const d = e.data || {};
+      if (!d || typeof d !== 'object') return;
+      if (d.type === 'lantern:signing') { clearTimeout(timer); return; } // reviewing — wait
+      if (d.type === 'lantern:txResult') finish({ ok: true, hash: d.hash });
+      if (d.type === 'lantern:txRejected') finish({ ok: false, error: 'Rejected in Lantern.' });
+      if (d.type === 'lantern:txError') finish({ ok: false, error: d.error || 'Transaction failed.' });
+    }
+    window.addEventListener('message', onMsg);
+    try { window.parent.postMessage({ type: 'lantern:signAndSubmit', intent }, '*'); } catch (_) {}
+    timer = setTimeout(() => finish({ ok: false, error: 'No response from Lantern (is the wallet open?).' }), timeoutMs);
+  });
+}
+
+async function doSend() {
+  $('sendErr').classList.add('hide');
+  $('sendOk').classList.add('hide');
+  const destination = $('sendTo').value.trim();
+  const amount = $('sendAmt').value.trim();
+  const memo = $('sendMemo').value.trim();
+  if (!isValidG(destination)) return showSendErr('Enter a valid destination (G…, 56 chars).');
+  if (!(Number(amount) > 0)) return showSendErr('Enter an amount greater than zero.');
+  $('sendBtn').disabled = true;
+  $('sendBtn').innerHTML = '<span class="spin"></span> Review in Lantern…';
+  const res = await sendViaLantern({ destination, amount, memo: memo || undefined });
+  $('sendBtn').disabled = false;
+  $('sendBtn').textContent = 'Send via Lantern';
+  if (res.ok) {
+    $('sendOk').innerHTML = `Sent ✓ <a href="#" style="color:var(--tert)">${short(res.hash)}</a>`;
+    $('sendOk').classList.remove('hide');
+    $('sendTo').value = ''; $('sendAmt').value = ''; $('sendMemo').value = '';
+    if (currentAddr) showBalance(currentAddr); // refresh balance
+  } else {
+    showSendErr(res.error);
+  }
+}
+function showSendErr(m) { $('sendErr').textContent = m; $('sendErr').classList.remove('hide'); }
+
 $('connectBtn').addEventListener('click', connect);
 $('refreshBtn').addEventListener('click', () => currentAddr && showBalance(currentAddr));
 $('disconnectBtn').addEventListener('click', disconnect);
+$('sendBtn').addEventListener('click', doSend);
+$('fundBtn').addEventListener('click', async () => {
+  if (!currentAddr) return;
+  $('fundBtn').disabled = true;
+  $('fundBtn').innerHTML = '<span class="spin"></span> Funding…';
+  try { await fundFriendbot(currentAddr); await showBalance(currentAddr); }
+  catch (e) { $('balErr').textContent = e.message; $('balErr').classList.remove('hide'); }
+  $('fundBtn').disabled = false;
+  $('fundBtn').textContent = 'Fund with Friendbot (Testnet)';
+});
 $('manualBtn').addEventListener('click', () => {
   const a = $('manualAddr').value.trim();
   if (isValidG(a)) { showBalance(a); }
