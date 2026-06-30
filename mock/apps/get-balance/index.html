@@ -131,21 +131,33 @@ let network = (params.get('network') || 'TESTNET').toUpperCase() === 'PUBLIC' ? 
 //   { type: 'lantern:getPublicKey' }
 // to its parent, and Lantern replies (after a user approval) with
 //   { type: 'lantern:publicKey', publicKey: 'G…', network: 'TESTNET' | 'PUBLIC' }
-function requestViaBridge(timeoutMs = 1500) {
+function requestViaBridge(timeoutMs = 2000) {
   return new Promise((resolve) => {
-    let done = false;
+    let settled = false;
+    let timer;
+    function finish(v) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      window.removeEventListener('message', onMsg);
+      resolve(v);
+    }
     function onMsg(e) {
       const d = e.data || {};
-      if (d && d.type === 'lantern:publicKey' && typeof d.publicKey === 'string') {
-        done = true;
-        window.removeEventListener('message', onMsg);
+      if (!d || typeof d !== 'object') return;
+      // Wallet is present and is asking the user to approve — stop the timeout
+      // and wait however long the approval takes.
+      if (d.type === 'lantern:connecting') { clearTimeout(timer); return; }
+      if (d.type === 'lantern:publicKey' && typeof d.publicKey === 'string') {
         if (d.network) network = String(d.network).toUpperCase() === 'PUBLIC' ? 'PUBLIC' : 'TESTNET';
-        resolve(d.publicKey);
+        finish(d.publicKey);
       }
+      if (d.type === 'lantern:connectRejected') { finish(null); }
     }
     window.addEventListener('message', onMsg);
     try { window.parent && window.parent.postMessage({ type: 'lantern:getPublicKey' }, '*'); } catch (_) {}
-    setTimeout(() => { if (!done) { window.removeEventListener('message', onMsg); resolve(null); } }, timeoutMs);
+    // If no wallet acks within the window, fall back (manual entry).
+    timer = setTimeout(() => finish(null), timeoutMs);
   });
 }
 

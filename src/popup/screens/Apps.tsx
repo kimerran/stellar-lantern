@@ -6,21 +6,24 @@ import {
   displayOrigin,
   type MiniApp,
 } from '@core/miniapps/directory';
+import type { NetworkId } from '@shared/constants';
+import { truncateAddress } from '@shared/format';
 import { Icon } from '../components/Icon';
 import { Card } from '../components/Card';
 
 // In-app mini-app browser (README "Mini-app browser for Stellar dApps").
 //
-// MOCK: bundled apps are self-contained static pages; the URL bar is best-effort
-// (most real sites refuse framing via X-Frame-Options). No real wallet bridge —
-// the wallet address is passed to bundled apps as a URL param so they can look
-// connected. The "Checked by Lantern" chip is visual only for now.
+// Bundled apps are self-contained static pages; the URL bar is best-effort (most
+// real sites refuse framing via X-Frame-Options). A read-only wallet bridge lets
+// an embedded app request the public key + network via postMessage (with user
+// approval) — see Browser below. Signing is not yet exposed; the "Checked by
+// Lantern" chip is still visual only.
 
 type Open =
   | { kind: 'app'; app: MiniApp; src: string; title: string; origin: string }
   | { kind: 'url'; src: string; title: string; origin: string };
 
-export function Apps({ address }: { address: string }) {
+export function Apps({ address, network }: { address: string; network: NetworkId }) {
   const [open, setOpen] = useState<Open | null>(null);
   const [urlText, setUrlText] = useState('');
   const [urlError, setUrlError] = useState(false);
@@ -46,7 +49,7 @@ export function Apps({ address }: { address: string }) {
   }
 
   if (open) {
-    return <Browser open={open} onClose={() => setOpen(null)} />;
+    return <Browser open={open} address={address} network={network} onClose={() => setOpen(null)} />;
   }
 
   return (
@@ -129,13 +132,65 @@ export function Apps({ address }: { address: string }) {
 // are first-party and always load, so they skip all of this.
 type Phase = 'loading' | 'shown' | 'blocked';
 
-function Browser({ open, onClose }: { open: Open; onClose: () => void }) {
+function Browser({
+  open,
+  address,
+  network,
+  onClose,
+}: {
+  open: Open;
+  address: string;
+  network: NetworkId;
+  onClose: () => void;
+}) {
   const [reloadKey, setReloadKey] = useState(0);
   const [phase, setPhase] = useState<Phase>(open.kind === 'url' ? 'loading' : 'shown');
   const frameRef = useRef<HTMLIFrameElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>();
 
   const isRemote = open.kind === 'url';
+
+  // ── Wallet bridge (read-only connect) ──
+  // A mini-app posts { type: 'lantern:getPublicKey' }; we reply (after the user
+  // approves) with { type: 'lantern:publicKey', publicKey, network }. Only the
+  // public key + network are ever shared — never secrets, never signing. We only
+  // trust messages from THIS app's frame (event.source check), and post back to
+  // that same frame (targetOrigin '*' is required for the opaque-origin sandbox).
+  const [connectReq, setConnectReq] = useState(false);
+  const granted = useRef(false);
+
+  function postToApp(message: unknown) {
+    frameRef.current?.contentWindow?.postMessage(message, '*');
+  }
+  function sendPublicKey() {
+    postToApp({ type: 'lantern:publicKey', publicKey: address, network });
+  }
+
+  useEffect(() => {
+    granted.current = false; // re-prompt per opened app
+    function onMessage(e: MessageEvent) {
+      const win = frameRef.current?.contentWindow;
+      if (!win || e.source !== win) return; // only our embedded app
+      if ((e.data as { type?: unknown } | null)?.type !== 'lantern:getPublicKey') return;
+      // Ack so the dApp knows a wallet is present and waits for approval.
+      postToApp({ type: 'lantern:connecting' });
+      if (granted.current) sendPublicKey();
+      else setConnectReq(true);
+    }
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open.src, address, network]);
+
+  function approveConnect() {
+    granted.current = true;
+    sendPublicKey();
+    setConnectReq(false);
+  }
+  function rejectConnect() {
+    postToApp({ type: 'lantern:connectRejected' });
+    setConnectReq(false);
+  }
 
   // If a remote frame never reports a load within the window, the site blocked
   // it before navigation committed (common with frame-ancestors 'none').
@@ -255,6 +310,37 @@ function Browser({ open, onClose }: { open: Open; onClose: () => void }) {
           </div>
         )}
       </div>
+
+      {/* Connect approval — a mini-app requested the wallet's public key. */}
+      {connectReq && (
+        <div className="absolute inset-x-0 bottom-0 z-20 space-y-3 rounded-t-2xl border-t border-outline-variant/40 bg-surface-container p-4 shadow-layer-1">
+          <div className="flex items-center gap-2">
+            <Icon name="link" size={18} className="text-primary-container" />
+            <span className="text-title-sm text-on-surface">
+              Connect to <span className="font-semibold">{open.title}</span>?
+            </span>
+          </div>
+          <p className="text-label-md text-on-surface-variant">
+            Share your public address (<span className="font-mono">{truncateAddress(address, 4, 4)}</span>) and
+            network ({network === 'PUBLIC' ? 'Mainnet' : 'Testnet'}) so it can read your balance. It cannot move
+            funds — signing always needs a separate prompt, and your secret key never leaves Lantern.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={rejectConnect}
+              className="flex-1 rounded-full border border-outline px-4 py-2.5 text-label-md font-semibold text-on-surface-variant active:scale-95"
+            >
+              Reject
+            </button>
+            <button
+              onClick={approveConnect}
+              className="flex-1 rounded-full bg-primary-container px-4 py-2.5 text-label-md font-semibold text-on-primary-container shadow-primary active:scale-95"
+            >
+              Connect
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
