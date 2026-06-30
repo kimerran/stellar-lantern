@@ -88,7 +88,7 @@ export function App() {
           {tab === 'send' && (
             <Send address={address} network={network} onDone={() => setTab('activity')} />
           )}
-          {tab === 'apps' && <Apps address={address} />}
+          {tab === 'apps' && <Apps address={address} network={settings.network} />}
         </div>
       </main>
 
