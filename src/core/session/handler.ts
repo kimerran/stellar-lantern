@@ -105,6 +105,18 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
       return ok<'SIGN_AND_SUBMIT'>({ hash: res.hash });
     }
 
+    case 'SIGN_MESSAGE': {
+      if (!session) {
+        return { ok: false, error: 'Wallet is locked.', code: 'LOCKED' };
+      }
+      await armAutoLock();
+      // Domain-separate the input so a signed "message" can never be a valid
+      // transaction signature. Sign the UTF-8 bytes; return base64.
+      const bytes = Buffer.from(`${SIGN_MESSAGE_PREFIX}${req.message}`, 'utf8');
+      const signature = session.keypair.sign(bytes).toString('base64');
+      return ok<'SIGN_MESSAGE'>({ signature });
+    }
+
     case 'RESET_WALLET': {
       lock();
       await clearVault();
@@ -112,6 +124,9 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
     }
   }
 }
+
+// Prefix that domain-separates wallet-signed messages from transaction envelopes.
+export const SIGN_MESSAGE_PREFIX = 'Lantern signed message:\n';
 
 // Public entry point. Never throws — converts errors to readable Results so
 // both the service worker and the in-process (mobile) caller can rely on it.
