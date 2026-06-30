@@ -9,6 +9,19 @@ import '../styles/tailwind.css';
 // instead of the fixed 360×600 extension popup box (see tailwind.css html.native).
 if (isNativePlatform()) {
   document.documentElement.classList.add('native');
+  // Draw the WebView edge-to-edge under the status bar so env(safe-area-inset-*)
+  // resolves on Android < 15 too (it's enforced on 15+). Dynamically imported so
+  // the extension popup bundle never pulls in the native plugin. Light icons over
+  // the navy theme. Failures are non-fatal (e.g. status bar unavailable).
+  void (async () => {
+    try {
+      const { StatusBar, Style } = await import('@capacitor/status-bar');
+      await StatusBar.setOverlaysWebView({ overlay: true });
+      await StatusBar.setStyle({ style: Style.Dark });
+    } catch {
+      /* status bar plugin not present / unsupported — safe-area padding is still applied */
+    }
+  })();
 }
 
 // Expanded ("open in full tab") mode — same wallet rendered as a centered card.
