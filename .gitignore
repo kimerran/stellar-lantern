@@ -1,5 +1,6 @@
 node_modules
 dist
+dist-mobile
 *.local
 .DS_Store
 .vite
@@ -12,3 +13,11 @@ BRAND.md
 
 # Packaged extension artifacts
 release
+
+# Capacitor / Android build outputs
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/app/src/main/assets/public/
+android/capacitor-cordova-android-plugins/
