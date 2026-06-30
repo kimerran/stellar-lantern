@@ -19,6 +19,7 @@
   "dependencies": {
     "@capacitor/core": "^8.4.1",
     "@capacitor/preferences": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.2",
     "@noble/hashes": "1.8.0",
     "@stellar/stellar-sdk": "15.1.0",
     "bip39": "3.1.0",
