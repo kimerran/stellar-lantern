@@ -75,6 +75,11 @@
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
+    /* Make #root the containing block for the app's fixed overlays (Apps browser,
+       Security) so they're confined to the inset content box, not the raw
+       viewport — otherwise they'd run under the system bars (same trick as
+       expanded mode above). */
+    transform: translateZ(0);
   }
 
   /* Visible keyboard focus for every interactive element (a11y: focus-states).
