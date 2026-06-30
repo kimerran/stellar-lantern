@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { Keypair } from '@stellar/stellar-sdk';
 import { __setKV, type KV } from '@shared/kv';
-import { handle, lock } from '@core/session/handler';
+import { handle, lock, SIGN_MESSAGE_PREFIX } from '@core/session/handler';
 
 function memoryKV(): KV {
   const store = new Map<string, string>();
@@ -52,5 +53,33 @@ describe('in-process session handler', () => {
       type: 'SIGN_AND_SUBMIT', xdr: 'x', networkPassphrase: 'p', horizonUrl: 'h',
     });
     expect(res).toMatchObject({ ok: false, code: 'LOCKED' });
+  });
+
+  it('rejects SIGN_MESSAGE while locked', async () => {
+    const res = await handle({ type: 'SIGN_MESSAGE', message: 'hello' });
+    expect(res).toMatchObject({ ok: false, code: 'LOCKED' });
+  });
+
+  it('returns a domain-separated signature verifiable with the public key', async () => {
+    const gen = await handle({ type: 'GENERATE_MNEMONIC', strength: 128 });
+    if (!gen.ok) throw new Error('mnemonic gen failed');
+    const mnemonic = (gen.data as { mnemonic: string }).mnemonic;
+    const created = await handle({ type: 'CREATE_WALLET', mnemonic, password: 'pw' });
+    if (!created.ok) throw new Error('create wallet failed');
+    const address = (created.data as { address: string }).address;
+
+    const message = 'Sign in to BlockHub at 2026-06-30';
+    const res = await handle({ type: 'SIGN_MESSAGE', message });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    const signature = (res.data as { signature: string }).signature;
+
+    // Verify against the domain-separated bytes with the account's public key.
+    const bytes = Buffer.from(`${SIGN_MESSAGE_PREFIX}${message}`, 'utf8');
+    expect(Keypair.fromPublicKey(address).verify(bytes, Buffer.from(signature, 'base64'))).toBe(true);
+    // A different message must NOT verify against the same signature.
+    expect(
+      Keypair.fromPublicKey(address).verify(Buffer.from('other', 'utf8'), Buffer.from(signature, 'base64')),
+    ).toBe(false);
   });
 });
