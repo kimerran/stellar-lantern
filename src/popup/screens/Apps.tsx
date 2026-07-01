@@ -352,7 +352,25 @@ function Browser({
     // Full-viewport overlay (like the Security screen) so the iframe gets a real
     // height to fill — nested in the padded tab area, h-full collapses and the
     // iframe falls back to its default 150px.
-    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+    //
+    // Safe-area insets (Android edge-to-edge): #root's `transform` makes it the
+    // containing block for this `fixed` overlay, but a transformed ancestor's
+    // containing block is its *padding box* — absolute/fixed children are laid
+    // against that box and so overlap #root's safe-area padding instead of being
+    // inset by it. So a bare `inset-0` runs the header under the status bar and
+    // the bottom sheets under the gesture bar. Inset the overlay box itself and
+    // every child (header at top, bottom approval sheets at bottom-0) lands in
+    // the safe area, with no double-inset. On the extension/desktop popup there
+    // is no safe area, so env(...) resolves to 0 and nothing changes.
+    <div
+      className="fixed z-50 flex flex-col bg-background"
+      style={{
+        top: 'env(safe-area-inset-top)',
+        bottom: 'env(safe-area-inset-bottom)',
+        left: 'env(safe-area-inset-left)',
+        right: 'env(safe-area-inset-right)',
+      }}
+    >
       <header className="flex h-12 shrink-0 items-center gap-2 bg-surface-container-low px-2">
         <button
           onClick={onClose}
