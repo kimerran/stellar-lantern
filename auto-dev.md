@@ -10,7 +10,7 @@ Before starting, make sure to read these files to get more context:
 
 1. **Fetch open issues assigned to you (or with a specific label):**
 ```
-   REPO=$(git remote get-url origin | sed 's/.*://' | sed 's/.git$//') && gh issue list --repo "$REPO" --label "agent-ready,agent-claude" --state open --json number,title,body,labels,comments --limit 10
+   REPO=$(git remote get-url origin | sed 's/.*://' | sed 's/.git$//') && gh issue list --repo "$REPO" --label "agent-ready" --state open --json number,title,body,labels,comments --limit 10
 
 ```
 
