@@ -5,6 +5,7 @@ import type { AssetBalance } from '@shared/types';
 import { sendMessage } from '@shared/messages';
 import { getServer, loadAccountState, destinationFunded } from '@core/stellar/client';
 import { buildTransferXdr, computeMaxXlm, memoByteLength, type AssetRef } from '@core/stellar/tx';
+import { fetchHistory, recentRecipients } from '@core/history/history';
 import { isValidPublicKey } from '@core/wallet/wallet';
 import { MAX_MEMO_BYTES } from '@shared/constants';
 import { formatAmount, truncateAddress } from '@shared/format';
@@ -40,6 +41,7 @@ export function Send({ address, network, onDone }: Props) {
   const [subentryCount, setSubentryCount] = useState(0);
 
   const [to, setTo] = useState('');
+  const [recipients, setRecipients] = useState<string[]>([]);
   const [assetKey, setAssetKey] = useState('XLM');
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
@@ -76,6 +78,22 @@ export function Send({ address, network, onDone }: Props) {
       setBalances(s.balances);
       setSubentryCount(s.subentryCount);
     });
+  }, [network, address]);
+
+  // Recent recipients shortcut — derived from decoded tx history. Best-effort:
+  // an unfunded account (no history) or a network hiccup just yields no chips.
+  useEffect(() => {
+    let cancelled = false;
+    void fetchHistory(network, address)
+      .then((page) => {
+        if (!cancelled) setRecipients(recentRecipients(page.items).filter((r) => r !== address));
+      })
+      .catch(() => {
+        /* no history available — show no shortcuts */
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [network, address]);
 
   const selected = useMemo(
@@ -352,6 +370,30 @@ export function Send({ address, network, onDone }: Props) {
           </button>
         </div>
       </div>
+
+      {/* Recent recipients — one tap to refill the destination. */}
+      {recipients.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-label-sm uppercase tracking-wide text-on-surface-variant">Recent</p>
+          <div className="flex flex-wrap gap-2">
+            {recipients.map((r) => (
+              <button
+                key={r}
+                type="button"
+                aria-label={`Send to recent recipient ${truncateAddress(r, 4, 4)}`}
+                onClick={() => {
+                  setTo(r);
+                  setError(null);
+                }}
+                className="flex items-center gap-1 rounded-full border border-outline-variant px-2.5 py-1 font-mono text-label-sm text-on-surface-variant transition-colors hover:border-primary-container hover:text-on-surface active:scale-95"
+              >
+                <Icon name="history" size={13} />
+                {truncateAddress(r, 4, 4)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Asset selector */}
       <div>
