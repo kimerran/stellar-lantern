@@ -3,6 +3,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { isNativePlatform } from '@shared/kv';
 import { App } from './App';
+import { ToastProvider } from './components/Toast';
 import '../styles/tailwind.css';
 
 // On Android (Capacitor) fill the whole device viewport + respect safe areas,
@@ -34,6 +35,8 @@ if (!root) throw new Error('Root element not found');
 
 createRoot(root).render(
   <React.StrictMode>
-    <App />
+    <ToastProvider>
+      <App />
+    </ToastProvider>
   </React.StrictMode>,
 );

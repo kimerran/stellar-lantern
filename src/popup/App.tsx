@@ -6,6 +6,7 @@ import { isNativePlatform } from '@shared/kv';
 import { AppBar } from './components/AppBar';
 import { BottomNav, type Tab } from './components/BottomNav';
 import { Icon } from './components/Icon';
+import { useToast } from './components/Toast';
 import { Onboarding } from './screens/Onboarding';
 import { Unlock } from './screens/Unlock';
 import { Assets } from './screens/Assets';
@@ -27,6 +28,7 @@ export function App() {
   const { settings, toggleNetwork } = useSettings();
   const [tab, setTab] = useState<Tab>('assets');
   const [scanOpen, setScanOpen] = useState(false);
+  const showToast = useToast();
 
   if (!status || !settings) return <Splash />;
 
@@ -45,7 +47,10 @@ export function App() {
   const address = status.address;
 
   const copyAddress = () => {
-    void navigator.clipboard.writeText(address);
+    navigator.clipboard.writeText(address).then(
+      () => showToast('Address copied'),
+      () => showToast('Couldn’t copy address'),
+    );
   };
 
   // Already in a full tab? Then don't offer "expand" again.
