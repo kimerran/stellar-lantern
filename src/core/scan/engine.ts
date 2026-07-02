@@ -1,6 +1,7 @@
 import { ACTION_FOR, type DecodedOp, type ScanContext, type ScanReason, type ScanVerdict } from './types';
 import { decodeTransaction } from './decode';
 import { explainTransaction } from './explainer';
+import { truncateAddress } from '@shared/format';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MOCK scan engine.
@@ -91,11 +92,19 @@ export function scan({ xdr, networkPassphrase, context }: ScanInput): ScanVerdic
   }
 
   if (decoded?.isSoroban) {
+    // Name the specific function + contract when the op is a contract
+    // invocation (vs. an opaque wasm-upload / create-contract host function).
+    const call = decoded.operations.find(
+      (o) => o.type === 'invokeHostFunction' && o.contractFunction,
+    );
+    const detail = call?.contractFunction
+      ? `This calls “${call.contractFunction}” on contract ${truncateAddress(call.contractId ?? '', 4, 4)}, which may move funds or change permissions.`
+      : 'This interacts with a contract that may move funds or change permissions.';
     reasons.push({
       code: 'contract_call',
       severity: 'medium',
       title: 'Smart contract call',
-      detail: 'This interacts with a contract that may move funds or change permissions.',
+      detail,
     });
   }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Account, Networks, Operation, TransactionBuilder } from '@stellar/stellar-sdk';
+import { Account, Contract, nativeToScVal, Networks, Operation, TransactionBuilder } from '@stellar/stellar-sdk';
 import { scan, DEMO_FLAGGED_ADDRESSES, sampleVerdict } from '@core/scan/engine';
 import { buildTransferXdr } from '@core/stellar/tx';
 import { analyzeMessage } from '@core/scan/paste';
@@ -37,6 +37,20 @@ function setOptionsXdr(opts: Parameters<typeof Operation.setOptions>[0]): string
     .toXDR();
 }
 
+// A valid Testnet contract id + an unsigned Soroban invoke XDR. No live network
+// — just exercises the decode path (the real Blend supply flow is the rest of
+// #21; this issue only teaches the scanner to *read* which function it calls).
+const SAMPLE_CID = 'CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE';
+function invokeXdr(fn: string): string {
+  const source = new Account(SOURCE, '1');
+  const op = new Contract(SAMPLE_CID).call(fn, nativeToScVal(1, { type: 'i128' }));
+  return new TransactionBuilder(source, { fee: '100', networkPassphrase: pp })
+    .addOperation(op)
+    .setTimeout(180)
+    .build()
+    .toXDR();
+}
+
 describe('decode + explain', () => {
   it('decodes a payment and explains it in one sentence', () => {
     const xdr = xdrFor({ dest: NORMAL_DEST, amount: '12', funded: true });
@@ -67,6 +81,16 @@ describe('decode + explain', () => {
     const xdr = setOptionsXdr({ masterWeight: 0 });
     const decoded = decodeTransaction(xdr, pp);
     expect(decoded?.operations[0]?.masterWeight).toBe(0);
+  });
+
+  it('decodes a Soroban invoke: contract id, function name, and names it in the explanation', () => {
+    const decoded = decodeTransaction(invokeXdr('supply'), pp);
+    const op = decoded?.operations[0];
+    expect(op?.type).toBe('invokeHostFunction');
+    expect(decoded?.isSoroban).toBe(true);
+    expect(op?.contractId).toBe(SAMPLE_CID);
+    expect(op?.contractFunction).toBe('supply');
+    expect(explainTransaction(decoded)).toMatch(/calls .*supply.* on a smart contract/i);
   });
 });
 
@@ -138,6 +162,14 @@ describe('scan engine (mock)', () => {
     const v = scan({ xdr, networkPassphrase: pp, context: { network: 'TESTNET', fromAddress: SOURCE } });
     expect(v.reasons.some((r) => r.code === 'account_control_change')).toBe(false);
     expect(v.risk).toBe('low');
+  });
+
+  it('flags a Soroban contract call as medium and names the function it calls', () => {
+    const v = scan({ xdr: invokeXdr('supply'), networkPassphrase: pp, context: { network: 'TESTNET', fromAddress: SOURCE } });
+    expect(v.risk).toBe('medium');
+    expect(v.tier).toBe(2); // uncertain contract call escalates to (mock) Tier 2
+    const reason = v.reasons.find((r) => r.code === 'contract_call');
+    expect(reason?.detail).toMatch(/supply/);
   });
 
   it('honors the demo forceScenario override', () => {

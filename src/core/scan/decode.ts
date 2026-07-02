@@ -1,4 +1,4 @@
-import { TransactionBuilder, Memo } from '@stellar/stellar-sdk';
+import { Address, TransactionBuilder, Memo } from '@stellar/stellar-sdk';
 import type { DecodedOp, DecodedTx } from './types';
 
 // Decode a Stellar transaction XDR into a display/scan summary (spec §4.1).
@@ -57,8 +57,37 @@ function mapOp(op: Record<string, unknown>): DecodedOp {
       };
     case 'setOptions':
       return { type, ...decodeSetOptions(op) };
+    case 'invokeHostFunction':
+      return { type, ...decodeInvoke(op) };
     default:
       return { type };
+  }
+}
+
+// Pull the contract address + function name out of a Soroban invokeHostFunction
+// op, but only when the host function is an actual *contract invocation*
+// (upload-wasm / create-contract host functions have no callable function, so
+// they decode to just `{ type }` and still count as `isSoroban`). Defensive:
+// any shape we don't recognise falls back to no extra fields.
+function decodeInvoke(op: Record<string, unknown>): Partial<DecodedOp> {
+  try {
+    const func = op.func as
+      | { switch?: () => { name?: string }; invokeContract?: () => unknown }
+      | undefined;
+    if (!func || typeof func.switch !== 'function' || typeof func.invokeContract !== 'function') {
+      return {};
+    }
+    if (func.switch().name !== 'hostFunctionTypeInvokeContract') return {};
+    const inv = func.invokeContract() as {
+      contractAddress: () => unknown;
+      functionName: () => { toString: () => string };
+    };
+    return {
+      contractId: Address.fromScAddress(inv.contractAddress() as never).toString(),
+      contractFunction: inv.functionName().toString(),
+    };
+  } catch {
+    return {};
   }
 }
 

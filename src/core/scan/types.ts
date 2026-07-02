@@ -31,6 +31,10 @@ export interface DecodedOp {
   lowThreshold?: number;
   medThreshold?: number;
   highThreshold?: number;
+  // invokeHostFunction — Soroban contract call. Present only when the host
+  // function is a contract invocation (not upload-wasm / create-contract).
+  contractId?: string; // the C… contract address being invoked
+  contractFunction?: string; // the invoked function name
 }
 
 export interface DecodedTx {

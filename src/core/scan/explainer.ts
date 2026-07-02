@@ -10,6 +10,11 @@ export function explainTransaction(tx: DecodedTx | null): string {
   }
 
   if (tx.isSoroban) {
+    const call = tx.operations.find((o) => o.type === 'invokeHostFunction' && o.contractFunction);
+    if (call?.contractFunction) {
+      const on = call.contractId ? ` (${truncateAddress(call.contractId, 4, 4)})` : '';
+      return `This calls “${call.contractFunction}” on a smart contract${on} that may move funds or change permissions. Only continue if you trust it.`;
+    }
     return 'This lets a smart contract move funds or change permissions on your account. Only continue if you trust it.';
   }
 
