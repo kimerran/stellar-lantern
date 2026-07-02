@@ -18,6 +18,7 @@ export type Request =
   | { type: 'LOCK' }
   | { type: 'PING' } // resets the auto-lock idle timer
   | { type: 'SIGN_AND_SUBMIT'; xdr: string; networkPassphrase: string; horizonUrl: string }
+  | { type: 'SIGN_ONLY'; xdr: string; networkPassphrase: string }
   | { type: 'SIGN_MESSAGE'; message: string }
   | { type: 'RESET_WALLET' };
 
@@ -35,6 +36,7 @@ export type ResponseMap = {
   LOCK: { ok: true };
   PING: { ok: true };
   SIGN_AND_SUBMIT: { hash: string };
+  SIGN_ONLY: { signedXdr: string };
   SIGN_MESSAGE: { signature: string };
   RESET_WALLET: { ok: true };
 };

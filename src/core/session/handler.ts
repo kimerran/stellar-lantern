@@ -105,6 +105,22 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
       return ok<'SIGN_AND_SUBMIT'>({ hash: res.hash });
     }
 
+    case 'SIGN_ONLY': {
+      if (!session) {
+        return { ok: false, error: 'Wallet is locked.', code: 'LOCKED' };
+      }
+      await armAutoLock();
+      // Sign but DO NOT submit — hand the signed XDR back to the caller. Any
+      // signatures already on the envelope are preserved (fromXDR keeps them,
+      // sign() appends ours), so this doubles as a co-signing primitive: a
+      // guardian adds their signature to a partially-signed recovery tx without
+      // broadcasting it, and SEP-10 signs a challenge tx that is returned, never
+      // submitted. Consumers: guardian recovery (#23), anchor SEP-10 auth (#24).
+      const tx = TransactionBuilder.fromXDR(req.xdr, req.networkPassphrase);
+      tx.sign(session.keypair);
+      return ok<'SIGN_ONLY'>({ signedXdr: tx.toXDR() });
+    }
+
     case 'SIGN_MESSAGE': {
       if (!session) {
         return { ok: false, error: 'Wallet is locked.', code: 'LOCKED' };
