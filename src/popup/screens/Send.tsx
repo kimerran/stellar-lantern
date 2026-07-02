@@ -7,6 +7,7 @@ import { getServer, loadAccountState, destinationFunded } from '@core/stellar/cl
 import { buildTransferXdr, computeMaxXlm, memoByteLength, type AssetRef } from '@core/stellar/tx';
 import { fetchHistory, recentRecipients } from '@core/history/history';
 import { isValidPublicKey } from '@core/wallet/wallet';
+import { isNativePlatform } from '@shared/kv';
 import { MAX_MEMO_BYTES } from '@shared/constants';
 import { formatAmount, truncateAddress } from '@shared/format';
 import { scan } from '@core/scan/engine';
@@ -17,6 +18,7 @@ import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { ScanBadge } from '../components/ScanBadge';
 import { RiskCallout } from '../components/RiskCallout';
+import { HoldToConfirm } from '../components/HoldToConfirm';
 
 interface Props {
   address: string;
@@ -252,7 +254,9 @@ export function Send({ address, network, onDone }: Props) {
   // ── Review (with Lantern scan) ──
   if (step === 'review' && review) {
     const isHigh = verdict?.action === 'block_confirm';
-    const acknowledged = !isHigh || confirmText.trim().toUpperCase() === 'CONFIRM';
+    // Mobile replaces the typed-CONFIRM gate with a press-and-hold button.
+    const native = isNativePlatform();
+    const acknowledged = !isHigh || native || confirmText.trim().toUpperCase() === 'CONFIRM';
 
     return (
       <div className="space-y-4 pt-2">
@@ -305,8 +309,9 @@ export function Send({ address, network, onDone }: Props) {
           <ReviewRow label="Network" value={network.label} />
         </Card>
 
-        {/* High-risk friction: type-to-confirm (spec §2, §7 Phase 4) */}
-        {isHigh && !scanning && (
+        {/* High-risk friction: type-to-confirm on desktop/extension (spec §2,
+            §7 Phase 4). Mobile uses the press-and-hold button below instead. */}
+        {isHigh && !scanning && !native && (
           <div className="space-y-2">
             <p className="text-label-sm text-error">
               To proceed anyway, type <span className="font-mono font-semibold">CONFIRM</span> below.
@@ -326,17 +331,26 @@ export function Send({ address, network, onDone }: Props) {
         </p>
       )}
 
-        <Button
-          fullWidth
-          onClick={confirm}
-          loading={submitting}
-          disabled={scanning || !acknowledged}
-          variant={isHigh ? 'secondary' : 'primary'}
-          trailingIcon="lock"
-          className={isHigh ? '!border-error/50 !text-error' : ''}
-        >
-          {isHigh ? 'Sign Anyway' : 'Confirm & Send'}
-        </Button>
+        {isHigh && native && !scanning ? (
+          <HoldToConfirm
+            label={submitting ? 'Sending…' : 'Hold to Sign Anyway'}
+            danger
+            onConfirm={confirm}
+            disabled={submitting}
+          />
+        ) : (
+          <Button
+            fullWidth
+            onClick={confirm}
+            loading={submitting}
+            disabled={scanning || !acknowledged}
+            variant={isHigh ? 'secondary' : 'primary'}
+            trailingIcon="lock"
+            className={isHigh ? '!border-error/50 !text-error' : ''}
+          >
+            {isHigh ? 'Sign Anyway' : 'Confirm & Send'}
+          </Button>
+        )}
       </div>
     );
   }

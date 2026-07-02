@@ -24,6 +24,8 @@ import { Icon } from '../components/Icon';
 import { Card } from '../components/Card';
 import { RiskCallout } from '../components/RiskCallout';
 import { ScanBadge } from '../components/ScanBadge';
+import { HoldToConfirm } from '../components/HoldToConfirm';
+import { isNativePlatform } from '@shared/kv';
 
 // In-app mini-app browser (README "Mini-app browser for Stellar dApps").
 //
@@ -493,7 +495,9 @@ function Browser({
           same Lantern scan as the wallet's own Send flow before any signing. */}
       {signReq && (() => {
         const isHigh = signReq.verdict.action === 'block_confirm';
-        const acknowledged = !isHigh || confirmText.trim().toUpperCase() === 'CONFIRM';
+        // Mobile replaces the typed-CONFIRM gate with a press-and-hold button.
+        const native = isNativePlatform();
+        const acknowledged = !isHigh || native || confirmText.trim().toUpperCase() === 'CONFIRM';
         return (
           <div className="absolute inset-x-0 bottom-0 z-20 max-h-[80%] space-y-3 overflow-y-auto rounded-t-2xl border-t border-outline-variant/40 bg-surface-container p-4 shadow-layer-1">
             <div className="flex items-center gap-2">
@@ -530,7 +534,7 @@ function Browser({
               <span>~{signReq.fee} XLM · {network === 'PUBLIC' ? 'Mainnet' : 'Testnet'}</span>
             </div>
 
-            {isHigh && (
+            {isHigh && !native && (
               <input
                 value={confirmText}
                 onChange={(e) => setConfirmText(e.target.value)}
@@ -548,17 +552,27 @@ function Browser({
               >
                 Reject
               </button>
-              <button
-                onClick={approveSign}
-                disabled={submitting || !acknowledged}
-                className={`flex-1 rounded-full px-4 py-2.5 text-label-md font-semibold active:scale-95 disabled:opacity-50 ${
-                  isHigh
-                    ? 'border border-error/50 text-error'
-                    : 'bg-primary-container text-on-primary-container shadow-primary'
-                }`}
-              >
-                {submitting ? 'Sending…' : isHigh ? 'Sign anyway' : 'Approve & send'}
-              </button>
+              {isHigh && native ? (
+                <HoldToConfirm
+                  className="flex-1"
+                  label={submitting ? 'Sending…' : 'Hold to Sign anyway'}
+                  danger
+                  onConfirm={approveSign}
+                  disabled={submitting}
+                />
+              ) : (
+                <button
+                  onClick={approveSign}
+                  disabled={submitting || !acknowledged}
+                  className={`flex-1 rounded-full px-4 py-2.5 text-label-md font-semibold active:scale-95 disabled:opacity-50 ${
+                    isHigh
+                      ? 'border border-error/50 text-error'
+                      : 'bg-primary-container text-on-primary-container shadow-primary'
+                  }`}
+                >
+                  {submitting ? 'Sending…' : isHigh ? 'Sign anyway' : 'Approve & send'}
+                </button>
+              )}
             </div>
           </div>
         );
