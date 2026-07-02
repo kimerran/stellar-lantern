@@ -7,6 +7,7 @@ Format: `- YYYY-MM-DD — <summary> (#PR, closes #issue)`
 
 ## Shipped
 
+- 2026-07-02 — Native: **live settings propagation**. `onSettingsChanged` was a no-op on native, leaving non-active surfaces stale after e.g. a network toggle; add an in-process subscriber set that `setSettings` fans out to on native (matching the extension's `chrome.storage.onChanged` behavior), unit-tested. (#30, part of #19)
 - 2026-07-02 — Mobile: **press-and-hold to confirm high-risk signs**. Replaces the typed-`CONFIRM` gate on native (Send + mini-app Apps approval) with a reusable `HoldToConfirm` button that fills a progress track and fires once — no on-screen keyboard, same "no accidental tap" guarantee. Extension keeps typed-`CONFIRM`. (#29, part of #19)
 - 2026-07-02 — UX: **Send recent-recipients shortcut**. Pure `recentRecipients()` derives distinct, newest-first sent-to addresses from decoded tx history (outgoing payments + account creations; ignores incoming/swap/failed/self), unit-tested; Send form shows up to 3 as tappable chips that refill the destination. (#28, part of #19)
 - 2026-07-02 — Android launcher icon: replace Capacitor's placeholder with the real **Lantern amber mark** across all mipmap densities (legacy square, circle-masked round, and adaptive foreground) + navy adaptive background. Generated from the same source art as the extension icons (`logo.jpg`) via a new cross-platform `scripts/gen-android-icons.mjs` (`npm run icons:android`, sharp-based) so the two sets can't silently diverge. (#25, closes #20)
