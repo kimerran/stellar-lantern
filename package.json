@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "icons": "node scripts/gen-icons.mjs",
+    "icons:android": "node scripts/gen-android-icons.mjs",
     "package": "npm run build && node scripts/package.mjs",
     "build:mobile": "tsc --noEmit && vite build --config vite.config.mobile.ts",
     "cap:sync": "npx cap sync android"
@@ -43,6 +44,7 @@
     "eslint-plugin-react-hooks": "4.6.2",
     "postcss": "8.5.15",
     "prettier": "3.4.2",
+    "sharp": "^0.35.3",
     "tailwindcss": "3.4.19",
     "typescript": "5.7.2",
     "vite": "6.3.6",
