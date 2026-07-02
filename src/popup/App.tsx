@@ -49,7 +49,7 @@ export function App() {
   const copyAddress = () => {
     navigator.clipboard.writeText(address).then(
       () => showToast('Address copied'),
-      () => showToast('Couldn’t copy address'),
+      () => showToast('Couldn’t copy address', 'error'),
     );
   };
 

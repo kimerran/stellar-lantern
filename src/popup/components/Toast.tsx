@@ -1,14 +1,16 @@
 import { createContext, useCallback, useContext, useRef, useState } from 'react';
 import { Icon } from './Icon';
 
-type ShowToast = (message: string) => void;
+type ToastVariant = 'success' | 'error';
+type ShowToast = (message: string, variant?: ToastVariant) => void;
 
 const ToastContext = createContext<ShowToast>(() => {});
 
 /**
- * Show a brief, auto-dismissing confirmation toast (e.g. "Address copied").
- * Returns a no-op if used outside a {@link ToastProvider}, so callers never
- * need to guard.
+ * Show a brief, auto-dismissing toast (e.g. "Address copied"). Pass
+ * `'error'` for failures so the icon/colour reflect the outcome; defaults to
+ * `'success'`. Returns a no-op if used outside a {@link ToastProvider}, so
+ * callers never need to guard.
  */
 export function useToast(): ShowToast {
   return useContext(ToastContext);
@@ -17,6 +19,7 @@ export function useToast(): ShowToast {
 interface ToastState {
   id: number;
   message: string;
+  variant: ToastVariant;
 }
 
 const VISIBLE_MS = 1600;
@@ -29,9 +32,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const counter = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const show = useCallback<ShowToast>((message) => {
+  const show = useCallback<ShowToast>((message, variant = 'success') => {
     counter.current += 1;
-    setToast({ id: counter.current, message });
+    setToast({ id: counter.current, message, variant });
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => setToast(null), VISIBLE_MS);
   }, []);
@@ -51,7 +54,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             aria-live="polite"
             className="flex items-center gap-1.5 rounded-full bg-surface-container-high px-3.5 py-2 text-label-md text-on-surface shadow-lg animate-toast-in"
           >
-            <Icon name="check_circle" filled size={16} className="text-primary-container" />
+            <Icon
+              name={toast.variant === 'error' ? 'error' : 'check_circle'}
+              filled
+              size={16}
+              className={toast.variant === 'error' ? 'text-error' : 'text-primary-container'}
+            />
             {toast.message}
           </div>
         </div>

@@ -127,7 +127,7 @@ export function Scan({ onBack }: { onBack: () => void }) {
               onClick={() =>
                 navigator.clipboard.writeText(flagged!).then(
                   () => showToast('Address copied'),
-                  () => showToast('Couldn’t copy address'),
+                  () => showToast('Couldn’t copy address', 'error'),
                 )
               }
               className="flex items-center gap-1.5 font-mono text-label-md text-primary hover:text-primary-container"
