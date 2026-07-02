@@ -30,6 +30,10 @@ export function explainTransaction(tx: DecodedTx | null): string {
     case 'pathPaymentStrictReceive':
       sentence = `This swaps assets and sends about ${amount} ${asset} to ${to}.`;
       break;
+    case 'setOptions':
+      sentence =
+        'This changes who can sign for your account or the approval thresholds it requires. Only continue if you set this up yourself.';
+      break;
     default:
       sentence = `This performs a ${humanizeType(first.type)} operation.`;
   }

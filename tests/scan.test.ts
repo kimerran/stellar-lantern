@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Networks } from '@stellar/stellar-sdk';
+import { Account, Networks, Operation, TransactionBuilder } from '@stellar/stellar-sdk';
 import { scan, DEMO_FLAGGED_ADDRESSES, sampleVerdict } from '@core/scan/engine';
 import { buildTransferXdr } from '@core/stellar/tx';
 import { analyzeMessage } from '@core/scan/paste';
@@ -25,6 +25,18 @@ function xdrFor(opts: { dest: string; amount: string; funded: boolean; memo?: st
   });
 }
 
+// Build an unsigned setOptions XDR directly via the SDK (there is no
+// buildSetOptions helper in core yet — the guardian-recovery flow that adds one
+// is the rest of #23; this issue only teaches the scanner to *read* it).
+function setOptionsXdr(opts: Parameters<typeof Operation.setOptions>[0]): string {
+  const source = new Account(SOURCE, '1');
+  return new TransactionBuilder(source, { fee: '100', networkPassphrase: pp })
+    .addOperation(Operation.setOptions(opts))
+    .setTimeout(180)
+    .build()
+    .toXDR();
+}
+
 describe('decode + explain', () => {
   it('decodes a payment and explains it in one sentence', () => {
     const xdr = xdrFor({ dest: NORMAL_DEST, amount: '12', funded: true });
@@ -39,6 +51,22 @@ describe('decode + explain', () => {
     const decoded = decodeTransaction(xdr, pp);
     expect(decoded?.operations[0]?.type).toBe('createAccount');
     expect(explainTransaction(decoded)).toMatch(/creates and funds a new account/i);
+  });
+
+  it('decodes a setOptions signer add and explains it as a control change', () => {
+    const xdr = setOptionsXdr({ signer: { ed25519PublicKey: NORMAL_DEST, weight: 1 } });
+    const decoded = decodeTransaction(xdr, pp);
+    const op = decoded?.operations[0];
+    expect(op?.type).toBe('setOptions');
+    expect(op?.signerKey).toBe(NORMAL_DEST);
+    expect(op?.signerWeight).toBe(1);
+    expect(explainTransaction(decoded)).toMatch(/who can sign|thresholds/i);
+  });
+
+  it('preserves masterWeight 0 (not dropped as unset)', () => {
+    const xdr = setOptionsXdr({ masterWeight: 0 });
+    const decoded = decodeTransaction(xdr, pp);
+    expect(decoded?.operations[0]?.masterWeight).toBe(0);
   });
 });
 
@@ -80,6 +108,36 @@ describe('scan engine (mock)', () => {
     const v = scan({ xdr, networkPassphrase: pp, context: { network: 'TESTNET', fromAddress: SOURCE, destinationFunded: true, spendableXlm: '1000' } });
     expect(v.reasons.some((r) => r.code === 'memo_language')).toBe(true);
     expect(v.risk).toBe('high');
+  });
+
+  it('blocks adding a signer (account-control change) as high', () => {
+    const xdr = setOptionsXdr({ signer: { ed25519PublicKey: NORMAL_DEST, weight: 1 } });
+    const v = scan({ xdr, networkPassphrase: pp, context: { network: 'TESTNET', fromAddress: SOURCE } });
+    expect(v.risk).toBe('high');
+    expect(v.action).toBe('block_confirm');
+    expect(v.reasons.some((r) => r.code === 'account_control_change')).toBe(true);
+  });
+
+  it('blocks a threshold change as high', () => {
+    const xdr = setOptionsXdr({ highThreshold: 2, medThreshold: 2, lowThreshold: 1 });
+    const v = scan({ xdr, networkPassphrase: pp, context: { network: 'TESTNET', fromAddress: SOURCE } });
+    expect(v.risk).toBe('high');
+    expect(v.reasons.some((r) => r.code === 'account_control_change')).toBe(true);
+  });
+
+  it('escalates masterWeight 0 to a "gives up control" warning', () => {
+    const xdr = setOptionsXdr({ masterWeight: 0 });
+    const v = scan({ xdr, networkPassphrase: pp, context: { network: 'TESTNET', fromAddress: SOURCE } });
+    expect(v.risk).toBe('high');
+    const reason = v.reasons.find((r) => r.code === 'account_control_change');
+    expect(reason?.title).toMatch(/gives up/i);
+  });
+
+  it('does not flag a home-domain-only setOptions', () => {
+    const xdr = setOptionsXdr({ homeDomain: 'example.com' });
+    const v = scan({ xdr, networkPassphrase: pp, context: { network: 'TESTNET', fromAddress: SOURCE } });
+    expect(v.reasons.some((r) => r.code === 'account_control_change')).toBe(false);
+    expect(v.risk).toBe('low');
   });
 
   it('honors the demo forceScenario override', () => {

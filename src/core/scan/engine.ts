@@ -1,4 +1,4 @@
-import { ACTION_FOR, type ScanContext, type ScanReason, type ScanVerdict } from './types';
+import { ACTION_FOR, type DecodedOp, type ScanContext, type ScanReason, type ScanVerdict } from './types';
 import { decodeTransaction } from './decode';
 import { explainTransaction } from './explainer';
 
@@ -99,6 +99,23 @@ export function scan({ xdr, networkPassphrase, context }: ScanInput): ScanVerdic
     });
   }
 
+  // setOptions signer/threshold changes are irreversible, high-impact edits to
+  // who controls the account (spec §4.1 / README "removing a signer, raising/
+  // lowering thresholds"). A malicious request here is far more dangerous than a
+  // one-off payment, so surface it as high before any signing prompt.
+  const control = decoded?.operations.find(isAccountControlChange);
+  if (control) {
+    const losesControl = control.masterWeight === 0;
+    reasons.push({
+      code: 'account_control_change',
+      severity: 'high',
+      title: losesControl ? 'Gives up account control' : 'Changes account control',
+      detail: losesControl
+        ? 'This sets your own key’s weight to zero — you could permanently lose the ability to sign for this account. Only continue if you set this up yourself.'
+        : 'This adds or removes a signer or changes the approval thresholds on your account — an irreversible, high-impact change. Only continue if you set this up yourself.',
+    });
+  }
+
   return verdictFrom(reasons, explanation);
 }
 
@@ -116,6 +133,19 @@ function verdictFrom(reasons: ScanReason[], explanation: string): ScanVerdict {
     tier: risk === 'low' ? 0 : escalated ? 2 : 1,
     latencyMs: mockLatency(risk),
   };
+}
+
+// A setOptions op is a control change when it touches signers or any threshold
+// (including masterWeight). Home-domain / flag-only setOptions are ignored here.
+function isAccountControlChange(op: DecodedOp): boolean {
+  return (
+    op.type === 'setOptions' &&
+    (op.signerKey != null ||
+      op.masterWeight != null ||
+      op.lowThreshold != null ||
+      op.medThreshold != null ||
+      op.highThreshold != null)
+  );
 }
 
 function highestSeverity(reasons: ScanReason[]): 'low' | 'medium' | 'high' {
