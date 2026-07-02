@@ -42,6 +42,9 @@ Before starting, make sure to read these files to get more context:
 5. **After processing all issues, stop and summarize what you did.**
 
 ## Rules
+- **Commit identity:** before committing, set the team identity so commits are not attributed to you or an individual:
+  `git config user.name "Artisan Team" && git config user.email "team@artisan.xyz"`
+  Do NOT add a `Co-Authored-By: Claude` trailer.
 - Use git worktrees to work on each issue
 - Do not auto-merge PRs - this will be decided by the human!!!
 - Never ask the human operator for input. Decide and act.
