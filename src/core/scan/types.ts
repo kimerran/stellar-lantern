@@ -17,10 +17,20 @@ export interface ScanReason {
 
 // What `scan()` learns from decoding the transaction XDR.
 export interface DecodedOp {
-  type: string; // 'payment' | 'createAccount' | 'invokeHostFunction' | …
+  type: string; // 'payment' | 'createAccount' | 'invokeHostFunction' | 'setOptions' | …
   destination?: string;
   assetCode?: string;
   amount?: string;
+  // setOptions — account-control changes (signers / thresholds). Present only
+  // for the fields the op actually sets; a value of 0 is meaningful (e.g.
+  // masterWeight 0 = the account gives up its own key), so these use
+  // `undefined` for "unset", never 0.
+  signerKey?: string; // the signer being added/removed (weight 0 = removed)
+  signerWeight?: number;
+  masterWeight?: number;
+  lowThreshold?: number;
+  medThreshold?: number;
+  highThreshold?: number;
 }
 
 export interface DecodedTx {
