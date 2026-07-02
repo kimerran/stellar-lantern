@@ -79,6 +79,82 @@ export function buildTransferXdr(params: BuildTransferParams): string {
   return builder.setTimeout(timeoutSecs).build().toXDR();
 }
 
+// ── Weighted multi-sig (setOptions) — social-recovery primitive (#23) ────────
+
+export interface SignerChange {
+  ed25519PublicKey: string; // guardian / co-signer account
+  weight: number; // 1–255 to add or re-weight, 0 to remove
+}
+
+export interface BuildSetOptionsParams {
+  sourceAccountId: string;
+  sourceSequence: string;
+  networkPassphrase: string;
+  baseFee: string; // stroops, as string
+  signer?: SignerChange;
+  masterWeight?: number;
+  lowThreshold?: number;
+  medThreshold?: number;
+  highThreshold?: number;
+  timeoutSecs?: number;
+}
+
+const WEIGHT_MIN = 0;
+const WEIGHT_MAX = 255;
+
+function assertWeight(label: string, w: number | undefined): void {
+  if (w === undefined) return;
+  if (!Number.isInteger(w) || w < WEIGHT_MIN || w > WEIGHT_MAX) {
+    throw new Error(`${label} must be an integer between ${WEIGHT_MIN} and ${WEIGHT_MAX}.`);
+  }
+}
+
+// Builds the *unsigned* XDR for a weighted-multisig change — add/remove a
+// guardian signer and/or adjust the account thresholds. This is the on-chain
+// primitive social recovery is built on (#23): signing/co-signing runs through
+// SIGN_ONLY in the worker, and the scanner already flags the result as a
+// high-risk account-control change (core/scan). Only the fields actually being
+// changed are emitted, so an unspecified threshold is never silently zeroed;
+// at least one change must be requested.
+export function buildSetOptionsXdr(params: BuildSetOptionsParams): string {
+  const {
+    sourceAccountId,
+    sourceSequence,
+    networkPassphrase,
+    baseFee,
+    signer,
+    masterWeight,
+    lowThreshold,
+    medThreshold,
+    highThreshold,
+    timeoutSecs = 180,
+  } = params;
+
+  assertWeight('signer weight', signer?.weight);
+  assertWeight('masterWeight', masterWeight);
+  assertWeight('lowThreshold', lowThreshold);
+  assertWeight('medThreshold', medThreshold);
+  assertWeight('highThreshold', highThreshold);
+
+  const opts: Parameters<typeof Operation.setOptions>[0] = {};
+  if (signer) opts.signer = { ed25519PublicKey: signer.ed25519PublicKey, weight: signer.weight };
+  if (masterWeight !== undefined) opts.masterWeight = masterWeight;
+  if (lowThreshold !== undefined) opts.lowThreshold = lowThreshold;
+  if (medThreshold !== undefined) opts.medThreshold = medThreshold;
+  if (highThreshold !== undefined) opts.highThreshold = highThreshold;
+
+  if (Object.keys(opts).length === 0) {
+    throw new Error('setOptions requires at least one signer or threshold change.');
+  }
+
+  const source = new Account(sourceAccountId, sourceSequence);
+  return new TransactionBuilder(source, { fee: baseFee || BASE_FEE, networkPassphrase })
+    .addOperation(Operation.setOptions(opts))
+    .setTimeout(timeoutSecs)
+    .build()
+    .toXDR();
+}
+
 // MAX spendable XLM = balance − (base reserve × (2 + subentries)) − fee buffer.
 // The +2 covers the base account reserve (2 entries). Never strand the account
 // below its minimum reserve. Returns a 7-dp string, clamped at 0.
