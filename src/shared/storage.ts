@@ -40,17 +40,31 @@ export async function getSettings(): Promise<Settings> {
   return { ...DEFAULT_SETTINGS, ...(parse<Partial<Settings>>(await kv.get(SETTINGS_KEY)) ?? {}) };
 }
 
+// In-process settings subscribers, used on native only. The extension gets
+// cross-surface change events for free via chrome.storage.onChanged; native is
+// a single JS context with no storage events, so we fan writes out ourselves.
+const nativeSettingsListeners = new Set<(settings: Settings) => void>();
+
 export async function setSettings(patch: Partial<Settings>): Promise<Settings> {
   const kv = await getKV();
   const next = { ...(await getSettings()), ...patch };
   await kv.set(SETTINGS_KEY, JSON.stringify(next));
+  if (isNativePlatform()) {
+    for (const cb of nativeSettingsListeners) cb(next);
+  }
   return next;
 }
 
-// On native there is a single process and no storage-change events; the UI
-// re-reads settings on demand, so the subscription is a no-op there.
+// Subscribe to settings changes so every mounted surface stays in sync. On the
+// extension this bridges chrome.storage.onChanged; on native it registers with
+// the in-process fan-out above (matching the extension's live-update behavior).
 export function onSettingsChanged(cb: (settings: Settings) => void): () => void {
-  if (isNativePlatform()) return () => {};
+  if (isNativePlatform()) {
+    nativeSettingsListeners.add(cb);
+    return () => {
+      nativeSettingsListeners.delete(cb);
+    };
+  }
   const listener = (
     changes: { [key: string]: chrome.storage.StorageChange },
     area: string,
