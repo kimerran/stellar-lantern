@@ -109,10 +109,15 @@ const config: Config = {
           '0%': { backgroundPosition: '-200% 0' },
           '100%': { backgroundPosition: '200% 0' },
         },
+        'toast-in': {
+          '0%': { opacity: '0', transform: 'translateY(8px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
       },
       animation: {
         'subtle-glow': 'subtle-glow 3s ease-in-out infinite',
         shimmer: 'shimmer 2s linear infinite',
+        'toast-in': 'toast-in 180ms ease-out',
       },
     },
   },

@@ -7,11 +7,13 @@ import { Icon } from '../components/Icon';
 import { Card } from '../components/Card';
 import { RiskCallout } from '../components/RiskCallout';
 import { ScanBadge } from '../components/ScanBadge';
+import { useToast } from '../components/Toast';
 import { truncateAddress } from '@shared/format';
 
 // Paste-to-check scam analyzer + a demo gallery of the pre-sign warning states
 // (spec §4.5). Backed by the MOCK engine; raw message text is never persisted.
 export function Scan({ onBack }: { onBack: () => void }) {
+  const showToast = useToast();
   const [text, setText] = useState('');
   const [result, setResult] = useState<MessageVerdict | null>(null);
   const [checking, setChecking] = useState(false);
@@ -122,7 +124,12 @@ export function Scan({ onBack }: { onBack: () => void }) {
               Send any amount to this demo-flagged address to trigger the high-risk block:
             </p>
             <button
-              onClick={() => navigator.clipboard.writeText(flagged!)}
+              onClick={() =>
+                navigator.clipboard.writeText(flagged!).then(
+                  () => showToast('Address copied'),
+                  () => showToast('Couldn’t copy address', 'error'),
+                )
+              }
               className="flex items-center gap-1.5 font-mono text-label-md text-primary hover:text-primary-container"
             >
               {truncateAddress(flagged!, 6, 6)}
