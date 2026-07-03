@@ -1,11 +1,12 @@
 import { Account, BASE_FEE, Operation, TransactionBuilder } from '@stellar/stellar-sdk';
 import { isValidPublicKey } from '@core/wallet/wallet';
 
-// Guardian social recovery — builds the on-chain weighted-multisig setup
-// transaction (#23, Milestone 1). Pure: no network, no signing (that runs
-// through SIGN_ONLY in the worker). The result is exactly the kind of
-// high-impact setOptions change the scanner already flags `high` (see
-// core/scan), so it is reviewed + confirmed before signing.
+// Guardian social recovery — builds the on-chain weighted-multisig transactions
+// (#23, Milestone 1): the guardian *setup* and the *recovery* that installs a
+// new device key. Pure: no network, no signing (that runs through SIGN_ONLY in
+// the worker). Both results are exactly the kind of high-impact setOptions
+// change the scanner already flags `high` (see core/scan), so they are
+// reviewed + confirmed before signing.
 
 export interface BuildGuardianSetupParams {
   sourceAccountId: string;
@@ -18,7 +19,12 @@ export interface BuildGuardianSetupParams {
 }
 
 // Max signers Stellar allows on an account (the master key is separate).
-const MAX_GUARDIANS = 20;
+const MAX_SIGNERS = 20;
+// Guardians are capped one below the signer limit so a recovery can ALWAYS add
+// the new device key (the last slot) without exceeding it — this guarantees the
+// feature's core promise ("K guardians can always recover") by construction,
+// rather than letting setup create an account that can never be recovered.
+const MAX_GUARDIANS = MAX_SIGNERS - 1; // 19
 
 // Weighting policy (documented so it can be reviewed and can't silently lock an
 // account OR hand guardians spending rights). Stellar maps operation categories
@@ -58,7 +64,9 @@ export function buildGuardianSetupXdr(params: BuildGuardianSetupParams): string 
 
   if (guardians.length === 0) throw new Error('At least one guardian is required.');
   if (guardians.length > MAX_GUARDIANS) {
-    throw new Error(`At most ${MAX_GUARDIANS} guardians are supported (Stellar's signer limit).`);
+    throw new Error(
+      `At most ${MAX_GUARDIANS} guardians are supported — one signer slot is reserved so recovery can always add a new key within Stellar's ${MAX_SIGNERS}-signer limit.`,
+    );
   }
   if (!Number.isInteger(threshold) || threshold < 1) {
     throw new Error('Threshold must be a positive integer.');
@@ -99,4 +107,72 @@ export function buildGuardianSetupXdr(params: BuildGuardianSetupParams): string 
   );
 
   return builder.setTimeout(timeoutSecs).build().toXDR();
+}
+
+export interface BuildRecoveryParams {
+  sourceAccountId: string; // the account being recovered (unchanged)
+  sourceSequence: string;
+  networkPassphrase: string;
+  baseFee: string; // stroops, as string
+  newSignerKey: string; // fresh device key to install (G…)
+  guardianCount: number; // N — guardians the account has (read from account state)
+  timeoutSecs?: number;
+}
+
+// Builds the recovery transaction (#23, Milestone 1, item 4). When the owner's
+// key is lost, the new device generates a fresh keypair and drafts this tx:
+// install the new key with owner-level weight and disable the lost master key,
+// in a single setOptions.
+//
+// This is a HIGH-threshold change (signer + masterWeight), so under the
+// thresholds buildGuardianSetupXdr installed (`highThreshold = K`) it is
+// authorized by exactly K guardian co-signatures — each collected out-of-band
+// via SIGN_ONLY (#33), no single guardian able to submit alone. It deliberately
+// leaves the thresholds AND the existing guardian signers untouched, so:
+//   - the new key inherits the old owner's power (weight `N+1` meets the low/med
+//     thresholds the setup set, and ≥ K meets high) and operates normally;
+//   - the account stays guardian-protected — the same K-of-N can recover again.
+//
+// Assumes a buildGuardianSetupXdr-configured account (that's where `N+1` comes
+// from); the caller supplies `guardianCount` from the account's current signers.
+export function buildRecoveryXdr(params: BuildRecoveryParams): string {
+  const {
+    sourceAccountId,
+    sourceSequence,
+    networkPassphrase,
+    baseFee,
+    newSignerKey,
+    guardianCount,
+    timeoutSecs = 180,
+  } = params;
+
+  if (!isValidPublicKey(newSignerKey)) throw new Error('Invalid new signer address.');
+  if (newSignerKey === sourceAccountId) {
+    throw new Error('The new signer cannot be the account itself.');
+  }
+  if (!Number.isInteger(guardianCount) || guardianCount < 1) {
+    throw new Error('Guardian count must be a positive integer.');
+  }
+  // The recovery adds one signer; with N guardian signers already present it must
+  // stay within Stellar's signer limit. Setup caps N at MAX_GUARDIANS precisely
+  // to guarantee this always holds, but validate defensively regardless.
+  if (guardianCount > MAX_GUARDIANS) {
+    throw new Error(`Too many guardians to add a new signer within Stellar's ${MAX_SIGNERS}-signer limit.`);
+  }
+
+  // Mirror the setup: the new key gets the same owner-level weight (N+1) so it
+  // meets the low/med thresholds the setup installed and operates normally.
+  const ownerWeight = guardianCount + 1;
+
+  const source = new Account(sourceAccountId, sourceSequence);
+  return new TransactionBuilder(source, { fee: baseFee || BASE_FEE, networkPassphrase })
+    .addOperation(
+      Operation.setOptions({
+        signer: { ed25519PublicKey: newSignerKey, weight: ownerWeight },
+        masterWeight: 0, // disable the lost master key
+      }),
+    )
+    .setTimeout(timeoutSecs)
+    .build()
+    .toXDR();
 }
