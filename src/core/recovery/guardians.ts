@@ -334,3 +334,17 @@ export function describeGuardianSetup(guardianCount: number, threshold: number):
       : `Any ${threshold} of your ${guardianCount} guardians`;
   return `${quorum} can help you recover this account if you lose your key. You keep full control yourself in the meantime.`;
 }
+
+// What changes between the current guardian set and a desired one — for the
+// review screen when editing an existing setup.
+export function guardianDiff(
+  current: string[],
+  desired: string[],
+): { added: string[]; removed: string[] } {
+  const c = new Set(current);
+  const d = new Set(desired);
+  return {
+    added: desired.filter((g) => !c.has(g)),
+    removed: current.filter((g) => !d.has(g)),
+  };
+}

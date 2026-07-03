@@ -8,6 +8,7 @@ import {
   hasThresholdSignatures,
   describeGuardianSetup,
   classifyGuardianConfig,
+  guardianDiff,
 } from '@core/recovery/guardians';
 import { totalFeeXlm } from '@core/stellar/tx';
 import { decodeTransaction } from '@core/scan/decode';
@@ -257,6 +258,15 @@ describe('classifyGuardianConfig', () => {
     expect(cfg.isRecoveryEnabled).toBe(false);
     expect(cfg.guardians).toEqual([]);
     expect(cfg.masterWeight).toBe(1);
+  });
+});
+
+describe('guardianDiff', () => {
+  it('reports added and removed guardians', () => {
+    expect(guardianDiff([G1, G2, G3], [G1, G2, G4])).toEqual({ added: [G4], removed: [G3] });
+  });
+  it('is empty when unchanged', () => {
+    expect(guardianDiff([G1, G2], [G2, G1])).toEqual({ added: [], removed: [] });
   });
 });
 
