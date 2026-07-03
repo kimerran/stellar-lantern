@@ -1,4 +1,4 @@
-import { Account, BASE_FEE, Operation, TransactionBuilder } from '@stellar/stellar-sdk';
+import { Account, BASE_FEE, Operation, TransactionBuilder, WebAuth } from '@stellar/stellar-sdk';
 import { isValidPublicKey } from '@core/wallet/wallet';
 
 // Guardian social recovery — builds the on-chain weighted-multisig transactions
@@ -175,4 +175,36 @@ export function buildRecoveryXdr(params: BuildRecoveryParams): string {
     .setTimeout(timeoutSecs)
     .build()
     .toXDR();
+}
+
+export interface WeightedSigner {
+  key: string; // signer account key (G…)
+  weight: number;
+}
+
+// How much signature weight a (partially-)signed recovery transaction has
+// collected, given the account's signers and their weights. The recovery
+// coordination flow (#23 M1, item 4) uses this to know when enough guardians
+// have co-signed — via SIGN_ONLY (#33), out-of-band — to submit. Pure: no
+// network. Only signatures from the provided signers count; any unknown/extra
+// signature is ignored, so a stray signature can't inflate the tally.
+export function collectedSignatureWeight(
+  xdr: string,
+  networkPassphrase: string,
+  signers: WeightedSigner[],
+): number {
+  const tx = TransactionBuilder.fromXDR(xdr, networkPassphrase);
+  const signed = new Set(WebAuth.gatherTxSigners(tx, signers.map((s) => s.key)));
+  return signers.reduce((sum, s) => (signed.has(s.key) ? sum + s.weight : sum), 0);
+}
+
+// Whether a (partially-)signed recovery tx has reached the weight required to
+// submit — the account's HIGH threshold for a setOptions recovery (= K).
+export function hasThresholdSignatures(
+  xdr: string,
+  networkPassphrase: string,
+  signers: WeightedSigner[],
+  requiredThreshold: number,
+): boolean {
+  return collectedSignatureWeight(xdr, networkPassphrase, signers) >= requiredThreshold;
 }
