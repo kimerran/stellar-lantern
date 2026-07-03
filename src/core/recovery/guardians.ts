@@ -1,6 +1,8 @@
 import { Account, BASE_FEE, Operation, TransactionBuilder, WebAuth } from '@stellar/stellar-sdk';
 import { isValidPublicKey } from '@core/wallet/wallet';
 import type { AccountSigner, AccountThresholds } from '@shared/types';
+import type { DecodedOp, DecodedTx } from '@core/scan/types';
+import { decodeTransaction } from '@core/scan/decode';
 
 // Guardian social recovery — builds the on-chain weighted-multisig transactions
 // (#23, Milestone 1): the guardian *setup* and the *recovery* that installs a
@@ -372,6 +374,60 @@ export function mergeGuardianSignatures(
 
 function signatureId(sig: { hint: () => Buffer; signature: () => Buffer }): string {
   return `${sig.hint().toString('hex')}:${sig.signature().toString('hex')}`;
+}
+
+function isAccountControlOp(op: DecodedOp): boolean {
+  return (
+    op.type === 'setOptions' &&
+    (op.signerKey != null ||
+      op.masterWeight != null ||
+      op.lowThreshold != null ||
+      op.medThreshold != null ||
+      op.highThreshold != null)
+  );
+}
+
+// Whether a decoded transaction is a guardian-recovery request — i.e. EVERY
+// operation is a setOptions signer/threshold change and nothing else. The
+// guardian co-sign screen refuses to sign anything that isn't this, so a
+// guardian can never be tricked into co-signing a payment (or any other op)
+// dressed up as a "recovery". Empty / unreadable transactions are not recovery.
+export function isRecoveryTransaction(decoded: DecodedTx | null): boolean {
+  if (!decoded || decoded.operations.length === 0) return false;
+  return decoded.operations.every(isAccountControlOp);
+}
+
+// Validate a pasted transaction as a guardian co-sign request for the guardian
+// whose own account is `ownAddress`. Returns a user-facing error if it must NOT
+// be co-signed, or null if it's safe to review + sign. Guards, in order:
+//   1. unreadable XDR;
+//   2. SOURCE is the guardian's OWN account — a legitimate co-sign is always for
+//      *someone else's* account (the recovering account, on which the guardian
+//      is a signer). A self-sourced tx co-signed with the guardian's master key
+//      would authorize changes to the guardian's OWN account — an account
+//      takeover of the guardian, not a recovery. This is the critical check.
+//   3. any operation that isn't a setOptions signer/threshold change (e.g. a
+//      payment) — the guardian only ever co-signs recovery here.
+export function recoveryCoSignError(
+  xdr: string,
+  networkPassphrase: string,
+  ownAddress: string,
+): string | null {
+  const trimmed = xdr.trim();
+  let tx;
+  try {
+    tx = TransactionBuilder.fromXDR(trimmed, networkPassphrase);
+  } catch {
+    return 'Couldn’t read this request. Make sure you pasted the whole thing.';
+  }
+  const inner = 'innerTransaction' in tx ? tx.innerTransaction : tx;
+  if (inner.source === ownAddress) {
+    return 'This changes your own account, which isn’t how co-signing works. Don’t sign it.';
+  }
+  if (!isRecoveryTransaction(decodeTransaction(trimmed, networkPassphrase))) {
+    return 'This isn’t a guardian-recovery request. Lantern only co-signs recovery here — never a payment.';
+  }
+  return null;
 }
 
 // What changes between the current guardian set and a desired one — for the
