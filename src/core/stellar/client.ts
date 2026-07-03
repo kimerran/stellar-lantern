@@ -1,6 +1,6 @@
 import { Horizon } from '@stellar/stellar-sdk';
 import type { NetworkConfig } from '@shared/constants';
-import type { AccountState, AssetBalance } from '@shared/types';
+import type { AccountSigner, AccountState, AccountThresholds, AssetBalance } from '@shared/types';
 
 // A single network-aware factory. Never hardcode a Horizon URL at a call site
 // (AGENT §5) — always go through here with the active NetworkConfig.
@@ -49,6 +49,29 @@ export async function loadAccountState(
     if (isNotFound(err)) {
       return { funded: false, balances: [], subentryCount: 0 };
     }
+    throw err;
+  }
+}
+
+// The account's signers + thresholds, for the Guardians & Recovery view.
+// Returns null for an unfunded account (no signers exist yet).
+export async function loadAccountSigners(
+  network: NetworkConfig,
+  address: string,
+): Promise<{ signers: AccountSigner[]; thresholds: AccountThresholds } | null> {
+  const server = getServer(network);
+  try {
+    const account = await server.loadAccount(address);
+    return {
+      signers: account.signers.map((s) => ({ key: s.key, weight: s.weight })),
+      thresholds: {
+        low: account.thresholds.low_threshold,
+        med: account.thresholds.med_threshold,
+        high: account.thresholds.high_threshold,
+      },
+    };
+  } catch (err) {
+    if (isNotFound(err)) return null;
     throw err;
   }
 }
