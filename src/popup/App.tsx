@@ -14,6 +14,7 @@ import { Activity } from './screens/Activity';
 import { Send } from './screens/Send';
 import { Scan } from './screens/Scan';
 import { Apps } from './screens/Apps';
+import { Guardians } from './screens/Guardians';
 
 function Splash() {
   return (
@@ -28,6 +29,7 @@ export function App() {
   const { settings, toggleNetwork } = useSettings();
   const [tab, setTab] = useState<Tab>('assets');
   const [scanOpen, setScanOpen] = useState(false);
+  const [guardiansOpen, setGuardiansOpen] = useState(false);
   const showToast = useToast();
 
   if (!status || !settings) return <Splash />;
@@ -70,6 +72,11 @@ export function App() {
     return <Scan onBack={() => setScanOpen(false)} />;
   }
 
+  // Full-screen Guardians & Recovery overlay.
+  if (guardiansOpen) {
+    return <Guardians address={address} network={network} onBack={() => setGuardiansOpen(false)} />;
+  }
+
   return (
     <div className="flex h-full flex-col bg-background">
       <AppBar
@@ -79,6 +86,7 @@ export function App() {
         onLock={lock}
         onCopyAddress={copyAddress}
         onOpenScan={() => setScanOpen(true)}
+        onOpenGuardians={() => setGuardiansOpen(true)}
         onExpand={isExpanded || isNativePlatform() ? undefined : openExpanded}
       />
 

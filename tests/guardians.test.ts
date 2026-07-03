@@ -5,7 +5,9 @@ import {
   buildRecoveryXdr,
   collectedSignatureWeight,
   hasThresholdSignatures,
+  describeGuardianSetup,
 } from '@core/recovery/guardians';
+import { totalFeeXlm } from '@core/stellar/tx';
 import { decodeTransaction } from '@core/scan/decode';
 import { scan } from '@core/scan/engine';
 import { explainTransaction } from '@core/scan/explainer';
@@ -171,5 +173,33 @@ describe('collectedSignatureWeight / hasThresholdSignatures', () => {
     expect(hasThresholdSignatures(recoverySignedBy(g[0]!), pp, signers, 2)).toBe(false);
     expect(hasThresholdSignatures(recoverySignedBy(g[0]!, g[1]!), pp, signers, 2)).toBe(true);
     expect(hasThresholdSignatures(recoverySignedBy(g[0]!, g[1]!, g[2]!), pp, signers, 2)).toBe(true);
+  });
+});
+
+describe('totalFeeXlm (multi-op fee shown on the setup review)', () => {
+  // The setup tx has N+1 ops, so the total fee is baseFee(100) × (N+1), NOT
+  // baseFee alone — the review screen must show the real total. (Regression for
+  // the (N+1)× fee understatement bug.)
+  it('scales the displayed fee with the operation count', () => {
+    const three = buildGuardianSetupXdr({ ...common, guardians: [G1, G2, G3], threshold: 2 });
+    expect(totalFeeXlm(three, pp)).toBe('0.00004'); // 4 ops × 100 stroops
+    const one = buildGuardianSetupXdr({ ...common, guardians: [G1], threshold: 1 });
+    expect(totalFeeXlm(one, pp)).toBe('0.00002'); // 2 ops × 100 stroops
+  });
+});
+
+describe('describeGuardianSetup', () => {
+  it('describes a K-of-N quorum', () => {
+    expect(describeGuardianSetup(3, 2)).toMatch(/Any 2 of your 3 guardians can help you recover/i);
+  });
+  it('describes an all-guardians quorum', () => {
+    expect(describeGuardianSetup(3, 3)).toMatch(/All 3 guardians can help you recover/i);
+  });
+  it('handles a single guardian', () => {
+    expect(describeGuardianSetup(1, 1)).toMatch(/Your 1 guardian can help you recover/i);
+  });
+  it('returns empty for an invalid/incomplete selection', () => {
+    expect(describeGuardianSetup(0, 1)).toBe('');
+    expect(describeGuardianSetup(2, 3)).toBe(''); // threshold > guardians
   });
 });
