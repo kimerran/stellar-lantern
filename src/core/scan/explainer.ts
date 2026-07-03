@@ -1,4 +1,4 @@
-import type { DecodedTx } from './types';
+import type { DecodedOp, DecodedTx } from './types';
 import { truncateAddress, formatAmount } from '@shared/format';
 
 // Turn a decoded transaction into ONE low-reading-level sentence for the
@@ -36,8 +36,7 @@ export function explainTransaction(tx: DecodedTx | null): string {
       sentence = `This swaps assets and sends about ${amount} ${asset} to ${to}.`;
       break;
     case 'setOptions':
-      sentence =
-        'This changes who can sign for your account or the approval thresholds it requires. Only continue if you set this up yourself.';
+      sentence = describeSetOptions(first);
       break;
     default:
       sentence = `This performs a ${humanizeType(first.type)} operation.`;
@@ -50,6 +49,46 @@ export function explainTransaction(tx: DecodedTx | null): string {
   }
   if (tx.memo) sentence += ` Memo: “${tx.memo}”.`;
   return sentence;
+}
+
+// Spell out exactly what a setOptions op changes — the highest-stakes op type
+// to get right (#23): naming the signer being added/removed with its weight,
+// and any threshold / master-weight change, in plain language. Clauses are
+// lowercase verb phrases so they read naturally after the "This " prefix.
+function describeSetOptions(op: DecodedOp): string {
+  const parts: string[] = [];
+
+  if (op.signerKey) {
+    const who = op.signerKey.startsWith('G') ? truncateAddress(op.signerKey, 4, 4) : op.signerKey;
+    parts.push(
+      op.signerWeight === 0
+        ? `removes signer ${who}`
+        : `adds signer ${who} with weight ${op.signerWeight ?? '?'}`,
+    );
+  }
+
+  if (op.masterWeight !== undefined) {
+    parts.push(
+      op.masterWeight === 0
+        ? 'removes your own key’s signing power'
+        : `sets your own key’s weight to ${op.masterWeight}`,
+    );
+  }
+
+  const thresholds: string[] = [];
+  if (op.lowThreshold !== undefined) thresholds.push(`low ${op.lowThreshold}`);
+  if (op.medThreshold !== undefined) thresholds.push(`medium ${op.medThreshold}`);
+  if (op.highThreshold !== undefined) thresholds.push(`high ${op.highThreshold}`);
+  if (thresholds.length > 0) parts.push(`sets the signing thresholds (${thresholds.join(', ')})`);
+
+  if (parts.length === 0) {
+    // Only non-signer/threshold fields changed (home domain, flags) — generic.
+    return 'This changes account options. Only continue if you set this up yourself.';
+  }
+
+  const joined =
+    parts.length > 1 ? `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}` : parts[0];
+  return `This ${joined}. Only continue if you set this up yourself.`;
 }
 
 function humanizeType(type: string): string {
