@@ -5,6 +5,7 @@ import {
   buildRecoveryXdr,
   collectedSignatureWeight,
   hasThresholdSignatures,
+  mergeGuardianSignatures,
   describeGuardianSetup,
   classifyGuardianConfig,
 } from '@core/recovery/guardians';
@@ -212,6 +213,40 @@ describe('classifyGuardianConfig', () => {
     expect(cfg.isRecoveryEnabled).toBe(false);
     expect(cfg.guardians).toEqual([]);
     expect(cfg.masterWeight).toBe(1);
+  });
+});
+
+describe('mergeGuardianSignatures', () => {
+  const gk = [Keypair.random(), Keypair.random(), Keypair.random()];
+  const signers = gk.map((k) => ({ key: k.publicKey(), weight: 1 }));
+  // One shared recovery XDR that every guardian signs a copy of.
+  const shared = buildRecoveryXdr({ ...common, newSignerKey: NEW_KEY, guardianCount: 3 });
+
+  function signedCopy(k: Keypair, xdr = shared): string {
+    const t = TransactionBuilder.fromXDR(xdr, pp);
+    t.sign(k);
+    return t.toXDR();
+  }
+
+  it('combines separate guardian signatures onto the shared tx (composes with the tally)', () => {
+    const merged = mergeGuardianSignatures(shared, [signedCopy(gk[0]!), signedCopy(gk[1]!)], pp);
+    expect(TransactionBuilder.fromXDR(merged, pp).signatures).toHaveLength(2);
+    expect(collectedSignatureWeight(merged, pp, signers)).toBe(2);
+  });
+
+  it('ignores duplicate signatures', () => {
+    const one = signedCopy(gk[0]!);
+    const merged = mergeGuardianSignatures(shared, [one, one], pp);
+    expect(TransactionBuilder.fromXDR(merged, pp).signatures).toHaveLength(1);
+  });
+
+  it('rejects a signature for a different transaction', () => {
+    const otherXdr = buildRecoveryXdr({ ...common, newSignerKey: G1, guardianCount: 3 });
+    expect(() => mergeGuardianSignatures(shared, [signedCopy(gk[0]!, otherXdr)], pp)).toThrow(/different transaction/i);
+  });
+
+  it('returns the base unchanged when there is nothing to merge', () => {
+    expect(TransactionBuilder.fromXDR(mergeGuardianSignatures(shared, [], pp), pp).signatures).toHaveLength(0);
   });
 });
 

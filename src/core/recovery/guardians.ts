@@ -257,3 +257,42 @@ export function describeGuardianSetup(guardianCount: number, threshold: number):
       : `Any ${threshold} of your ${guardianCount} guardians`;
   return `${quorum} can help you recover this account if you lose your key. You keep full control yourself in the meantime.`;
 }
+
+// Merge the guardian co-signatures collected out-of-band into one transaction
+// ready to submit (#23 M1, item 4). Each guardian signs a copy of the SAME
+// shared recovery XDR on their own device (via SIGN_ONLY, #33) and hands the
+// signed copy back; this combines all their signatures onto the base tx.
+//
+// Security: every signed copy must be the SAME transaction as `baseXdr` — a copy
+// whose transaction hash differs is rejected, so a malicious guardian can't get
+// their signature counted toward a DIFFERENT transaction they slipped in.
+// Duplicate signatures are ignored. Pure: no network, no signing. Pair with
+// hasThresholdSignatures to know when enough weight is collected to submit.
+export function mergeGuardianSignatures(
+  baseXdr: string,
+  signedXdrs: string[],
+  networkPassphrase: string,
+): string {
+  const merged = TransactionBuilder.fromXDR(baseXdr, networkPassphrase);
+  const baseHash = merged.hash().toString('hex');
+  const seen = new Set(merged.signatures.map(signatureId));
+
+  for (const signedXdr of signedXdrs) {
+    const copy = TransactionBuilder.fromXDR(signedXdr, networkPassphrase);
+    if (copy.hash().toString('hex') !== baseHash) {
+      throw new Error('A collected signature is for a different transaction — rejected.');
+    }
+    for (const sig of copy.signatures) {
+      const id = signatureId(sig);
+      if (!seen.has(id)) {
+        merged.addDecoratedSignature(sig);
+        seen.add(id);
+      }
+    }
+  }
+  return merged.toXDR();
+}
+
+function signatureId(sig: { hint: () => Buffer; signature: () => Buffer }): string {
+  return `${sig.hint().toString('hex')}:${sig.signature().toString('hex')}`;
+}
