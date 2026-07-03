@@ -52,17 +52,10 @@ const MAX_GUARDIANS = MAX_SIGNERS - 1; // 19
 // This assumes a standard single-master-key account (the wallet's default). It
 // overwrites the master weight + thresholds, so it is a first-time-setup builder,
 // not an incremental editor.
-export function buildGuardianSetupXdr(params: BuildGuardianSetupParams): string {
-  const {
-    sourceAccountId,
-    sourceSequence,
-    networkPassphrase,
-    baseFee,
-    guardians,
-    threshold,
-    timeoutSecs = 180,
-  } = params;
-
+// Shared validation for a desired guardian set: within the signer limit, each a
+// valid distinct account key, none the account itself. Threshold must be a
+// positive integer no larger than the guardian count.
+function assertValidGuardianSet(guardians: string[], sourceAccountId: string, threshold: number): void {
   if (guardians.length === 0) throw new Error('At least one guardian is required.');
   if (guardians.length > MAX_GUARDIANS) {
     throw new Error(
@@ -75,7 +68,6 @@ export function buildGuardianSetupXdr(params: BuildGuardianSetupParams): string 
   if (threshold > guardians.length) {
     throw new Error('Threshold cannot exceed the number of guardians.');
   }
-
   const seen = new Set<string>();
   for (const g of guardians) {
     if (!isValidPublicKey(g)) throw new Error(`Invalid guardian address: ${g}`);
@@ -83,6 +75,20 @@ export function buildGuardianSetupXdr(params: BuildGuardianSetupParams): string 
     if (seen.has(g)) throw new Error(`Duplicate guardian: ${g}`);
     seen.add(g);
   }
+}
+
+export function buildGuardianSetupXdr(params: BuildGuardianSetupParams): string {
+  const {
+    sourceAccountId,
+    sourceSequence,
+    networkPassphrase,
+    baseFee,
+    guardians,
+    threshold,
+    timeoutSecs = 180,
+  } = params;
+
+  assertValidGuardianSet(guardians, sourceAccountId, threshold);
 
   // Strictly greater than all guardians combined — guardians can never reach the
   // low/medium thresholds, so they cannot pay/trade/change trustlines.
@@ -98,6 +104,77 @@ export function buildGuardianSetupXdr(params: BuildGuardianSetupParams): string 
   // Owner keeps solo control of everything (low/med/high all met by ownerWeight);
   // only the HIGH threshold is lowered to K so any K guardians can co-sign the
   // recovery setOptions — and nothing lower (no payments).
+  builder.addOperation(
+    Operation.setOptions({
+      masterWeight: ownerWeight,
+      lowThreshold: ownerWeight,
+      medThreshold: ownerWeight,
+      highThreshold: threshold,
+    }),
+  );
+
+  return builder.setTimeout(timeoutSecs).build().toXDR();
+}
+
+export interface BuildGuardianUpdateParams {
+  sourceAccountId: string;
+  sourceSequence: string;
+  networkPassphrase: string;
+  baseFee: string; // stroops, as string
+  currentGuardians: string[]; // the account's COMPLETE current guardian set
+  desiredGuardians: string[]; // the new complete guardian set
+  threshold: number; // K over the desired set
+  timeoutSecs?: number;
+}
+
+// Transition an account's guardians from `currentGuardians` to
+// `desiredGuardians` and set the recovery threshold. Unlike buildGuardianSetupXdr
+// (first-time only, which only ADDS), this is safe on an already-configured
+// account: it emits weight-0 REMOVALS for every current guardian not in the
+// desired set, adds the new ones, and recomputes the owner weight + thresholds
+// from the FINAL (desired) set — so the anti-drain invariant ("all guardians
+// combined < the medium threshold", so no guardian quorum can authorize a
+// payment) is preserved after the change, not just at first setup.
+//
+// PRECONDITION: `currentGuardians` MUST be the account's *complete* current
+// guardian set (read from chain, e.g. via classifyGuardianConfig). Passing an
+// incomplete set would leave stray signers on the account and break the
+// invariant — so the caller must supply the real on-chain set. Only valid
+// ed25519 current guardians are removed; exotic signer types are left untouched.
+export function buildGuardianUpdateXdr(params: BuildGuardianUpdateParams): string {
+  const {
+    sourceAccountId,
+    sourceSequence,
+    networkPassphrase,
+    baseFee,
+    currentGuardians,
+    desiredGuardians,
+    threshold,
+    timeoutSecs = 180,
+  } = params;
+
+  assertValidGuardianSet(desiredGuardians, sourceAccountId, threshold);
+
+  const desired = new Set(desiredGuardians);
+  const current = new Set(currentGuardians);
+  // Remove current guardians dropped from the desired set (valid ed25519 only).
+  const toRemove = currentGuardians.filter((g) => !desired.has(g) && isValidPublicKey(g));
+  const toAdd = desiredGuardians.filter((g) => !current.has(g));
+
+  // Owner weight + low/med thresholds from the FINAL guardian count, so the
+  // desired set (each weight 1, combined = desiredGuardians.length) can never
+  // reach the medium threshold.
+  const ownerWeight = desiredGuardians.length + 1;
+
+  const source = new Account(sourceAccountId, sourceSequence);
+  const builder = new TransactionBuilder(source, { fee: baseFee || BASE_FEE, networkPassphrase });
+
+  for (const g of toRemove) {
+    builder.addOperation(Operation.setOptions({ signer: { ed25519PublicKey: g, weight: 0 } }));
+  }
+  for (const g of toAdd) {
+    builder.addOperation(Operation.setOptions({ signer: { ed25519PublicKey: g, weight: 1 } }));
+  }
   builder.addOperation(
     Operation.setOptions({
       masterWeight: ownerWeight,
@@ -295,4 +372,18 @@ export function mergeGuardianSignatures(
 
 function signatureId(sig: { hint: () => Buffer; signature: () => Buffer }): string {
   return `${sig.hint().toString('hex')}:${sig.signature().toString('hex')}`;
+}
+
+// What changes between the current guardian set and a desired one — for the
+// review screen when editing an existing setup.
+export function guardianDiff(
+  current: string[],
+  desired: string[],
+): { added: string[]; removed: string[] } {
+  const c = new Set(current);
+  const d = new Set(desired);
+  return {
+    added: desired.filter((g) => !c.has(g)),
+    removed: current.filter((g) => !d.has(g)),
+  };
 }

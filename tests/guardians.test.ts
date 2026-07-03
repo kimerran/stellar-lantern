@@ -2,12 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { Keypair, Networks, TransactionBuilder } from '@stellar/stellar-sdk';
 import {
   buildGuardianSetupXdr,
+  buildGuardianUpdateXdr,
   buildRecoveryXdr,
   collectedSignatureWeight,
   hasThresholdSignatures,
   mergeGuardianSignatures,
   describeGuardianSetup,
   classifyGuardianConfig,
+  guardianDiff,
 } from '@core/recovery/guardians';
 import { totalFeeXlm } from '@core/stellar/tx';
 import { decodeTransaction } from '@core/scan/decode';
@@ -101,6 +103,50 @@ describe('buildGuardianSetupXdr', () => {
   it('caps guardians at 19 so a recovery signer slot is always reserved', () => {
     const twenty = Array.from({ length: 20 }, () => Keypair.random().publicKey());
     expect(() => buildGuardianSetupXdr({ ...common, guardians: twenty, threshold: 2 })).toThrow(/at most 19|reserved/i);
+  });
+});
+
+describe('buildGuardianUpdateXdr', () => {
+  const G4 = 'GAIXZJSGJM7HWMEVNED4KXVPOBVHAQBXFP572VP45VOFJF5PCE3F62SA';
+
+  function opsFor(current: string[], desired: string[], threshold: number) {
+    const xdr = buildGuardianUpdateXdr({ ...common, currentGuardians: current, desiredGuardians: desired, threshold });
+    return decodeTransaction(xdr, pp)?.operations ?? [];
+  }
+
+  it('replaces a guardian: weight-0 removal for the dropped one, add for the new one', () => {
+    // current G1,G2,G3 → desired G1,G2,G4 (drop G3, add G4), threshold 2.
+    const ops = opsFor([G1, G2, G3], [G1, G2, G4], 2);
+    const removals = ops.filter((o) => o.type === 'setOptions' && o.signerWeight === 0);
+    const adds = ops.filter((o) => o.type === 'setOptions' && o.signerWeight === 1);
+    expect(removals.map((o) => o.signerKey)).toEqual([G3]);
+    expect(adds.map((o) => o.signerKey)).toEqual([G4]);
+    // Unchanged guardians (G1, G2) get no op — they stay at weight 1.
+    expect(ops.some((o) => o.signerKey === G1)).toBe(false);
+  });
+
+  it('removes a guardian without adding, recomputing thresholds for the smaller set', () => {
+    const ops = opsFor([G1, G2, G3], [G1, G2], 2); // final N = 2 → ownerWeight 3
+    expect(ops.filter((o) => o.signerWeight === 0).map((o) => o.signerKey)).toEqual([G3]);
+    const t = ops[ops.length - 1]!;
+    expect(t).toMatchObject({ masterWeight: 3, lowThreshold: 3, medThreshold: 3, highThreshold: 2 });
+  });
+
+  it('preserves the anti-drain invariant for the FINAL set (combined weight < medium)', () => {
+    // Grow to 4 guardians: each ends at weight 1 (combined 4), med must be > 4.
+    const ops = opsFor([G1], [G1, G2, G3, G4], 3);
+    const t = ops[ops.length - 1]!;
+    const finalGuardianCombinedWeight = 4; // 4 guardians × weight 1
+    expect(t.medThreshold!).toBe(finalGuardianCombinedWeight + 1); // 5 > 4
+    expect(t.medThreshold!).toBeGreaterThan(finalGuardianCombinedWeight);
+    expect(t.highThreshold).toBe(3); // K guardians can still recover
+  });
+
+  it('reuses the setup validation (invalid/duplicate/self/threshold/empty)', () => {
+    expect(() => buildGuardianUpdateXdr({ ...common, currentGuardians: [G1], desiredGuardians: [], threshold: 1 })).toThrow(/at least one/i);
+    expect(() => buildGuardianUpdateXdr({ ...common, currentGuardians: [], desiredGuardians: ['nope'], threshold: 1 })).toThrow(/invalid guardian/i);
+    expect(() => buildGuardianUpdateXdr({ ...common, currentGuardians: [], desiredGuardians: [G1, G1], threshold: 1 })).toThrow(/duplicate/i);
+    expect(() => buildGuardianUpdateXdr({ ...common, currentGuardians: [], desiredGuardians: [G1, G2], threshold: 3 })).toThrow(/exceed/i);
   });
 });
 
@@ -247,6 +293,15 @@ describe('mergeGuardianSignatures', () => {
 
   it('returns the base unchanged when there is nothing to merge', () => {
     expect(TransactionBuilder.fromXDR(mergeGuardianSignatures(shared, [], pp), pp).signatures).toHaveLength(0);
+  });
+});
+
+describe('guardianDiff', () => {
+  it('reports added and removed guardians', () => {
+    expect(guardianDiff([G1, G2, G3], [G1, G2, G4])).toEqual({ added: [G4], removed: [G3] });
+  });
+  it('is empty when unchanged', () => {
+    expect(guardianDiff([G1, G2], [G2, G1])).toEqual({ added: [], removed: [] });
   });
 });
 

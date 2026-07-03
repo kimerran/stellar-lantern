@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BASE_FEE } from '@stellar/stellar-sdk';
 import type { NetworkConfig } from '@shared/constants';
 import { sendMessage } from '@shared/messages';
@@ -6,8 +6,10 @@ import { getServer, loadAccountSigners } from '@core/stellar/client';
 import { totalFeeXlm } from '@core/stellar/tx';
 import {
   buildGuardianSetupXdr,
+  buildGuardianUpdateXdr,
   classifyGuardianConfig,
   describeGuardianSetup,
+  guardianDiff,
   type GuardianConfig,
 } from '@core/recovery/guardians';
 import { scan } from '@core/scan/engine';
@@ -19,7 +21,6 @@ import { Input } from '../components/Input';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { RiskCallout } from '../components/RiskCallout';
-import { WarningCallout } from '../components/WarningCallout';
 import { HoldToConfirm } from '../components/HoldToConfirm';
 
 interface Props {
@@ -52,23 +53,34 @@ export function Guardians({ address, network, onBack }: Props) {
   const [scanning, setScanning] = useState(false);
   const [confirmText, setConfirmText] = useState('');
 
-  // The account's existing guardian setup (so a new setup doesn't silently
-  // overwrite it). null until loaded / for an unfunded account.
+  // The account's existing guardian setup. When recovery is already configured
+  // the screen becomes an editor: we prefill the form with the current guardians
+  // and route the change through buildGuardianUpdateXdr (safe add/replace/remove)
+  // instead of the first-time setup builder. null until loaded / unfunded.
   const [current, setCurrent] = useState<GuardianConfig | null>(null);
+  const prefilled = useRef(false);
   useEffect(() => {
     let cancelled = false;
     void loadAccountSigners(network, address)
       .then((state) => {
         if (cancelled || !state) return;
-        setCurrent(classifyGuardianConfig(address, state.signers, state.thresholds));
+        const cfg = classifyGuardianConfig(address, state.signers, state.thresholds);
+        setCurrent(cfg);
+        if (cfg.isRecoveryEnabled && !prefilled.current) {
+          prefilled.current = true;
+          setGuardians(cfg.guardians.map((g) => g.key));
+          setThreshold(cfg.recoveryThreshold);
+        }
       })
       .catch(() => {
-        /* best-effort — no current-setup panel if it can't load */
+        /* best-effort — falls back to first-time setup if it can't load */
       });
     return () => {
       cancelled = true;
     };
   }, [network, address]);
+
+  const editing = current?.isRecoveryEnabled === true;
 
   // Reveal the scan verdict after a short latency-shaped delay (mirrors Send).
   useEffect(() => {
@@ -102,15 +114,6 @@ export function Guardians({ address, network, onBack }: Props) {
   }
 
   async function toReview() {
-    // buildGuardianSetupXdr is a first-time-setup builder: re-running it on an
-    // account that already has guardians ADDS the new ones on top (setOptions
-    // never removes the others) while recomputing thresholds for only the new
-    // count — which breaks the anti-drain invariant. Block it until a proper
-    // manage/replace flow exists.
-    if (current?.isRecoveryEnabled) {
-      setError('Changing existing guardians isn’t supported yet.');
-      return;
-    }
     if (filled.length === 0) {
       setError('Add at least one guardian address.');
       return;
@@ -128,18 +131,29 @@ export function Guardians({ address, network, onBack }: Props) {
         /* keep BASE_FEE fallback */
       }
 
+      const common = {
+        sourceAccountId: address,
+        sourceSequence: sourceAccount.sequenceNumber(),
+        networkPassphrase: network.passphrase,
+        baseFee,
+        threshold: effectiveThreshold,
+      };
+
       let xdr: string;
       try {
-        xdr = buildGuardianSetupXdr({
-          sourceAccountId: address,
-          sourceSequence: sourceAccount.sequenceNumber(),
-          networkPassphrase: network.passphrase,
-          baseFee,
-          guardians: filled,
-          threshold: effectiveThreshold,
-        });
+        // Editing an existing setup routes through the safe add/replace/remove
+        // builder (weight-0 removals + thresholds recomputed from the final set),
+        // passing the account's COMPLETE current guardian set. First-time setup
+        // uses the setup builder.
+        xdr = editing
+          ? buildGuardianUpdateXdr({
+              ...common,
+              currentGuardians: current!.guardians.map((g) => g.key),
+              desiredGuardians: filled,
+            })
+          : buildGuardianSetupXdr({ ...common, guardians: filled });
       } catch (e) {
-        // buildGuardianSetupXdr rejects invalid/duplicate/self keys and bad K.
+        // The builders reject invalid/duplicate/self keys and bad K.
         setError(e instanceof Error ? e.message : 'Invalid guardian setup.');
         setBuilding(false);
         return;
@@ -201,7 +215,7 @@ export function Guardians({ address, network, onBack }: Props) {
           <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-primary-container/15">
             <Icon name="verified_user" filled size={48} className="text-primary-container drop-shadow-glow-amber" />
           </div>
-          <h2 className="text-title-md text-on-surface">Recovery set up</h2>
+          <h2 className="text-title-md text-on-surface">{editing ? 'Recovery updated' : 'Recovery set up'}</h2>
           <p className="mt-1 px-2 text-label-md text-on-surface-variant">
             {describeGuardianSetup(review.guardianCount, review.threshold)}
           </p>
@@ -229,10 +243,11 @@ export function Guardians({ address, network, onBack }: Props) {
     const isHigh = verdict?.action === 'block_confirm';
     const native = isNativePlatform();
     const acknowledged = !isHigh || native || confirmText.trim().toUpperCase() === 'CONFIRM';
+    const changes = editing && current ? guardianDiff(current.guardians.map((g) => g.key), filled) : null;
 
     return (
       <div className="flex h-full flex-col bg-background">
-        <ScreenHeader title="Review Setup" onBack={backToForm} />
+        <ScreenHeader title={editing ? 'Review Changes' : 'Review Setup'} onBack={backToForm} />
         <div className="no-scrollbar flex-1 space-y-4 overflow-y-auto px-4 pb-4">
           <div className="rounded-2xl bg-surface-container p-5 text-center shadow-layer-1">
             <p className="text-label-sm uppercase tracking-wide text-on-surface-variant">Guardian recovery</p>
@@ -261,6 +276,21 @@ export function Guardians({ address, network, onBack }: Props) {
             ) : null}
           </div>
 
+          {changes && (changes.added.length > 0 || changes.removed.length > 0) && (
+            <Card className="space-y-1.5">
+              {changes.added.map((g) => (
+                <p key={g} className="flex items-center gap-2 font-mono text-label-sm text-on-surface">
+                  <Icon name="add" size={14} className="shrink-0 text-tertiary" /> {truncateAddress(g, 6, 6)}
+                </p>
+              ))}
+              {changes.removed.map((g) => (
+                <p key={g} className="flex items-center gap-2 font-mono text-label-sm text-on-surface-variant line-through">
+                  <Icon name="close" size={14} className="shrink-0 text-error" /> {truncateAddress(g, 6, 6)}
+                </p>
+              ))}
+            </Card>
+          )}
+
           <Card className="space-y-3">
             <ReviewRow label="Guardians" value={String(review.guardianCount)} />
             <ReviewRow label="Required to recover" value={`${review.threshold} of ${review.guardianCount}`} />
@@ -285,7 +315,7 @@ export function Guardians({ address, network, onBack }: Props) {
 
           {isHigh && native && !scanning ? (
             <HoldToConfirm
-              label={submitting ? 'Setting up…' : 'Hold to Set Up Recovery'}
+              label={submitting ? 'Saving…' : editing ? 'Hold to Update Recovery' : 'Hold to Set Up Recovery'}
               danger
               onConfirm={confirm}
               disabled={submitting}
@@ -300,7 +330,7 @@ export function Guardians({ address, network, onBack }: Props) {
               trailingIcon="lock"
               className={isHigh ? '!border-error/50 !text-error' : ''}
             >
-              Set Up Recovery
+              {editing ? 'Update Recovery' : 'Set Up Recovery'}
             </Button>
           )}
         </div>
@@ -308,62 +338,27 @@ export function Guardians({ address, network, onBack }: Props) {
     );
   }
 
-  // ── Form ──
-  // This screen only *sets up* recovery on an account that doesn't have it yet.
-  // buildGuardianSetupXdr adds signers without removing existing ones, so
-  // re-running it on a configured account would accumulate guardians and break
-  // the anti-drain threshold math — block that path until a manage/replace flow
-  // exists (the current-guardians view below stays; it's the useful part).
-  const alreadySetUp = current?.isRecoveryEnabled === true;
+  // ── Form ── First-time setup, or editing an existing setup (the guardian list
+  // is prefilled from the account's current guardians when editing, and the
+  // change routes through buildGuardianUpdateXdr).
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="Set Up Recovery" onBack={onBack} />
+      <ScreenHeader title={editing ? 'Manage Guardians' : 'Set Up Recovery'} onBack={onBack} />
       <div className="no-scrollbar flex-1 space-y-4 overflow-y-auto px-4 pb-4">
-        {!alreadySetUp && (
-          <p className="text-label-md leading-relaxed text-on-surface-variant">
-            Add trusted people as <span className="text-on-surface">guardians</span>. If you ever lose your key, a
-            quorum of them can help you recover this account — without any of them being able to spend your funds.
-          </p>
-        )}
+        <p className="text-label-md leading-relaxed text-on-surface-variant">
+          {editing ? (
+            <>
+              Edit who can help you recover this account. Add or remove{' '}
+              <span className="text-on-surface">guardians</span> and change how many are required.
+            </>
+          ) : (
+            <>
+              Add trusted people as <span className="text-on-surface">guardians</span>. If you ever lose your key, a
+              quorum of them can help you recover this account — without any of them being able to spend your funds.
+            </>
+          )}
+        </p>
 
-        {/* Current setup — so a new setup doesn't silently overwrite existing guardians. */}
-        {current?.isRecoveryEnabled && (
-          <Card className="space-y-2.5">
-            <div className="flex items-center gap-2">
-              <Icon name="verified_user" filled size={18} className="text-primary-container" />
-              <p className="text-label-md text-on-surface">
-                Recovery is on —{' '}
-                {current.recoveryThreshold >= current.guardians.length
-                  ? `all ${current.guardians.length}`
-                  : `any ${current.recoveryThreshold} of ${current.guardians.length}`}{' '}
-                guardian{current.guardians.length > 1 ? 's' : ''} can recover.
-              </p>
-            </div>
-            <ul className="space-y-1">
-              {current.guardians.map((g) => (
-                <li key={g.key} className="flex items-center gap-2 font-mono text-label-sm text-on-surface-variant">
-                  <Icon name="shield_person" size={14} className="shrink-0 text-on-surface-variant" />
-                  {truncateAddress(g.key, 6, 6)}
-                </li>
-              ))}
-            </ul>
-          </Card>
-        )}
-
-        {alreadySetUp && (
-          <>
-            <WarningCallout>
-              Changing your guardians isn’t supported yet. This screen can only set up recovery on an account that
-              doesn’t already have it — safely adding or replacing guardians is coming.
-            </WarningCallout>
-            <Button fullWidth variant="secondary" onClick={onBack}>
-              Done
-            </Button>
-          </>
-        )}
-
-        {!alreadySetUp && (
-          <>
         <div className="space-y-2">
           <label className="block text-label-sm uppercase tracking-wide text-on-surface-variant">Guardians</label>
           {guardians.map((g, i) => (
@@ -436,8 +431,6 @@ export function Guardians({ address, network, onBack }: Props) {
         <Button fullWidth onClick={toReview} loading={building} trailingIcon="arrow_forward">
           Review
         </Button>
-          </>
-        )}
       </div>
     </div>
   );
