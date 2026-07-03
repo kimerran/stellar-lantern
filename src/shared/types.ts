@@ -37,6 +37,17 @@ export interface AccountState {
   subentryCount: number;
 }
 
+// An account's on-chain signers + thresholds (for the guardians view).
+export interface AccountSigner {
+  key: string;
+  weight: number;
+}
+export interface AccountThresholds {
+  low: number;
+  med: number;
+  high: number;
+}
+
 export type TxDirection = 'sent' | 'received' | 'swap' | 'create';
 
 export interface HistoryItem {

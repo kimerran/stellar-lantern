@@ -6,6 +6,7 @@ import {
   collectedSignatureWeight,
   hasThresholdSignatures,
   describeGuardianSetup,
+  classifyGuardianConfig,
 } from '@core/recovery/guardians';
 import { totalFeeXlm } from '@core/stellar/tx';
 import { decodeTransaction } from '@core/scan/decode';
@@ -185,6 +186,32 @@ describe('totalFeeXlm (multi-op fee shown on the setup review)', () => {
     expect(totalFeeXlm(three, pp)).toBe('0.00004'); // 4 ops × 100 stroops
     const one = buildGuardianSetupXdr({ ...common, guardians: [G1], threshold: 1 });
     expect(totalFeeXlm(one, pp)).toBe('0.00002'); // 2 ops × 100 stroops
+  });
+});
+
+describe('classifyGuardianConfig', () => {
+  it('reads guardians (non-master signers) + recovery threshold from account state', () => {
+    const cfg = classifyGuardianConfig(
+      SOURCE,
+      [
+        { key: SOURCE, weight: 3 }, // the master key
+        { key: G1, weight: 1 },
+        { key: G2, weight: 1 },
+        { key: G3, weight: 1 },
+      ],
+      { low: 3, med: 3, high: 2 },
+    );
+    expect(cfg.isRecoveryEnabled).toBe(true);
+    expect(cfg.masterWeight).toBe(3);
+    expect(cfg.recoveryThreshold).toBe(2);
+    expect(cfg.guardians.map((g) => g.key)).toEqual([G1, G2, G3]);
+  });
+
+  it('reports no recovery when the account has only its master key', () => {
+    const cfg = classifyGuardianConfig(SOURCE, [{ key: SOURCE, weight: 1 }], { low: 0, med: 0, high: 0 });
+    expect(cfg.isRecoveryEnabled).toBe(false);
+    expect(cfg.guardians).toEqual([]);
+    expect(cfg.masterWeight).toBe(1);
   });
 });
 

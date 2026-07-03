@@ -1,5 +1,6 @@
 import { Account, BASE_FEE, Operation, TransactionBuilder, WebAuth } from '@stellar/stellar-sdk';
 import { isValidPublicKey } from '@core/wallet/wallet';
+import type { AccountSigner, AccountThresholds } from '@shared/types';
 
 // Guardian social recovery — builds the on-chain weighted-multisig transactions
 // (#23, Milestone 1): the guardian *setup* and the *recovery* that installs a
@@ -207,6 +208,33 @@ export function hasThresholdSignatures(
   requiredThreshold: number,
 ): boolean {
   return collectedSignatureWeight(xdr, networkPassphrase, signers) >= requiredThreshold;
+}
+
+export interface GuardianConfig {
+  guardians: AccountSigner[]; // non-master signers — the guardians
+  masterWeight: number; // the account's own key weight
+  recoveryThreshold: number; // high threshold = K guardians needed to recover
+  isRecoveryEnabled: boolean; // at least one guardian is configured
+}
+
+// Read an account's current guardian setup from its signers + thresholds. Pure:
+// the guardians are simply the non-master signers, the recovery threshold is the
+// account's HIGH threshold (what a recovery setOptions requires), and recovery
+// is "on" once any guardian exists. Used by the Guardians screen to show the
+// current state and warn before a setup overwrites it.
+export function classifyGuardianConfig(
+  accountId: string,
+  signers: AccountSigner[],
+  thresholds: AccountThresholds,
+): GuardianConfig {
+  const master = signers.find((s) => s.key === accountId);
+  const guardians = signers.filter((s) => s.key !== accountId);
+  return {
+    guardians,
+    masterWeight: master?.weight ?? 0,
+    recoveryThreshold: thresholds.high,
+    isRecoveryEnabled: guardians.length > 0,
+  };
 }
 
 // One plain-language sentence describing a guardian setup, for the review screen.
