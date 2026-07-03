@@ -1,5 +1,5 @@
 import type { AssetRef } from '@core/stellar/tx';
-import { isValidPublicKey } from '@core/wallet/wallet';
+import { isValidContractId, isValidPublicKey } from '@core/wallet/wallet';
 import { MAX_MEMO_BYTES } from '@shared/constants';
 
 // Pure helpers for the mini-app wallet bridge (see src/popup/screens/Apps.tsx).
@@ -71,6 +71,63 @@ export function validatePaymentIntent(intent: unknown): IntentResult {
       ...(typeof memo === 'string' && memo.trim() !== '' ? { memo: memo.trim() } : {}),
       ...(normalizedAsset ? { asset: normalizedAsset } : {}),
     },
+  };
+}
+
+// ── Soroban contract-invocation intent (#21) ─────────────────────────────────
+
+/**
+ * A Soroban contract call a mini-app asks Lantern to sign — e.g. a Blend
+ * `supply` of USDC. Args are kept opaque (stringified) at this bridge layer;
+ * turning them into typed ScVals belongs in the (RPC-simulated) invoke builder,
+ * not in untrusted-input validation. The call still flows through the same
+ * connect → scan → approve → sign pipeline as a payment.
+ */
+export interface InvokeIntent {
+  contractId: string; // C… contract address
+  function: string; // invoked function name (Soroban symbol)
+  args: string[]; // positional argument descriptors, normalized to strings
+}
+
+export type InvokeIntentResult =
+  | { ok: true; value: InvokeIntent }
+  | { ok: false; error: string };
+
+// Soroban symbols: ASCII alphanumeric + underscore, at most 32 chars.
+const SYMBOL_RE = /^[a-zA-Z0-9_]+$/;
+const MAX_SYMBOL_LEN = 32;
+
+/**
+ * Validate a contract-invocation intent from an untrusted mini-app. Returns a
+ * normalized intent, or a readable error the bridge can surface to the dApp.
+ */
+export function validateInvokeIntent(intent: unknown): InvokeIntentResult {
+  if (!intent || typeof intent !== 'object') {
+    return { ok: false, error: 'Invalid contract request.' };
+  }
+  const { contractId, function: fn, args } = intent as Record<string, unknown>;
+
+  if (typeof contractId !== 'string' || !isValidContractId(contractId)) {
+    return { ok: false, error: 'Invalid contract address.' };
+  }
+  if (typeof fn !== 'string' || !SYMBOL_RE.test(fn) || fn.length > MAX_SYMBOL_LEN) {
+    return { ok: false, error: 'Invalid contract function name.' };
+  }
+
+  let normalizedArgs: string[] = [];
+  if (args != null) {
+    if (!Array.isArray(args)) return { ok: false, error: 'Contract args must be a list.' };
+    for (const a of args) {
+      if (typeof a !== 'string' && typeof a !== 'number' && typeof a !== 'boolean') {
+        return { ok: false, error: 'Each contract arg must be a string, number, or boolean.' };
+      }
+    }
+    normalizedArgs = args.map((a) => String(a));
+  }
+
+  return {
+    ok: true,
+    value: { contractId: contractId.trim(), function: fn, args: normalizedArgs },
   };
 }
 

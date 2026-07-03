@@ -69,3 +69,8 @@ export function keypairFromStoredSecret(secret: string): Keypair {
 export function isValidPublicKey(address: string): boolean {
   return StrKey.isValidEd25519PublicKey(address.trim());
 }
+
+// A Soroban contract address (C…), as opposed to an account public key (G…).
+export function isValidContractId(id: string): boolean {
+  return StrKey.isValidContract(id.trim());
+}
