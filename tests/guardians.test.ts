@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { Networks } from '@stellar/stellar-sdk';
-import { buildGuardianSetupXdr } from '@core/recovery/guardians';
+import { Keypair, Networks } from '@stellar/stellar-sdk';
+import { buildGuardianSetupXdr, buildRecoveryXdr } from '@core/recovery/guardians';
 import { decodeTransaction } from '@core/scan/decode';
 import { scan } from '@core/scan/engine';
+import { explainTransaction } from '@core/scan/explainer';
 
 const SOURCE = 'GDRXE2BQUC3AZNPVFSCEZ76NJ3WWL25FYFK6RGZGIEKWE4SOOHSUJUJ6';
+const NEW_KEY = 'GBVG3DQJNAYAPTB4FKPLL65BUNF76K2TKPTK72LDIAJKRATGRY5BFJBP';
 const G1 = 'GDVEU3DD4KOFECV66VIHWEZOYX4ZKR3WV27L464SIIPOU2IUI3JCZA57';
 const G2 = 'GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H';
 const G3 = 'GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ';
@@ -85,5 +87,48 @@ describe('buildGuardianSetupXdr', () => {
     expect(() => buildGuardianSetupXdr({ ...common, guardians: ['not-a-key'], threshold: 1 })).toThrow(/invalid guardian/i);
     expect(() => buildGuardianSetupXdr({ ...common, guardians: [SOURCE], threshold: 1 })).toThrow(/cannot be the account/i);
     expect(() => buildGuardianSetupXdr({ ...common, guardians: [G1, G1], threshold: 1 })).toThrow(/duplicate/i);
+  });
+
+  it('caps guardians at 19 so a recovery signer slot is always reserved', () => {
+    const twenty = Array.from({ length: 20 }, () => Keypair.random().publicKey());
+    expect(() => buildGuardianSetupXdr({ ...common, guardians: twenty, threshold: 2 })).toThrow(/at most 19|reserved/i);
+  });
+});
+
+describe('buildRecoveryXdr', () => {
+  it('installs the new key at owner weight (N+1) and disables the lost master, in one op', () => {
+    const ops = decodeTransaction(buildRecoveryXdr({ ...common, newSignerKey: NEW_KEY, guardianCount: 3 }), pp)?.operations ?? [];
+    expect(ops).toHaveLength(1);
+    expect(ops[0]).toMatchObject({
+      type: 'setOptions',
+      signerKey: NEW_KEY,
+      signerWeight: 4, // N+1, mirrors the setup so the new key operates normally
+      masterWeight: 0, // lost master key disabled
+    });
+  });
+
+  it('is scanned high-risk and explained as installing a signer + removing the old key', () => {
+    const xdr = buildRecoveryXdr({ ...common, newSignerKey: NEW_KEY, guardianCount: 3 });
+    const v = scan({ xdr, networkPassphrase: pp, context: { network: 'TESTNET', fromAddress: SOURCE } });
+    expect(v.risk).toBe('high');
+    expect(v.action).toBe('block_confirm');
+    const explanation = explainTransaction(decodeTransaction(xdr, pp));
+    expect(explanation).toMatch(/adds signer/i);
+    expect(explanation).toMatch(/removes your own key.{0,3}s signing power/i);
+  });
+
+  it('rejects malformed input', () => {
+    expect(() => buildRecoveryXdr({ ...common, newSignerKey: 'nope', guardianCount: 3 })).toThrow(/invalid new signer/i);
+    expect(() => buildRecoveryXdr({ ...common, newSignerKey: SOURCE, guardianCount: 3 })).toThrow(/cannot be the account/i);
+    expect(() => buildRecoveryXdr({ ...common, newSignerKey: NEW_KEY, guardianCount: 0 })).toThrow(/positive/i);
+    expect(() => buildRecoveryXdr({ ...common, newSignerKey: NEW_KEY, guardianCount: 20 })).toThrow(/20-signer limit/i);
+  });
+
+  it('the max allowed setup (19 guardians) is always recoverable — the headroom guarantee', () => {
+    const nineteen = Array.from({ length: 19 }, () => Keypair.random().publicKey());
+    // Setup accepts exactly 19…
+    expect(() => buildGuardianSetupXdr({ ...common, guardians: nineteen, threshold: 10 })).not.toThrow();
+    // …and recovery for that same N=19 account stays within the signer limit.
+    expect(() => buildRecoveryXdr({ ...common, newSignerKey: NEW_KEY, guardianCount: 19 })).not.toThrow();
   });
 });
