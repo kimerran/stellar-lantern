@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { Keypair, Networks } from '@stellar/stellar-sdk';
-import { buildGuardianSetupXdr, buildRecoveryXdr } from '@core/recovery/guardians';
+import { Keypair, Networks, TransactionBuilder } from '@stellar/stellar-sdk';
+import {
+  buildGuardianSetupXdr,
+  buildRecoveryXdr,
+  collectedSignatureWeight,
+  hasThresholdSignatures,
+} from '@core/recovery/guardians';
 import { decodeTransaction } from '@core/scan/decode';
 import { scan } from '@core/scan/engine';
 import { explainTransaction } from '@core/scan/explainer';
@@ -130,5 +135,41 @@ describe('buildRecoveryXdr', () => {
     expect(() => buildGuardianSetupXdr({ ...common, guardians: nineteen, threshold: 10 })).not.toThrow();
     // …and recovery for that same N=19 account stays within the signer limit.
     expect(() => buildRecoveryXdr({ ...common, newSignerKey: NEW_KEY, guardianCount: 19 })).not.toThrow();
+  });
+});
+
+describe('collectedSignatureWeight / hasThresholdSignatures', () => {
+  // Three guardian keypairs (weight 1 each) on a recovery tx.
+  const g = [Keypair.random(), Keypair.random(), Keypair.random()];
+  const signers = g.map((k) => ({ key: k.publicKey(), weight: 1 }));
+
+  function recoverySignedBy(...keys: Keypair[]): string {
+    const xdr = buildRecoveryXdr({ ...common, newSignerKey: NEW_KEY, guardianCount: 3 });
+    const tx = TransactionBuilder.fromXDR(xdr, pp);
+    if (keys.length) tx.sign(...keys);
+    return tx.toXDR();
+  }
+
+  it('sums the weight of the guardians who actually signed', () => {
+    expect(collectedSignatureWeight(recoverySignedBy(), pp, signers)).toBe(0);
+    expect(collectedSignatureWeight(recoverySignedBy(g[0]!), pp, signers)).toBe(1);
+    expect(collectedSignatureWeight(recoverySignedBy(g[0]!, g[1]!), pp, signers)).toBe(2);
+  });
+
+  it('ignores signatures from keys not in the signer set', () => {
+    const stranger = Keypair.random();
+    // g0 + a stranger sign; only g0 is a known signer, so weight stays 1.
+    expect(collectedSignatureWeight(recoverySignedBy(g[0]!, stranger), pp, signers)).toBe(1);
+  });
+
+  it('honors per-signer weights', () => {
+    const weighted = g.map((k) => ({ key: k.publicKey(), weight: 3 }));
+    expect(collectedSignatureWeight(recoverySignedBy(g[0]!, g[1]!), pp, weighted)).toBe(6);
+  });
+
+  it('reaches the threshold once K guardians have co-signed', () => {
+    expect(hasThresholdSignatures(recoverySignedBy(g[0]!), pp, signers, 2)).toBe(false);
+    expect(hasThresholdSignatures(recoverySignedBy(g[0]!, g[1]!), pp, signers, 2)).toBe(true);
+    expect(hasThresholdSignatures(recoverySignedBy(g[0]!, g[1]!, g[2]!), pp, signers, 2)).toBe(true);
   });
 });
