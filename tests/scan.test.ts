@@ -67,20 +67,34 @@ describe('decode + explain', () => {
     expect(explainTransaction(decoded)).toMatch(/creates and funds a new account/i);
   });
 
-  it('decodes a setOptions signer add and explains it as a control change', () => {
+  it('decodes a setOptions signer add and names the signer + weight in the explanation', () => {
     const xdr = setOptionsXdr({ signer: { ed25519PublicKey: NORMAL_DEST, weight: 1 } });
     const decoded = decodeTransaction(xdr, pp);
     const op = decoded?.operations[0];
     expect(op?.type).toBe('setOptions');
     expect(op?.signerKey).toBe(NORMAL_DEST);
     expect(op?.signerWeight).toBe(1);
-    expect(explainTransaction(decoded)).toMatch(/who can sign|thresholds/i);
+    // Specific plain-language wording (spec #23): who + weight, truncated key.
+    expect(explainTransaction(decoded)).toMatch(/adds signer GDVE.{0,3}ZA57 with weight 1/i);
   });
 
-  it('preserves masterWeight 0 (not dropped as unset)', () => {
+  it('explains a signer removal (weight 0) as a removal', () => {
+    const xdr = setOptionsXdr({ signer: { ed25519PublicKey: NORMAL_DEST, weight: 0 } });
+    expect(explainTransaction(decodeTransaction(xdr, pp))).toMatch(/removes signer GDVE.{0,3}ZA57/i);
+  });
+
+  it('explains a threshold change with the specific values', () => {
+    const xdr = setOptionsXdr({ lowThreshold: 1, medThreshold: 2, highThreshold: 2 });
+    expect(explainTransaction(decodeTransaction(xdr, pp))).toMatch(
+      /signing thresholds \(low 1, medium 2, high 2\)/i,
+    );
+  });
+
+  it('preserves masterWeight 0 and explains it as removing signing power', () => {
     const xdr = setOptionsXdr({ masterWeight: 0 });
     const decoded = decodeTransaction(xdr, pp);
     expect(decoded?.operations[0]?.masterWeight).toBe(0);
+    expect(explainTransaction(decoded)).toMatch(/removes your own key.{0,3}s signing power/i);
   });
 
   it('decodes a Soroban invoke: contract id, function name, and names it in the explanation', () => {
