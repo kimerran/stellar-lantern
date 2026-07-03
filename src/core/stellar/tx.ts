@@ -166,3 +166,12 @@ export function computeMaxXlm(balance: string, subentryCount: number): string {
   // floor to 7 decimals to avoid over-spend from rounding
   return (Math.floor(max * 1e7) / 1e7).toFixed(7).replace(/\.?0+$/, '');
 }
+
+// The TOTAL network fee of a built transaction, as a 7-dp XLM string. A tx's
+// stored fee is baseFee × operation count, so this is correct for multi-op
+// transactions (e.g. a guardian setup with one op per guardian), not just the
+// single-op case where baseFee alone happens to equal the total.
+export function totalFeeXlm(xdr: string, networkPassphrase: string): string {
+  const tx = TransactionBuilder.fromXDR(xdr, networkPassphrase);
+  return (Number(tx.fee) / 1e7).toFixed(7).replace(/\.?0+$/, '');
+}

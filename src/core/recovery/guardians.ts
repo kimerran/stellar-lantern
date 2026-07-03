@@ -208,3 +208,24 @@ export function hasThresholdSignatures(
 ): boolean {
   return collectedSignatureWeight(xdr, networkPassphrase, signers) >= requiredThreshold;
 }
+
+// One plain-language sentence describing a guardian setup, for the review screen.
+// Returns '' for an incomplete/invalid selection so the UI can hide it.
+export function describeGuardianSetup(guardianCount: number, threshold: number): string {
+  if (
+    !Number.isInteger(guardianCount) ||
+    !Number.isInteger(threshold) ||
+    guardianCount < 1 ||
+    threshold < 1 ||
+    threshold > guardianCount
+  ) {
+    return '';
+  }
+  const quorum =
+    threshold >= guardianCount
+      ? guardianCount === 1
+        ? 'Your 1 guardian'
+        : `All ${guardianCount} guardians`
+      : `Any ${threshold} of your ${guardianCount} guardians`;
+  return `${quorum} can help you recover this account if you lose your key. You keep full control yourself in the meantime.`;
+}
