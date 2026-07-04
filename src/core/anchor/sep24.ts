@@ -43,6 +43,20 @@ export async function startInteractive(
   if (typeof body.url !== 'string' || typeof body.id !== 'string') {
     throw new Error('Anchor did not return an interactive URL.');
   }
+  // The interactive URL is attacker-influenced input that gets hosted in an
+  // iframe inside the wallet's own chrome — so it must be https, per SEP-24. A
+  // `data:`/`javascript:` URL would render arbitrary script in the wallet's
+  // trusted surface (phishing / XSS), so reject anything that isn't https here,
+  // at the trust boundary, before it can reach the frame.
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(body.url);
+  } catch {
+    throw new Error('Anchor returned an invalid interactive URL.');
+  }
+  if (parsedUrl.protocol !== 'https:') {
+    throw new Error('Anchor interactive URL must be https.');
+  }
   return {
     id: body.id,
     url: body.url,

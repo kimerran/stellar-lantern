@@ -15,6 +15,16 @@ import { Icon } from './Icon';
 // load is confirmed, otherwise show a clean "open in new tab" card.
 type Phase = 'loading' | 'shown' | 'blocked';
 
+/** Only http(s) URLs may be loaded into the iframe — never data:/javascript:/etc. */
+function isEmbeddableUrl(src: string): boolean {
+  try {
+    const { protocol } = new URL(src);
+    return protocol === 'https:' || protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
 export function SandboxedFrame({
   title,
   origin,
@@ -33,13 +43,20 @@ export function SandboxedFrame({
   const frameRef = useRef<HTMLIFrameElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>();
 
+  // Belt-and-suspenders: callers should hand us an https URL, but this is a
+  // general-purpose remote-frame host, so refuse to put anything that isn't
+  // http(s) into the iframe `src` — a `data:`/`javascript:` URL would run script
+  // inside the wallet's trusted chrome (phishing / XSS).
+  const embeddable = isEmbeddableUrl(src);
+
   // If a remote frame never reports a load within the window, the site blocked
   // it before navigation committed (common with frame-ancestors 'none').
   useEffect(() => {
+    if (!embeddable) return;
     setPhase('loading');
     timer.current = setTimeout(() => setPhase((p) => (p === 'loading' ? 'blocked' : p)), 4000);
     return () => clearTimeout(timer.current);
-  }, [src, reloadKey]);
+  }, [src, reloadKey, embeddable]);
 
   // A load event fired — but it may be the blocked frame at about:blank. Treat a
   // readable about:blank as blocked; a cross-origin document (reading location
@@ -89,7 +106,7 @@ export function SandboxedFrame({
         </button>
       </header>
 
-      {phase === 'shown' && (
+      {embeddable && phase === 'shown' && (
         <button
           onClick={() => window.open(src, '_blank', 'noopener')}
           className="flex shrink-0 items-center justify-center gap-1 bg-surface-container-high py-1.5 text-label-sm text-on-surface-variant hover:text-on-surface"
@@ -99,43 +116,58 @@ export function SandboxedFrame({
       )}
 
       <div className="relative flex-1 overflow-hidden bg-white">
-        <iframe
-          ref={frameRef}
-          key={`${src}#${reloadKey}`}
-          src={src}
-          title={title}
-          sandbox="allow-scripts allow-forms allow-popups allow-same-origin"
-          className="h-full w-full border-0"
-          onLoad={onFrameLoad}
-        />
-
-        {phase === 'loading' && (
-          <div className="absolute inset-0 grid place-items-center bg-background">
-            <Icon name="progress_activity" size={28} className="animate-spin text-on-surface-variant" />
-          </div>
-        )}
-
-        {phase === 'blocked' && (
+        {!embeddable ? (
           <div className="absolute inset-0 grid place-items-center bg-background px-6 text-center">
             <div className="space-y-2">
-              <Icon name="block" size={36} className="text-on-surface-variant" />
-              <p className="text-title-sm text-on-surface">This page can’t be embedded</p>
+              <Icon name="gpp_bad" size={36} className="text-error" />
+              <p className="text-title-sm text-on-surface">This page can’t be shown</p>
               <p className="text-label-md text-on-surface-variant">
-                {origin} blocks loading inside another app (a common anti-clickjacking protection).
+                {origin} returned a link that isn’t a secure <span className="font-mono">https</span> web
+                address, so Lantern won’t open it.
               </p>
-              <div className="flex flex-col items-center gap-1.5 pt-1">
-                <button
-                  onClick={() => window.open(src, '_blank', 'noopener')}
-                  className="text-label-md text-primary hover:text-primary-container"
-                >
-                  Open in a new tab →
-                </button>
-                <button onClick={reload} className="text-label-sm text-on-surface-variant hover:text-on-surface">
-                  Try again
-                </button>
-              </div>
             </div>
           </div>
+        ) : (
+          <>
+            <iframe
+              ref={frameRef}
+              key={`${src}#${reloadKey}`}
+              src={src}
+              title={title}
+              sandbox="allow-scripts allow-forms allow-popups allow-same-origin"
+              className="h-full w-full border-0"
+              onLoad={onFrameLoad}
+            />
+
+            {phase === 'loading' && (
+              <div className="absolute inset-0 grid place-items-center bg-background">
+                <Icon name="progress_activity" size={28} className="animate-spin text-on-surface-variant" />
+              </div>
+            )}
+
+            {phase === 'blocked' && (
+              <div className="absolute inset-0 grid place-items-center bg-background px-6 text-center">
+                <div className="space-y-2">
+                  <Icon name="block" size={36} className="text-on-surface-variant" />
+                  <p className="text-title-sm text-on-surface">This page can’t be embedded</p>
+                  <p className="text-label-md text-on-surface-variant">
+                    {origin} blocks loading inside another app (a common anti-clickjacking protection).
+                  </p>
+                  <div className="flex flex-col items-center gap-1.5 pt-1">
+                    <button
+                      onClick={() => window.open(src, '_blank', 'noopener')}
+                      className="text-label-md text-primary hover:text-primary-container"
+                    >
+                      Open in a new tab →
+                    </button>
+                    <button onClick={reload} className="text-label-sm text-on-surface-variant hover:text-on-surface">
+                      Try again
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
