@@ -82,3 +82,60 @@ export async function fetchTransaction(
     ...(typeof t.amount_out === 'string' ? { amountOut: t.amount_out } : {}),
   };
 }
+
+// What the anchor supports for one asset on one side (deposit or withdraw).
+export interface AssetTransferInfo {
+  assetCode: string;
+  enabled: boolean;
+  minAmount?: number;
+  maxAmount?: number;
+  feeFixed?: number;
+  feePercent?: number;
+}
+
+export interface Sep24Info {
+  deposit: AssetTransferInfo[]; // sorted by assetCode
+  withdraw: AssetTransferInfo[];
+}
+
+function numberField(v: unknown): number | undefined {
+  return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+}
+
+function parseAssetMap(raw: unknown): AssetTransferInfo[] {
+  if (!raw || typeof raw !== 'object') return [];
+  const out: AssetTransferInfo[] = [];
+  for (const [assetCode, value] of Object.entries(raw as Record<string, unknown>)) {
+    const v = (value ?? {}) as Record<string, unknown>;
+    out.push({
+      assetCode,
+      // SEP-24 omits `enabled` to mean true; only an explicit `false` disables.
+      enabled: v.enabled !== false,
+      ...(numberField(v.min_amount) !== undefined ? { minAmount: numberField(v.min_amount) } : {}),
+      ...(numberField(v.max_amount) !== undefined ? { maxAmount: numberField(v.max_amount) } : {}),
+      ...(numberField(v.fee_fixed) !== undefined ? { feeFixed: numberField(v.fee_fixed) } : {}),
+      ...(numberField(v.fee_percent) !== undefined ? { feePercent: numberField(v.fee_percent) } : {}),
+    });
+  }
+  return out.sort((a, b) => a.assetCode.localeCompare(b.assetCode));
+}
+
+/**
+ * Discover which assets an anchor supports for deposit/withdraw, plus per-asset
+ * limits and fees, via SEP-24 `GET /info`. Public endpoint — no SEP-10 JWT
+ * needed — so a "Cash in / Cash out" screen can list supported assets (e.g. XLM,
+ * USDC) before the user authenticates. Assets are returned sorted by code with
+ * `enabled` preserved so the caller can filter or grey out disabled ones.
+ */
+export async function fetchSep24Info(
+  transferServer: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Sep24Info> {
+  const res = await fetchImpl(`${base(transferServer)}/info`);
+  if (!res.ok) throw new Error(`Could not load anchor info (${res.status}).`);
+  const body = (await res.json()) as { deposit?: unknown; withdraw?: unknown };
+  return {
+    deposit: parseAssetMap(body.deposit),
+    withdraw: parseAssetMap(body.withdraw),
+  };
+}

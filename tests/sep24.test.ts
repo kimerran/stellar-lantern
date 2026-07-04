@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { startInteractive, fetchTransaction } from '@core/anchor/sep24';
+import { startInteractive, fetchTransaction, fetchSep24Info } from '@core/anchor/sep24';
 
 const TRANSFER = 'https://anchor.example.com/sep24';
 const ACCOUNT = 'GDVEU3DD4KOFECV66VIHWEZOYX4ZKR3WV27L464SIIPOU2IUI3JCZA57';
@@ -62,5 +62,53 @@ describe('fetchTransaction', () => {
     await expect(fetchTransaction(TRANSFER, 'tx-1', JWT, bad.impl)).rejects.toThrow(/404/);
     const empty = jsonFetch({ transaction: { id: 'tx-1' } }); // missing status
     await expect(fetchTransaction(TRANSFER, 'tx-1', JWT, empty.impl)).rejects.toThrow(/unreadable/i);
+  });
+});
+
+describe('fetchSep24Info', () => {
+  it('GETs /info (no auth) and maps deposit/withdraw assets, limits and fees, sorted by code', async () => {
+    const { impl, calls } = jsonFetch({
+      deposit: {
+        USDC: { enabled: true, min_amount: 1, max_amount: 1000, fee_fixed: 0.5, fee_percent: 1 },
+        native: { enabled: true },
+      },
+      withdraw: {
+        USDC: { enabled: true, min_amount: 5 },
+      },
+      fee: { enabled: false },
+    });
+    const info = await fetchSep24Info(TRANSFER, impl);
+    expect(calls[0]!.url).toBe('https://anchor.example.com/sep24/info');
+    // /info is public — no Authorization header attached.
+    expect((calls[0]!.init?.headers as Record<string, string> | undefined)?.Authorization).toBeUndefined();
+    // sorted by code: 'native' sorts before 'USDC' (localeCompare)
+    expect(info.deposit).toEqual([
+      { assetCode: 'native', enabled: true },
+      { assetCode: 'USDC', enabled: true, minAmount: 1, maxAmount: 1000, feeFixed: 0.5, feePercent: 1 },
+    ]);
+    expect(info.withdraw).toEqual([{ assetCode: 'USDC', enabled: true, minAmount: 5 }]);
+  });
+
+  it('treats a missing `enabled` as enabled and an explicit false as disabled', async () => {
+    const { impl } = jsonFetch({ deposit: { USDC: {}, ABC: { enabled: false } } });
+    const info = await fetchSep24Info(TRANSFER, impl);
+    // sorted: ABC before USDC
+    expect(info.deposit).toEqual([
+      { assetCode: 'ABC', enabled: false },
+      { assetCode: 'USDC', enabled: true },
+    ]);
+    expect(info.withdraw).toEqual([]);
+  });
+
+  it('tolerates a trailing slash and a response missing deposit/withdraw', async () => {
+    const { impl, calls } = jsonFetch({});
+    const info = await fetchSep24Info(`${TRANSFER}/`, impl);
+    expect(calls[0]!.url).toBe('https://anchor.example.com/sep24/info');
+    expect(info).toEqual({ deposit: [], withdraw: [] });
+  });
+
+  it('throws on a non-2xx response', async () => {
+    const bad = jsonFetch({}, { ok: false, status: 500 });
+    await expect(fetchSep24Info(TRANSFER, bad.impl)).rejects.toThrow(/500/);
   });
 });
