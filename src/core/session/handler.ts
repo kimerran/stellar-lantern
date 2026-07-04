@@ -121,6 +121,19 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
       return ok<'SIGN_ONLY'>({ signedXdr: tx.toXDR() });
     }
 
+    case 'SUBMIT_ONLY': {
+      // Broadcast an ALREADY-signed transaction without adding our signature.
+      // Used by guardian recovery (#23): the recovering device collects K
+      // guardian co-signatures and submits the merged tx — but its own key is
+      // NOT a signer on the account being recovered, so signing here would
+      // attach an unused signature and Horizon would reject the tx
+      // (tx_bad_auth_extra). No unlock needed — this only broadcasts.
+      const tx = TransactionBuilder.fromXDR(req.xdr, req.networkPassphrase);
+      const server = new Horizon.Server(req.horizonUrl);
+      const res = await server.submitTransaction(tx);
+      return ok<'SUBMIT_ONLY'>({ hash: res.hash });
+    }
+
     case 'SIGN_MESSAGE': {
       if (!session) {
         return { ok: false, error: 'Wallet is locked.', code: 'LOCKED' };

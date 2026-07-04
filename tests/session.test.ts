@@ -91,6 +91,19 @@ describe('in-process session handler', () => {
     expect(res).toMatchObject({ ok: false, code: 'LOCKED' });
   });
 
+  it('SUBMIT_ONLY is broadcast-only — not gated on an unlocked session', async () => {
+    // Locked (beforeEach) + a malformed XDR: unlike SIGN_AND_SUBMIT it must NOT
+    // reject with LOCKED (it never touches the key), it just fails to parse.
+    const res = await handle({
+      type: 'SUBMIT_ONLY',
+      xdr: 'not-a-real-xdr',
+      networkPassphrase: Networks.TESTNET,
+      horizonUrl: 'https://horizon-testnet.stellar.org',
+    });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.code).not.toBe('LOCKED');
+  });
+
   it('SIGN_ONLY signs the tx with the wallet key and returns it unsubmitted', async () => {
     const address = await createUnlockedWallet();
     const xdr = unsignedPaymentXdr(address);
