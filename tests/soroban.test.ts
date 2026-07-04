@@ -64,6 +64,35 @@ describe('simulateTransaction', () => {
     });
   });
 
+  it('captures the auth entries from results[0].auth (for calls that need authorization)', async () => {
+    const { impl } = jsonFetch({
+      jsonrpc: '2.0',
+      id: 1,
+      result: {
+        transactionData: 'AAAAB...soroban-data',
+        minResourceFee: '999',
+        results: [{ xdr: 'AAAA', auth: ['AUTH_ENTRY_1', 'AUTH_ENTRY_2'] }],
+      },
+    });
+    const r = await simulateTransaction(TX_XDR, { rpcUrl: RPC, fetchImpl: impl });
+    expect(r).toEqual({
+      ok: true,
+      minResourceFee: '999',
+      transactionData: 'AAAAB...soroban-data',
+      auth: ['AUTH_ENTRY_1', 'AUTH_ENTRY_2'],
+    });
+  });
+
+  it('omits auth when the call needs none (no results / empty auth)', async () => {
+    const { impl } = jsonFetch({
+      jsonrpc: '2.0',
+      id: 1,
+      result: { transactionData: 'd', minResourceFee: '1', results: [{ xdr: 'AAAA', auth: [] }] },
+    });
+    const r = await simulateTransaction(TX_XDR, { rpcUrl: RPC, fetchImpl: impl });
+    expect(r).toEqual({ ok: true, minResourceFee: '1', transactionData: 'd' });
+  });
+
   it('returns ok:false with the reason when the contract would fail (result.error set)', async () => {
     const { impl } = jsonFetch({
       jsonrpc: '2.0',

@@ -17,6 +17,7 @@ import {
   BASE_FEE,
   Contract,
   nativeToScVal,
+  Operation,
   TransactionBuilder,
   XdrLargeInt,
   xdr,
@@ -163,4 +164,71 @@ export function buildInvokeContractXdr(params: BuildInvokeParams): string {
     .setTimeout(timeoutSecs)
     .build()
     .toXDR();
+}
+
+export interface AssembleInvokeParams {
+  // The pre-simulation XDR from `buildInvokeContractXdr`.
+  builtXdr: string;
+  networkPassphrase: string;
+  // From `simulateTransaction` (#56): the resource-fee estimate, the prepared
+  // footprint (base64 `SorobanTransactionData`), and any auth entries the call
+  // requires (base64 `SorobanAuthorizationEntry`, empty for no-auth calls).
+  minResourceFee: string;
+  transactionData: string;
+  auth?: string[];
+  // Classic inclusion fee (per op), default `BASE_FEE`.
+  inclusionFee?: string;
+}
+
+/**
+ * Apply a `simulateTransaction` (#56) result to a pre-simulation invoke tx,
+ * producing the *ready-to-sign* XDR. This is the "assemble" step between build
+ * (#61) and signing: it attaches the simulated **footprint** (`SorobanTransactionData`)
+ * and **auth entries** to the invoke op and sets the total fee to
+ * `inclusion + minResourceFee` (a Soroban tx pays a classic inclusion fee plus the
+ * resource fee). Source account, sequence and timebounds are preserved.
+ *
+ * Pure/offline. NOTE: the inputs come from a live Soroban RPC simulation; this
+ * function is unit-tested against constructed fixtures, but the assembled tx is
+ * only truly validated by a real RPC round-trip (submitting a simulated call).
+ */
+export function assembleInvokeXdr(params: AssembleInvokeParams): string {
+  const { builtXdr, networkPassphrase, minResourceFee, transactionData, auth = [], inclusionFee } =
+    params;
+  if (!transactionData) {
+    throw new Error('Simulation is missing footprint data (transactionData); cannot assemble.');
+  }
+
+  const tx = TransactionBuilder.fromXDR(builtXdr, networkPassphrase);
+  if ('innerTransaction' in tx) {
+    throw new Error('assembleInvokeXdr expects a plain transaction, not a fee-bump.');
+  }
+  if (tx.operations.length !== 1) {
+    throw new Error('assembleInvokeXdr expects a single-operation invoke transaction.');
+  }
+  const op = tx.operations[0];
+  if (!op || op.type !== 'invokeHostFunction') {
+    throw new Error('assembleInvokeXdr expects an invokeHostFunction operation.');
+  }
+
+  const sorobanData = xdr.SorobanTransactionData.fromXDR(transactionData, 'base64');
+  const authEntries = auth.map((a) => xdr.SorobanAuthorizationEntry.fromXDR(a, 'base64'));
+  const fee = (BigInt(inclusionFee ?? BASE_FEE) + BigInt(minResourceFee)).toString();
+
+  const source = new Account(tx.source, (BigInt(tx.sequence) - 1n).toString());
+  const builder = new TransactionBuilder(source, { fee, networkPassphrase })
+    .addOperation(
+      Operation.invokeHostFunction({
+        func: op.func,
+        auth: authEntries,
+        ...(op.source ? { source: op.source } : {}),
+      }),
+    )
+    .setSorobanData(sorobanData);
+  if (tx.timeBounds) {
+    builder.setTimebounds(Number(tx.timeBounds.minTime), Number(tx.timeBounds.maxTime));
+  } else {
+    builder.setTimeout(180);
+  }
+  return builder.build().toXDR();
 }

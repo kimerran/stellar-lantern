@@ -23,7 +23,16 @@ export interface SimulateOptions {
 // human-readable reason (either the simulate `result.error`, i.e. the contract
 // would revert, or a JSON-RPC transport-level error).
 export type SimulateResult =
-  | { ok: true; minResourceFee: string; transactionData?: string; latestLedger?: number }
+  | {
+      ok: true;
+      minResourceFee: string;
+      transactionData?: string;
+      // Base64 `SorobanAuthorizationEntry` list the call requires — from the
+      // simulation's `results[0].auth`. These must be attached to the invoke op
+      // before signing (see `assembleInvokeXdr`); empty for calls that need no auth.
+      auth?: string[];
+      latestLedger?: number;
+    }
   | { ok: false; error: string };
 
 interface JsonRpcSimulateResponse {
@@ -32,8 +41,18 @@ interface JsonRpcSimulateResponse {
     error?: unknown;
     minResourceFee?: unknown;
     transactionData?: unknown;
+    results?: unknown;
     latestLedger?: unknown;
   };
+}
+
+// Pull the base64 auth entries out of `result.results[0].auth`, defensively.
+function parseAuth(results: unknown): string[] | undefined {
+  if (!Array.isArray(results) || results.length === 0) return undefined;
+  const first = results[0] as { auth?: unknown } | null;
+  if (!first || !Array.isArray(first.auth)) return undefined;
+  const auth = first.auth.filter((a): a is string => typeof a === 'string');
+  return auth.length > 0 ? auth : undefined;
 }
 
 /**
@@ -96,12 +115,14 @@ export async function simulateTransaction(
     return { ok: false, error: 'Unreadable simulation response.' };
   }
 
+  const auth = parseAuth(result.results);
   return {
     ok: true,
     minResourceFee: result.minResourceFee,
     ...(typeof result.transactionData === 'string'
       ? { transactionData: result.transactionData }
       : {}),
+    ...(auth ? { auth } : {}),
     ...(typeof result.latestLedger === 'number' && Number.isFinite(result.latestLedger)
       ? { latestLedger: result.latestLedger }
       : {}),
