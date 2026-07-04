@@ -106,6 +106,37 @@ describe('decode + explain', () => {
     expect(op?.contractFunction).toBe('supply');
     expect(explainTransaction(decoded)).toMatch(/calls .*supply.* on a smart contract/i);
   });
+
+  it('leads a known DeFi call (supply) with a friendly action and still names the function', () => {
+    const explanation = explainTransaction(decodeTransaction(invokeXdr('supply'), pp));
+    expect(explanation).toMatch(/^Deposits funds into a lending pool/);
+    // Still spells out the raw function name + that it's a contract call.
+    expect(explanation).toMatch(/calls .*supply.* on a smart contract/i);
+  });
+
+  it('matches DeFi function names case-insensitively', () => {
+    const explanation = explainTransaction(decodeTransaction(invokeXdr('WITHDRAW'), pp));
+    expect(explanation).toMatch(/^Withdraws funds from a lending pool/);
+    expect(explanation).toMatch(/calls .*WITHDRAW.* on a smart contract/i);
+  });
+
+  it('keeps the generic wording for an unrecognized contract function (no regression)', () => {
+    const explanation = explainTransaction(decodeTransaction(invokeXdr('frobnicate'), pp));
+    expect(explanation).toMatch(
+      /^This calls .*frobnicate.* on a smart contract.* that may move funds or change permissions/i,
+    );
+    expect(explanation).not.toMatch(/lending pool/i);
+  });
+
+  it('uses the generic Soroban fallback when there is no invoked function name', () => {
+    const decoded = {
+      operations: [{ type: 'invokeHostFunction' as const }],
+      isSoroban: true,
+    };
+    expect(explainTransaction(decoded)).toMatch(
+      /smart contract move funds or change permissions/i,
+    );
+  });
 });
 
 describe('scan engine (mock)', () => {

@@ -1,5 +1,6 @@
 import type { DecodedOp, DecodedTx } from './types';
 import { truncateAddress, formatAmount } from '@shared/format';
+import { describeDefiFunction } from './defi';
 
 // Turn a decoded transaction into ONE low-reading-level sentence for the
 // approval UI (spec §4.4). Rules-based today; a Tier 2 model could refine the
@@ -13,6 +14,12 @@ export function explainTransaction(tx: DecodedTx | null): string {
     const call = tx.operations.find((o) => o.type === 'invokeHostFunction' && o.contractFunction);
     if (call?.contractFunction) {
       const on = call.contractId ? ` (${truncateAddress(call.contractId, 4, 4)})` : '';
+      // For well-known DeFi/lending functions, lead with a friendly description
+      // of the action; otherwise keep the generic wording (no regression).
+      const action = describeDefiFunction(call.contractFunction);
+      if (action) {
+        return `${action} — calls “${call.contractFunction}” on a smart contract${on}. Only continue if you trust it.`;
+      }
       return `This calls “${call.contractFunction}” on a smart contract${on} that may move funds or change permissions. Only continue if you trust it.`;
     }
     return 'This lets a smart contract move funds or change permissions on your account. Only continue if you trust it.';
