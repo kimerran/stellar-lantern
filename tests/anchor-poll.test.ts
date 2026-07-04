@@ -82,17 +82,17 @@ describe('pollTransferStatus', () => {
   });
 
   it('stops early when isCancelled() flips, returning the last status seen', async () => {
-    let polls = 0;
-    const { impl } = scriptedFetch(['pending_anchor']); // never terminal on its own
+    // 'pending_anchor' is never terminal, and maxAttempts is high, so the ONLY
+    // thing that can end this loop is cancellation. Trip it off the real fetch
+    // count (not onUpdate, which fires only on a status *change* and so would
+    // never advance while the status is constant).
+    const { impl, count } = scriptedFetch(['pending_anchor']);
     const result = await pollTransferStatus(
-      base(impl, {
-        isCancelled: () => polls >= 2,
-        onUpdate: () => {
-          polls += 1;
-        },
-      }),
+      base(impl, { maxAttempts: 60, isCancelled: () => count() >= 2 }),
     );
     expect(result.transaction.status).toBe('pending_anchor');
+    // Stopped by cancel at the top of the 3rd iteration — well short of maxAttempts.
+    expect(count()).toBe(2);
   });
 
   it('gives up after maxAttempts without a terminal status, returning the last', async () => {
