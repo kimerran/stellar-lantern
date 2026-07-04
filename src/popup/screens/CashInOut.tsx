@@ -1,12 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { NetworkConfig } from '@shared/constants';
+import { sendMessage } from '@shared/messages';
 import { anchorsForNetwork, type AnchorEntry } from '@core/anchor/directory';
-import { discoverAnchor } from '@core/anchor/toml';
-import { fetchSep24Info, type TransferKind } from '@core/anchor/sep24';
-import { summarizeAssetSupport, formatTransferLimits, type AssetSupport } from '@core/anchor/transfer';
+import { discoverAnchor, type AnchorInfo } from '@core/anchor/toml';
+import { fetchSep24Info, startInteractive, type TransferKind } from '@core/anchor/sep24';
+import { authenticateSep10 } from '@core/anchor/session';
+import { pollTransferStatus } from '@core/anchor/poll';
+import type { TransferStatusInfo } from '@core/anchor/status';
+import {
+  summarizeAssetSupport,
+  formatTransferLimits,
+  webAuthDomainFor,
+  type AssetSupport,
+} from '@core/anchor/transfer';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
+import { SandboxedFrame } from '../components/SandboxedFrame';
 
 interface Props {
   address: string;
@@ -17,17 +27,27 @@ interface Props {
 // XLM is the SEP-24 `native` asset code; show the familiar ticker.
 const displayCode = (code: string) => (code === 'native' ? 'XLM' : code);
 
-type Pending = { asset: string; direction: TransferKind };
+interface TransferState {
+  asset: string;
+  direction: TransferKind;
+  phase: 'authing' | 'interactive' | 'done' | 'error';
+  url?: string; // interactive URL once authenticated
+  id?: string; // SEP-24 transaction id (to poll)
+  status?: TransferStatusInfo; // latest polled status
+  error?: string;
+}
 
-export function CashInOut({ network, onBack }: Props) {
+export function CashInOut({ address, network, onBack }: Props) {
   const kind = network.id === 'TESTNET' ? 'testnet' : 'public';
   const anchors = anchorsForNetwork(kind);
 
   const [selected, setSelected] = useState<AnchorEntry | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<AnchorInfo | null>(null);
   const [support, setSupport] = useState<AssetSupport[] | null>(null);
-  const [pending, setPending] = useState<Pending | null>(null);
+  const [transfer, setTransfer] = useState<TransferState | null>(null);
+  const jwtRef = useRef<string | null>(null);
 
   // Discover the selected anchor's stellar.toml (SEP-1) then its supported
   // deposit/withdraw assets (SEP-24 /info — a public endpoint, no auth needed).
@@ -36,17 +56,19 @@ export function CashInOut({ network, onBack }: Props) {
     let live = true;
     setLoading(true);
     setError(null);
+    setInfo(null);
     setSupport(null);
     (async () => {
       try {
-        const info = await discoverAnchor(selected.homeDomain);
-        if (!info.transferServerSep24) {
+        const anchorInfo = await discoverAnchor(selected.homeDomain);
+        if (!anchorInfo.transferServerSep24) {
           throw new Error('This anchor doesn’t offer SEP-24 deposits or withdrawals.');
         }
-        const sep24 = await fetchSep24Info(info.transferServerSep24);
+        const sep24 = await fetchSep24Info(anchorInfo.transferServerSep24);
         const assets = summarizeAssetSupport(sep24);
         if (!live) return;
         if (assets.length === 0) throw new Error('This anchor has no assets available right now.');
+        setInfo(anchorInfo);
         setSupport(assets);
       } catch (e) {
         if (live) setError(e instanceof Error ? e.message : 'Couldn’t reach this anchor.');
@@ -59,42 +81,154 @@ export function CashInOut({ network, onBack }: Props) {
     };
   }, [selected]);
 
+  // Once authenticated + the interactive session is open, poll its status until a
+  // terminal state (completed / refunded / …). Cancels on close/unmount.
+  useEffect(() => {
+    if (!transfer || transfer.phase !== 'interactive' || !transfer.id) return;
+    const transferServer = info?.transferServerSep24;
+    const jwt = jwtRef.current;
+    if (!transferServer || !jwt) return;
+    const activeId = transfer.id;
+    let cancelled = false;
+    void pollTransferStatus({
+      transferServer,
+      id: activeId,
+      jwt,
+      onUpdate: (u) =>
+        setTransfer((t) => (t && t.id === activeId ? { ...t, status: u.info } : t)),
+      isCancelled: () => cancelled,
+    })
+      .then((final) =>
+        setTransfer((t) =>
+          t && t.id === activeId
+            ? { ...t, status: final.info, phase: final.info.terminal ? 'done' : t.phase }
+            : t,
+        ),
+      )
+      .catch(() => {
+        // A polling failure is non-fatal — the anchor's own window still works and
+        // the user can watch the result there; we just stop reflecting status.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Re-run only when a new interactive session opens — not on every status tick
+    // (which also mutates `transfer`), which would restart the poll.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transfer?.id, transfer?.phase, info]);
+
   const backToAnchors = () => {
     setSelected(null);
+    setInfo(null);
     setSupport(null);
     setError(null);
-    setPending(null);
+    setTransfer(null);
   };
 
-  // --- Slice-2 handoff: authenticate (SEP-10) + complete at the anchor. ---
-  if (pending && selected) {
-    const verb = pending.direction === 'deposit' ? 'Cash in' : 'Cash out';
-    return (
-      <div className="flex h-full flex-col bg-background">
-        <ScreenHeader title={`${verb} — ${displayCode(pending.asset)}`} onBack={() => setPending(null)} />
-        <main className="no-scrollbar flex-1 overflow-y-auto px-4 pb-6">
-          <Card className="mt-2 space-y-3 p-4">
-            <div className="flex items-center gap-2 text-on-surface">
-              <Icon name="lock" size={20} className="text-primary-container" />
-              <span className="text-title-sm">Next: verify it’s you</span>
+  // Authenticate (SEP-10, signing only) then open the anchor's SEP-24 interactive
+  // deposit/withdraw window. The only thing signed is the auth challenge, which
+  // `authenticateSep10` validates against the anchor's SIGNING_KEY before signing.
+  async function startTransfer(asset: string, direction: TransferKind) {
+    if (!selected || !info?.transferServerSep24 || !info.webAuthEndpoint || !info.signingKey) {
+      setTransfer({
+        asset,
+        direction,
+        phase: 'error',
+        error: 'This anchor isn’t set up for interactive transfers (missing SEP-10 auth or transfer server).',
+      });
+      return;
+    }
+    setTransfer({ asset, direction, phase: 'authing' });
+    try {
+      const jwt = await authenticateSep10({
+        webAuthEndpoint: info.webAuthEndpoint,
+        signingKey: info.signingKey,
+        homeDomain: selected.homeDomain,
+        webAuthDomain: webAuthDomainFor(info.webAuthEndpoint, selected.homeDomain),
+        account: address,
+        networkPassphrase: network.passphrase,
+        signChallenge: async (xdr, passphrase) => {
+          const res = await sendMessage({ type: 'SIGN_ONLY', xdr, networkPassphrase: passphrase });
+          if (!res.ok) {
+            throw new Error(
+              res.code === 'LOCKED'
+                ? 'Your wallet is locked. Reopen it, unlock, and try again.'
+                : res.error,
+            );
+          }
+          return res.data.signedXdr;
+        },
+      });
+      jwtRef.current = jwt;
+      const { id, url } = await startInteractive(info.transferServerSep24, {
+        kind: direction,
+        assetCode: asset,
+        account: address,
+        jwt,
+      });
+      setTransfer({ asset, direction, phase: 'interactive', url, id });
+    } catch (e) {
+      setTransfer({
+        asset,
+        direction,
+        phase: 'error',
+        error: e instanceof Error ? e.message : 'Couldn’t start the transfer.',
+      });
+    }
+  }
+
+  // --- Active transfer: authenticating, interactive window, or error ---
+  if (transfer) {
+    const verb = transfer.direction === 'deposit' ? 'Cash in' : 'Cash out';
+    const title = `${verb} — ${displayCode(transfer.asset)}`;
+
+    if (transfer.phase === 'error') {
+      return (
+        <div className="flex h-full flex-col bg-background">
+          <ScreenHeader title={title} onBack={() => setTransfer(null)} />
+          <main className="no-scrollbar flex-1 overflow-y-auto px-4 pb-6">
+            <Card className="mt-2 space-y-3 p-4">
+              <p role="alert" className="text-body-md text-error">
+                {transfer.error}
+              </p>
+              <Button variant="secondary" fullWidth onClick={() => setTransfer(null)}>
+                Back
+              </Button>
+            </Card>
+          </main>
+        </div>
+      );
+    }
+
+    if (transfer.phase === 'authing') {
+      return (
+        <div className="flex h-full flex-col bg-background">
+          <ScreenHeader title={title} onBack={() => setTransfer(null)} />
+          <main className="no-scrollbar flex-1 overflow-y-auto px-4 pb-6">
+            <div className="flex flex-col items-center gap-3 py-12 text-on-surface-variant">
+              <Icon name="progress_activity" size={32} className="animate-spin text-primary-container" />
+              <span className="text-label-md">Verifying with {selected?.name}…</span>
+              <span className="max-w-xs text-center text-label-sm">
+                Signing a one-time authentication challenge (never submitted on-chain).
+              </span>
             </div>
-            <p className="text-body-md text-on-surface-variant">
-              To {verb.toLowerCase()} {displayCode(pending.asset)} with{' '}
-              <span className="text-on-surface">{selected.name}</span>, you’ll sign a one-time
-              authentication challenge (never submitted on-chain), then complete the transfer in a
-              secure window hosted by the anchor. Any transaction it asks you to sign is scanned
-              first, like everywhere else in Lantern.
-            </p>
-            <p className="text-label-md text-on-surface-variant">
-              Authentication and the interactive transfer arrive in the next update.
-            </p>
-          </Card>
-          <Button fullWidth disabled className="mt-4" trailingIcon="open_in_new">
-            Continue at {selected.name}
-          </Button>
-        </main>
-      </div>
-    );
+          </main>
+        </div>
+      );
+    }
+
+    // interactive | done — host the anchor's window with a status strip below it.
+    if (transfer.url) {
+      return (
+        <SandboxedFrame
+          title={title}
+          origin={selected?.name ?? 'Anchor'}
+          src={transfer.url}
+          onClose={() => setTransfer(null)}
+          footer={<StatusStrip transfer={transfer} onDone={() => setTransfer(null)} />}
+        />
+      );
+    }
   }
 
   // --- Anchor picker ---
@@ -179,14 +313,14 @@ export function CashInOut({ network, onBack }: Props) {
                         icon="south_west"
                         enabled={s.canDeposit}
                         limits={s.deposit ? formatTransferLimits(s.deposit) : null}
-                        onClick={() => setPending({ asset: s.assetCode, direction: 'deposit' })}
+                        onClick={() => startTransfer(s.assetCode, 'deposit')}
                       />
                       <DirectionButton
                         label="Cash out"
                         icon="north_east"
                         enabled={s.canWithdraw}
                         limits={s.withdraw ? formatTransferLimits(s.withdraw) : null}
-                        onClick={() => setPending({ asset: s.assetCode, direction: 'withdraw' })}
+                        onClick={() => startTransfer(s.assetCode, 'withdraw')}
                       />
                     </div>
                   </Card>
@@ -196,6 +330,33 @@ export function CashInOut({ network, onBack }: Props) {
           </>
         )}
       </main>
+    </div>
+  );
+}
+
+// The status strip shown below the anchor's interactive window while polling.
+function StatusStrip({ transfer, onDone }: { transfer: TransferState; onDone: () => void }) {
+  const status = transfer.status;
+  const done = transfer.phase === 'done';
+  const icon =
+    status?.kind === 'done'
+      ? { name: 'check_circle', className: 'text-tertiary-container' }
+      : status?.kind === 'error'
+        ? { name: 'error', className: 'text-error' }
+        : status?.kind === 'action-needed'
+          ? { name: 'touch_app', className: 'text-primary-container' }
+          : { name: 'progress_activity', className: 'animate-spin text-on-surface-variant' };
+  return (
+    <div className="flex shrink-0 items-center gap-2.5 border-t border-outline-variant/40 bg-surface-container px-4 py-3">
+      <Icon name={icon.name} size={18} className={icon.className} />
+      <span className="min-w-0 flex-1 text-label-md text-on-surface">
+        {status?.label ?? 'Complete the transfer in the window above…'}
+      </span>
+      {done && (
+        <Button className="shrink-0 px-4 py-2" onClick={onDone}>
+          Done
+        </Button>
+      )}
     </div>
   );
 }
