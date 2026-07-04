@@ -16,6 +16,7 @@ import { Scan } from './screens/Scan';
 import { Apps } from './screens/Apps';
 import { Guardians } from './screens/Guardians';
 import { CashInOut } from './screens/CashInOut';
+import { Receive } from './screens/Receive';
 
 function Splash() {
   return (
@@ -32,6 +33,7 @@ export function App() {
   const [scanOpen, setScanOpen] = useState(false);
   const [guardiansOpen, setGuardiansOpen] = useState(false);
   const [cashOpen, setCashOpen] = useState(false);
+  const [receiveOpen, setReceiveOpen] = useState(false);
   const showToast = useToast();
 
   if (!status || !settings) return <Splash />;
@@ -84,6 +86,11 @@ export function App() {
     return <CashInOut address={address} network={network} onBack={() => setCashOpen(false)} />;
   }
 
+  // Full-screen Receive (address QR code) overlay.
+  if (receiveOpen) {
+    return <Receive address={address} onBack={() => setReceiveOpen(false)} />;
+  }
+
   return (
     <div className="flex h-full flex-col bg-background">
       <AppBar
@@ -92,6 +99,7 @@ export function App() {
         onToggleNetwork={toggleNetwork}
         onLock={lock}
         onCopyAddress={copyAddress}
+        onOpenReceive={() => setReceiveOpen(true)}
         onOpenScan={() => setScanOpen(true)}
         onOpenGuardians={() => setGuardiansOpen(true)}
         onOpenCashInOut={() => setCashOpen(true)}
