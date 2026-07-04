@@ -22,6 +22,7 @@ import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { RiskCallout } from '../components/RiskCallout';
 import { HoldToConfirm } from '../components/HoldToConfirm';
+import { CoSignRecovery } from './CoSignRecovery';
 
 interface Props {
   address: string;
@@ -40,6 +41,7 @@ interface ReviewData {
 
 export function Guardians({ address, network, onBack }: Props) {
   const [step, setStep] = useState<Step>('form');
+  const [coSign, setCoSign] = useState(false);
   const [guardians, setGuardians] = useState<string[]>(['']);
   const [threshold, setThreshold] = useState(2);
 
@@ -205,6 +207,11 @@ export function Guardians({ address, network, onBack }: Props) {
     } else {
       setError(res.error);
     }
+  }
+
+  // Guardian side — co-sign someone else's recovery request.
+  if (coSign) {
+    return <CoSignRecovery address={address} network={network} onBack={() => setCoSign(false)} />;
   }
 
   // ── Success ──
@@ -431,6 +438,14 @@ export function Guardians({ address, network, onBack }: Props) {
         <Button fullWidth onClick={toReview} loading={building} trailingIcon="arrow_forward">
           Review
         </Button>
+
+        <button
+          type="button"
+          onClick={() => setCoSign(true)}
+          className="flex w-full items-center justify-center gap-1.5 py-1 text-label-md text-on-surface-variant transition-colors hover:text-on-surface"
+        >
+          <Icon name="handshake" size={16} /> Helping someone recover? Co-sign their request
+        </button>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Keypair, Networks, TransactionBuilder } from '@stellar/stellar-sdk';
+import { Account, Keypair, Networks, Operation, TransactionBuilder } from '@stellar/stellar-sdk';
 import {
   buildGuardianSetupXdr,
   buildGuardianUpdateXdr,
@@ -10,7 +10,10 @@ import {
   describeGuardianSetup,
   classifyGuardianConfig,
   guardianDiff,
+  isRecoveryTransaction,
+  recoveryCoSignError,
 } from '@core/recovery/guardians';
+import { buildTransferXdr } from '@core/stellar/tx';
 import { totalFeeXlm } from '@core/stellar/tx';
 import { decodeTransaction } from '@core/scan/decode';
 import { scan } from '@core/scan/engine';
@@ -293,6 +296,93 @@ describe('mergeGuardianSignatures', () => {
 
   it('returns the base unchanged when there is nothing to merge', () => {
     expect(TransactionBuilder.fromXDR(mergeGuardianSignatures(shared, [], pp), pp).signatures).toHaveLength(0);
+  });
+});
+
+describe('isRecoveryTransaction', () => {
+  it('accepts guardian setup, update, and recovery transactions', () => {
+    const setup = buildGuardianSetupXdr({ ...common, guardians: [G1, G2, G3], threshold: 2 });
+    const update = buildGuardianUpdateXdr({ ...common, currentGuardians: [G1], desiredGuardians: [G1, G2], threshold: 2 });
+    const recovery = buildRecoveryXdr({ ...common, newSignerKey: NEW_KEY, guardianCount: 3 });
+    for (const xdr of [setup, update, recovery]) {
+      expect(isRecoveryTransaction(decodeTransaction(xdr, pp))).toBe(true);
+    }
+  });
+
+  it('rejects a payment (so a guardian can never co-sign a transfer here)', () => {
+    const payment = buildTransferXdr({
+      sourceAccountId: SOURCE,
+      sourceSequence: '1',
+      networkPassphrase: pp,
+      baseFee: '100',
+      destination: G1,
+      destinationFunded: true,
+      asset: { isNative: true },
+      amount: '10',
+    });
+    expect(isRecoveryTransaction(decodeTransaction(payment, pp))).toBe(false);
+  });
+
+  it('rejects an unreadable / empty transaction', () => {
+    expect(isRecoveryTransaction(null)).toBe(false);
+  });
+});
+
+describe('recoveryCoSignError', () => {
+  // A recovery setup sourced from SOURCE (the recovering account).
+  const recovery = buildGuardianSetupXdr({ ...common, guardians: [G1, G2, G3], threshold: 2 });
+
+  it('accepts a recovery request for someone else’s account', () => {
+    // From guardian G4's perspective, this modifies SOURCE's account — fine.
+    expect(recoveryCoSignError(recovery, pp, G4)).toBeNull();
+  });
+
+  it('rejects a tx that modifies the guardian’s OWN account (takeover guard)', () => {
+    // Attacker sends the guardian a setOptions sourced from the guardian's own
+    // account, adding the attacker as a signer. All-setOptions, so the shape
+    // guard passes — but the source is the guardian, so this must be refused.
+    const takeover = buildGuardianSetupXdr({ ...common, sourceAccountId: G4, guardians: [G1], threshold: 1 });
+    expect(recoveryCoSignError(takeover, pp, G4)).toMatch(/your own account/i);
+  });
+
+  it('rejects a per-operation source override targeting the guardian’s OWN account (takeover guard)', () => {
+    // Subtler takeover: the TX source is a throwaway (SOURCE, attacker-controlled),
+    // so the tx-level source check misses it — but a setOptions op carries a per-op
+    // `source` override pointing at the guardian's own account (G4), adding the
+    // attacker as a full-weight signer. All-setOptions, so the shape guard passes;
+    // co-signed with G4's master key it would authorize a signer on G4's account.
+    const attacker = G5;
+    const tx = new TransactionBuilder(new Account(SOURCE, '1'), {
+      fee: '100',
+      networkPassphrase: pp,
+    })
+      .addOperation(
+        Operation.setOptions({
+          source: G4,
+          signer: { ed25519PublicKey: attacker, weight: 10 },
+        }),
+      )
+      .setTimeout(0)
+      .build();
+    expect(recoveryCoSignError(tx.toXDR(), pp, G4)).toMatch(/your own account/i);
+  });
+
+  it('rejects a non-recovery transaction (payment)', () => {
+    const payment = buildTransferXdr({
+      sourceAccountId: SOURCE,
+      sourceSequence: '1',
+      networkPassphrase: pp,
+      baseFee: '100',
+      destination: G1,
+      destinationFunded: true,
+      asset: { isNative: true },
+      amount: '10',
+    });
+    expect(recoveryCoSignError(payment, pp, G4)).toMatch(/recovery/i);
+  });
+
+  it('rejects unreadable input', () => {
+    expect(recoveryCoSignError('not-a-real-xdr', pp, G4)).toMatch(/read this request/i);
   });
 });
 
