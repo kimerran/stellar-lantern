@@ -15,6 +15,7 @@ import { Send } from './screens/Send';
 import { Scan } from './screens/Scan';
 import { Apps } from './screens/Apps';
 import { Guardians } from './screens/Guardians';
+import { CashInOut } from './screens/CashInOut';
 
 function Splash() {
   return (
@@ -30,6 +31,7 @@ export function App() {
   const [tab, setTab] = useState<Tab>('assets');
   const [scanOpen, setScanOpen] = useState(false);
   const [guardiansOpen, setGuardiansOpen] = useState(false);
+  const [cashOpen, setCashOpen] = useState(false);
   const showToast = useToast();
 
   if (!status || !settings) return <Splash />;
@@ -77,6 +79,11 @@ export function App() {
     return <Guardians address={address} network={network} onBack={() => setGuardiansOpen(false)} />;
   }
 
+  // Full-screen Cash in / Cash out (anchor deposit/withdraw) overlay.
+  if (cashOpen) {
+    return <CashInOut address={address} network={network} onBack={() => setCashOpen(false)} />;
+  }
+
   return (
     <div className="flex h-full flex-col bg-background">
       <AppBar
@@ -87,6 +94,7 @@ export function App() {
         onCopyAddress={copyAddress}
         onOpenScan={() => setScanOpen(true)}
         onOpenGuardians={() => setGuardiansOpen(true)}
+        onOpenCashInOut={() => setCashOpen(true)}
         onExpand={isExpanded || isNativePlatform() ? undefined : openExpanded}
       />
 
