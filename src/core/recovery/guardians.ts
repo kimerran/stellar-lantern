@@ -401,11 +401,15 @@ export function isRecoveryTransaction(decoded: DecodedTx | null): boolean {
 // whose own account is `ownAddress`. Returns a user-facing error if it must NOT
 // be co-signed, or null if it's safe to review + sign. Guards, in order:
 //   1. unreadable XDR;
-//   2. SOURCE is the guardian's OWN account — a legitimate co-sign is always for
-//      *someone else's* account (the recovering account, on which the guardian
-//      is a signer). A self-sourced tx co-signed with the guardian's master key
-//      would authorize changes to the guardian's OWN account — an account
-//      takeover of the guardian, not a recovery. This is the critical check.
+//   2. The guardian's OWN account is being modified — a legitimate co-sign is
+//      always for *someone else's* account (the recovering account, on which the
+//      guardian is a signer). A tx that touches the guardian's OWN account,
+//      co-signed with the guardian's master key, would authorize changes to that
+//      account — an account takeover of the guardian, not a recovery. This is the
+//      critical check, and it must cover BOTH the transaction-level source AND
+//      every per-operation source override: a Stellar op can carry its own
+//      `source` distinct from the tx source, so an attacker can front a throwaway
+//      tx source while a setOptions op is sourced from the guardian's own account.
 //   3. any operation that isn't a setOptions signer/threshold change (e.g. a
 //      payment) — the guardian only ever co-signs recovery here.
 export function recoveryCoSignError(
@@ -421,7 +425,7 @@ export function recoveryCoSignError(
     return 'Couldn’t read this request. Make sure you pasted the whole thing.';
   }
   const inner = 'innerTransaction' in tx ? tx.innerTransaction : tx;
-  if (inner.source === ownAddress) {
+  if (inner.source === ownAddress || inner.operations.some((op) => op.source === ownAddress)) {
     return 'This changes your own account, which isn’t how co-signing works. Don’t sign it.';
   }
   if (!isRecoveryTransaction(decodeTransaction(trimmed, networkPassphrase))) {

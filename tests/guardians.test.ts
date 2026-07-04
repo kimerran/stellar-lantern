@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Keypair, Networks, TransactionBuilder } from '@stellar/stellar-sdk';
+import { Account, Keypair, Networks, Operation, TransactionBuilder } from '@stellar/stellar-sdk';
 import {
   buildGuardianSetupXdr,
   buildGuardianUpdateXdr,
@@ -343,6 +343,28 @@ describe('recoveryCoSignError', () => {
     // guard passes — but the source is the guardian, so this must be refused.
     const takeover = buildGuardianSetupXdr({ ...common, sourceAccountId: G4, guardians: [G1], threshold: 1 });
     expect(recoveryCoSignError(takeover, pp, G4)).toMatch(/your own account/i);
+  });
+
+  it('rejects a per-operation source override targeting the guardian’s OWN account (takeover guard)', () => {
+    // Subtler takeover: the TX source is a throwaway (SOURCE, attacker-controlled),
+    // so the tx-level source check misses it — but a setOptions op carries a per-op
+    // `source` override pointing at the guardian's own account (G4), adding the
+    // attacker as a full-weight signer. All-setOptions, so the shape guard passes;
+    // co-signed with G4's master key it would authorize a signer on G4's account.
+    const attacker = G5;
+    const tx = new TransactionBuilder(new Account(SOURCE, '1'), {
+      fee: '100',
+      networkPassphrase: pp,
+    })
+      .addOperation(
+        Operation.setOptions({
+          source: G4,
+          signer: { ed25519PublicKey: attacker, weight: 10 },
+        }),
+      )
+      .setTimeout(0)
+      .build();
+    expect(recoveryCoSignError(tx.toXDR(), pp, G4)).toMatch(/your own account/i);
   });
 
   it('rejects a non-recovery transaction (payment)', () => {
