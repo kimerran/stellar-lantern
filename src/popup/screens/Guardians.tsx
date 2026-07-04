@@ -23,6 +23,7 @@ import { Icon } from '../components/Icon';
 import { RiskCallout } from '../components/RiskCallout';
 import { HoldToConfirm } from '../components/HoldToConfirm';
 import { CoSignRecovery } from './CoSignRecovery';
+import { RecoverAccount } from './RecoverAccount';
 
 interface Props {
   address: string;
@@ -42,6 +43,7 @@ interface ReviewData {
 export function Guardians({ address, network, onBack }: Props) {
   const [step, setStep] = useState<Step>('form');
   const [coSign, setCoSign] = useState(false);
+  const [recover, setRecover] = useState(false);
   const [guardians, setGuardians] = useState<string[]>(['']);
   const [threshold, setThreshold] = useState(2);
 
@@ -212,6 +214,11 @@ export function Guardians({ address, network, onBack }: Props) {
   // Guardian side — co-sign someone else's recovery request.
   if (coSign) {
     return <CoSignRecovery address={address} network={network} onBack={() => setCoSign(false)} />;
+  }
+
+  // Recovering side — regain access to an account you've lost the key to.
+  if (recover) {
+    return <RecoverAccount address={address} network={network} onBack={() => setRecover(false)} />;
   }
 
   // ── Success ──
@@ -445,6 +452,14 @@ export function Guardians({ address, network, onBack }: Props) {
           className="flex w-full items-center justify-center gap-1.5 py-1 text-label-md text-on-surface-variant transition-colors hover:text-on-surface"
         >
           <Icon name="handshake" size={16} /> Helping someone recover? Co-sign their request
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setRecover(true)}
+          className="flex w-full items-center justify-center gap-1.5 py-1 text-label-md text-on-surface-variant transition-colors hover:text-on-surface"
+        >
+          <Icon name="restore" size={16} /> Lost access to another account? Recover it
         </button>
       </div>
     </div>
