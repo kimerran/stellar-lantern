@@ -9,6 +9,10 @@ export interface NetworkConfig {
   horizonUrl: string;
   explorerTxUrl: (hash: string) => string;
   friendbotUrl?: string;
+  // Soroban RPC endpoint for contract simulation/invocation (#21). Optional: a
+  // network without one can't do Soroban calls (mainnet has no single canonical
+  // public RPC, so it's left unset until configured).
+  sorobanRpcUrl?: string;
 }
 
 export const NETWORKS: Record<NetworkId, NetworkConfig> = {
@@ -19,6 +23,7 @@ export const NETWORKS: Record<NetworkId, NetworkConfig> = {
     horizonUrl: 'https://horizon-testnet.stellar.org',
     explorerTxUrl: (hash) => `https://stellar.expert/explorer/testnet/tx/${hash}`,
     friendbotUrl: 'https://friendbot.stellar.org',
+    sorobanRpcUrl: 'https://soroban-testnet.stellar.org',
   },
   PUBLIC: {
     id: 'PUBLIC',
