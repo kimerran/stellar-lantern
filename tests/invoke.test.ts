@@ -1,6 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { Networks, scValToNative } from '@stellar/stellar-sdk';
-import { argToScVal, buildInvokeContractXdr, type InvokeArg } from '@core/stellar/invoke';
+import {
+  Networks,
+  scValToNative,
+  TransactionBuilder,
+  SorobanDataBuilder,
+  type Transaction,
+} from '@stellar/stellar-sdk';
+import {
+  argToScVal,
+  buildInvokeContractXdr,
+  assembleInvokeXdr,
+  type InvokeArg,
+} from '@core/stellar/invoke';
 import { decodeTransaction } from '@core/scan/decode';
 
 const SOURCE = 'GDRXE2BQUC3AZNPVFSCEZ76NJ3WWL25FYFK6RGZGIEKWE4SOOHSUJUJ6';
@@ -141,5 +152,52 @@ describe('argToScVal', () => {
 
   it('throws on a bad bool', () => {
     expect(() => argToScVal({ type: 'bool', value: '1' })).toThrow(/bool/i);
+  });
+});
+
+describe('assembleInvokeXdr', () => {
+  const built = buildInvokeContractXdr({
+    ...common,
+    functionName: 'supply',
+    args: [{ type: 'i128', value: '100' }],
+  });
+  // A default (empty) SorobanTransactionData stands in for the simulation footprint.
+  const footprint = new SorobanDataBuilder().build().toXDR('base64');
+
+  it('applies footprint + resource fee and preserves the invoke call', () => {
+    const assembled = assembleInvokeXdr({
+      builtXdr: built,
+      networkPassphrase: pp,
+      minResourceFee: '12345',
+      transactionData: footprint,
+    });
+    const tx = TransactionBuilder.fromXDR(assembled, pp) as Transaction;
+    // total fee = 100 inclusion + 12345 resource
+    expect(tx.fee).toBe('12445');
+    // the SorobanTransactionData (footprint) is attached (tx ext arm 1)
+    expect(tx.toEnvelope().v1().tx().ext().switch()).toBe(1);
+    // the invoke call survived the rebuild (same contract + function)
+    const decoded = decodeTransaction(assembled, pp);
+    expect(decoded?.operations[0]?.contractFunction).toBe('supply');
+    expect(decoded?.operations[0]?.contractId).toBe(CONTRACT);
+    // source + sequence preserved
+    expect(tx.source).toBe(SOURCE);
+  });
+
+  it('respects a custom inclusion fee', () => {
+    const assembled = assembleInvokeXdr({
+      builtXdr: built,
+      networkPassphrase: pp,
+      minResourceFee: '900',
+      transactionData: footprint,
+      inclusionFee: '10000',
+    });
+    expect((TransactionBuilder.fromXDR(assembled, pp) as Transaction).fee).toBe('10900');
+  });
+
+  it('throws when the simulation has no footprint data', () => {
+    expect(() =>
+      assembleInvokeXdr({ builtXdr: built, networkPassphrase: pp, minResourceFee: '1', transactionData: '' }),
+    ).toThrow(/footprint/i);
   });
 });
