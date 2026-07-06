@@ -23,6 +23,7 @@ import {
   xdr,
 } from '@stellar/stellar-sdk';
 import { isValidContractId } from '@core/wallet/wallet';
+import { simulateTransaction } from './soroban';
 
 // A single typed argument for a contract invocation. `value` is always a string
 // (the wire/UI representation); `type` tells us how to turn it into an ScVal.
@@ -231,4 +232,74 @@ export function assembleInvokeXdr(params: AssembleInvokeParams): string {
     builder.setTimeout(180);
   }
   return builder.build().toXDR();
+}
+
+export interface PrepareInvokeParams {
+  sourceAccount: string;
+  sourceSequence: string;
+  contractId: string;
+  functionName: string;
+  args: InvokeArg[];
+  networkPassphrase: string;
+  rpcUrl: string; // Soroban RPC endpoint (NetworkConfig.sorobanRpcUrl)
+  fetchImpl?: typeof fetch;
+  inclusionFee?: string;
+  timeoutSecs?: number;
+}
+
+export type PrepareInvokeResult = { ok: true; xdr: string } | { ok: false; error: string };
+
+/**
+ * The full **build → simulate → assemble** pipeline for a Soroban contract call,
+ * producing a *ready-to-sign* XDR (#21). This is what the mini-app invoke bridge
+ * / a UI calls before handing the result to the existing scan → approve →
+ * SIGN_AND_SUBMIT path. Args are TYPED (`InvokeArg`) — the caller resolves the
+ * intent's arg types. The `fetch` is injectable so the whole pipeline is
+ * unit-testable offline. Any failure (bad arg, RPC/network error, the contract
+ * would revert, or a missing footprint) comes back as `{ ok: false, error }`
+ * rather than throwing, so the caller has one thing to surface.
+ */
+export async function prepareInvoke(params: PrepareInvokeParams): Promise<PrepareInvokeResult> {
+  let built: string;
+  try {
+    built = buildInvokeContractXdr({
+      sourceAccount: params.sourceAccount,
+      sourceSequence: params.sourceSequence,
+      contractId: params.contractId,
+      functionName: params.functionName,
+      args: params.args,
+      networkPassphrase: params.networkPassphrase,
+      ...(params.timeoutSecs !== undefined ? { timeoutSecs: params.timeoutSecs } : {}),
+    });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Invalid contract call.' };
+  }
+
+  let sim;
+  try {
+    sim = await simulateTransaction(built, {
+      rpcUrl: params.rpcUrl,
+      ...(params.fetchImpl ? { fetchImpl: params.fetchImpl } : {}),
+    });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Simulation request failed.' };
+  }
+  if (!sim.ok) return { ok: false, error: sim.error };
+  if (!sim.transactionData) {
+    return { ok: false, error: 'Simulation returned no footprint data.' };
+  }
+
+  try {
+    const xdr = assembleInvokeXdr({
+      builtXdr: built,
+      networkPassphrase: params.networkPassphrase,
+      minResourceFee: sim.minResourceFee,
+      transactionData: sim.transactionData,
+      ...(sim.auth ? { auth: sim.auth } : {}),
+      ...(params.inclusionFee !== undefined ? { inclusionFee: params.inclusionFee } : {}),
+    });
+    return { ok: true, xdr };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Could not assemble the transaction.' };
+  }
 }

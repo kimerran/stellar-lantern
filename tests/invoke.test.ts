@@ -10,6 +10,7 @@ import {
   argToScVal,
   buildInvokeContractXdr,
   assembleInvokeXdr,
+  prepareInvoke,
   type InvokeArg,
 } from '@core/stellar/invoke';
 import { decodeTransaction } from '@core/scan/decode';
@@ -199,5 +200,65 @@ describe('assembleInvokeXdr', () => {
     expect(() =>
       assembleInvokeXdr({ builtXdr: built, networkPassphrase: pp, minResourceFee: '1', transactionData: '' }),
     ).toThrow(/footprint/i);
+  });
+});
+
+describe('prepareInvoke', () => {
+  const footprint = new SorobanDataBuilder().build().toXDR('base64');
+
+  // A JSON-RPC fetch stub returning a simulate `result`; records call count.
+  function rpcFetch(result: unknown, init: { ok?: boolean; status?: number } = {}) {
+    const calls: string[] = [];
+    const impl = ((url: string) => {
+      calls.push(url);
+      return Promise.resolve({
+        ok: init.ok ?? true,
+        status: init.status ?? 200,
+        json: () => Promise.resolve({ jsonrpc: '2.0', id: 1, result }),
+      });
+    }) as unknown as typeof fetch;
+    return { impl, calls };
+  }
+
+  const base = {
+    sourceAccount: SOURCE,
+    sourceSequence: '1',
+    contractId: CONTRACT,
+    functionName: 'supply',
+    args: [{ type: 'i128', value: '100' }] as InvokeArg[],
+    networkPassphrase: pp,
+    rpcUrl: 'https://rpc.example.com',
+  };
+
+  it('builds → simulates → assembles into a ready-to-sign XDR', async () => {
+    const { impl } = rpcFetch({ transactionData: footprint, minResourceFee: '500' });
+    const r = await prepareInvoke({ ...base, fetchImpl: impl });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const decoded = decodeTransaction(r.xdr, pp);
+      expect(decoded?.operations[0]?.contractFunction).toBe('supply');
+      // fee = 100 inclusion + 500 resource
+      expect((TransactionBuilder.fromXDR(r.xdr, pp) as Transaction).fee).toBe('600');
+    }
+  });
+
+  it('returns ok:false with the reason when the contract would revert', async () => {
+    const { impl } = rpcFetch({ error: 'HostError: insufficient balance' });
+    const r = await prepareInvoke({ ...base, fetchImpl: impl });
+    expect(r).toEqual({ ok: false, error: 'HostError: insufficient balance' });
+  });
+
+  it('returns ok:false on a bad arg and never calls the RPC', async () => {
+    const { impl, calls } = rpcFetch({ transactionData: footprint, minResourceFee: '1' });
+    const r = await prepareInvoke({ ...base, args: [{ type: 'i128', value: 'not-a-number' }], fetchImpl: impl });
+    expect(r.ok).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('returns ok:false when the RPC request fails (non-2xx)', async () => {
+    const { impl } = rpcFetch({}, { ok: false, status: 500 });
+    const r = await prepareInvoke({ ...base, fetchImpl: impl });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/500/);
   });
 });
