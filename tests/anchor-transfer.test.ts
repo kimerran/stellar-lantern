@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { summarizeAssetSupport, formatTransferLimits } from '@core/anchor/transfer';
+import { summarizeAssetSupport, formatTransferLimits, webAuthDomainFor } from '@core/anchor/transfer';
 import type { Sep24Info } from '@core/anchor/sep24';
 
 const info = (deposit: Sep24Info['deposit'], withdraw: Sep24Info['withdraw']): Sep24Info => ({
@@ -45,6 +45,16 @@ describe('summarizeAssetSupport', () => {
 
   it('returns an empty list when nothing is supported', () => {
     expect(summarizeAssetSupport(info([], []))).toEqual([]);
+  });
+});
+
+describe('webAuthDomainFor', () => {
+  it('returns the host of the web-auth endpoint', () => {
+    expect(webAuthDomainFor('https://auth.anchor.example.com/auth', 'anchor.example.com')).toBe('auth.anchor.example.com');
+    expect(webAuthDomainFor('https://anchor.example.com/webauth', 'anchor.example.com')).toBe('anchor.example.com');
+  });
+  it('falls back to the home domain when the endpoint is unparseable', () => {
+    expect(webAuthDomainFor('not-a-url', 'anchor.example.com')).toBe('anchor.example.com');
   });
 });
 

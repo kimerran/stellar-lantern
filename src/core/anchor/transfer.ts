@@ -45,6 +45,19 @@ export function summarizeAssetSupport(info: Sep24Info): AssetSupport[] {
     .sort((a, b) => a.assetCode.localeCompare(b.assetCode));
 }
 
+/**
+ * The `web_auth_domain` to expect in a SEP-10 challenge: the host of the anchor's
+ * WEB_AUTH_ENDPOINT, falling back to its home domain if the URL is unparseable.
+ * (The challenge validator, `authenticateSep10`, must know this up front.)
+ */
+export function webAuthDomainFor(webAuthEndpoint: string, homeDomain: string): string {
+  try {
+    return new URL(webAuthEndpoint).host;
+  } catch {
+    return homeDomain;
+  }
+}
+
 /** Human-readable amount limits for one side, or null if the anchor set none. */
 export function formatTransferLimits(a: AssetTransferInfo): string | null {
   const fmt = (n: number) => n.toLocaleString('en-US');

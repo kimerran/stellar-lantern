@@ -42,6 +42,20 @@ describe('startInteractive', () => {
     const empty = jsonFetch({ id: 'tx-3' }); // missing url
     await expect(startInteractive(TRANSFER, { kind: 'deposit', assetCode: 'USDC', account: ACCOUNT, jwt: JWT }, empty.impl)).rejects.toThrow(/interactive URL/i);
   });
+
+  it('rejects a non-https interactive URL (data:/javascript:/http:) — it gets hosted in an iframe in the wallet chrome', async () => {
+    for (const url of [
+      'data:text/html,<script>alert(1)</script>',
+      'javascript:alert(document.cookie)',
+      'http://anchor.example.com/i/tx', // plain http — SEP-24 mandates https
+      'not-a-url',
+    ]) {
+      const { impl } = jsonFetch({ id: 'tx-1', url });
+      await expect(
+        startInteractive(TRANSFER, { kind: 'deposit', assetCode: 'USDC', account: ACCOUNT, jwt: JWT }, impl),
+      ).rejects.toThrow(/https|invalid interactive URL/i);
+    }
+  });
 });
 
 describe('fetchTransaction', () => {
