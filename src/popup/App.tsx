@@ -16,6 +16,7 @@ import { Scan } from './screens/Scan';
 import { Apps } from './screens/Apps';
 import { Guardians } from './screens/Guardians';
 import { CashInOut } from './screens/CashInOut';
+import { Earn } from './screens/Earn';
 import { Receive } from './screens/Receive';
 
 function Splash() {
@@ -33,6 +34,7 @@ export function App() {
   const [scanOpen, setScanOpen] = useState(false);
   const [guardiansOpen, setGuardiansOpen] = useState(false);
   const [cashOpen, setCashOpen] = useState(false);
+  const [earnOpen, setEarnOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const showToast = useToast();
 
@@ -86,6 +88,11 @@ export function App() {
     return <CashInOut address={address} network={network} onBack={() => setCashOpen(false)} />;
   }
 
+  // Full-screen Earn (Blend supply/withdraw) overlay.
+  if (earnOpen) {
+    return <Earn address={address} network={network} onBack={() => setEarnOpen(false)} />;
+  }
+
   // Full-screen Receive (address QR code) overlay.
   if (receiveOpen) {
     return <Receive address={address} onBack={() => setReceiveOpen(false)} />;
@@ -103,6 +110,7 @@ export function App() {
         onOpenScan={() => setScanOpen(true)}
         onOpenGuardians={() => setGuardiansOpen(true)}
         onOpenCashInOut={() => setCashOpen(true)}
+        onOpenEarn={() => setEarnOpen(true)}
         onExpand={isExpanded || isNativePlatform() ? undefined : openExpanded}
       />
 
