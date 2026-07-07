@@ -40,7 +40,7 @@ export function explainTransaction(tx: DecodedTx | null): string {
       break;
     case 'pathPaymentStrictSend':
     case 'pathPaymentStrictReceive':
-      sentence = `This swaps assets and sends about ${amount} ${asset} to ${to}.`;
+      sentence = describeSwap(first);
       break;
     case 'setOptions':
       sentence = describeSetOptions(first);
@@ -96,6 +96,22 @@ function describeSetOptions(op: DecodedOp): string {
   const joined =
     parts.length > 1 ? `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}` : parts[0];
   return `This ${joined}. Only continue if you set this up yourself.`;
+}
+
+// Name both sides of a swap + the slippage bound in plain language, e.g.
+// "This swaps 100 XLM for at least 24.3 USDC." (strict-send) — not the generic
+// payment wording (#71). Whether the proceeds leave the wallet (a swap-and-send)
+// is a risk signal raised in the engine, which knows the source account.
+function describeSwap(op: DecodedOp): string {
+  const sendAmt = op.sendAmount ? formatAmount(op.sendAmount) : '';
+  const sendCode = op.sendAssetCode ?? 'XLM';
+  const destCode = op.destAssetCode ?? op.assetCode ?? 'XLM';
+  if (op.type === 'pathPaymentStrictSend' && op.destMin) {
+    return `This swaps ${sendAmt} ${sendCode} for at least ${formatAmount(op.destMin)} ${destCode}.`;
+  }
+  // strict-receive: an exact amount received, capped by how much is spent.
+  const recvAmt = op.amount ? formatAmount(op.amount) : '';
+  return `This swaps up to ${sendAmt} ${sendCode} for ${recvAmt} ${destCode}.`;
 }
 
 function humanizeType(type: string): string {

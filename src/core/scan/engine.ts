@@ -125,6 +125,22 @@ export function scan({ xdr, networkPassphrase, context }: ScanInput): ScanVerdic
     });
   }
 
+  // A swap normally routes its proceeds back to the sender (a self-swap). One
+  // that sends the swapped output to a DIFFERENT account is a "swap and send" —
+  // the funds leave the wallet, and a drainer could disguise a transfer as a
+  // swap. Flag it (a plain self-swap stays low-risk). (#71)
+  const swap = decoded?.operations.find(
+    (o) => o.type === 'pathPaymentStrictSend' || o.type === 'pathPaymentStrictReceive',
+  );
+  if (swap?.destination && swap.destination !== context.fromAddress) {
+    reasons.push({
+      code: 'swap_to_other',
+      severity: 'medium',
+      title: 'Swap sends funds elsewhere',
+      detail: `The swapped funds go to ${truncateAddress(swap.destination, 4, 4)}, not back to your own wallet. Only continue if you meant to send them there.`,
+    });
+  }
+
   return verdictFrom(reasons, explanation);
 }
 
