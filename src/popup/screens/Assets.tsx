@@ -12,9 +12,10 @@ interface Props {
   address: string;
   network: NetworkConfig;
   onSend: () => void;
+  onSwap: () => void;
 }
 
-export function Assets({ address, network, onSend }: Props) {
+export function Assets({ address, network, onSend, onSwap }: Props) {
   const [state, setState] = useState<AccountState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +77,9 @@ export function Assets({ address, network, onSend }: Props) {
         <div className="mt-4 flex justify-center gap-2">
           <Button onClick={onSend} leadingIcon="send">
             Send
+          </Button>
+          <Button variant="secondary" onClick={onSwap} leadingIcon="swap_horiz">
+            Swap
           </Button>
           <Button variant="secondary" onClick={() => load()} leadingIcon="refresh">
             Refresh

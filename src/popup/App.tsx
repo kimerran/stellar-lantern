@@ -12,6 +12,7 @@ import { Unlock } from './screens/Unlock';
 import { Assets } from './screens/Assets';
 import { Activity } from './screens/Activity';
 import { Send } from './screens/Send';
+import { Swap } from './screens/Swap';
 import { Scan } from './screens/Scan';
 import { Apps } from './screens/Apps';
 import { Guardians } from './screens/Guardians';
@@ -35,6 +36,7 @@ export function App() {
   const [guardiansOpen, setGuardiansOpen] = useState(false);
   const [cashOpen, setCashOpen] = useState(false);
   const [earnOpen, setEarnOpen] = useState(false);
+  const [swapOpen, setSwapOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const showToast = useToast();
 
@@ -93,6 +95,11 @@ export function App() {
     return <Earn address={address} network={network} onBack={() => setEarnOpen(false)} />;
   }
 
+  // Full-screen Swap (SDEX path-payment) overlay.
+  if (swapOpen) {
+    return <Swap address={address} network={network} onBack={() => setSwapOpen(false)} />;
+  }
+
   // Full-screen Receive (address QR code) overlay.
   if (receiveOpen) {
     return <Receive address={address} onBack={() => setReceiveOpen(false)} />;
@@ -119,7 +126,12 @@ export function App() {
         <div className="pointer-events-none sticky top-0 z-10 h-3 bg-gradient-to-b from-background to-transparent" />
         <div className="px-4 pb-4">
           {tab === 'assets' && (
-            <Assets address={address} network={network} onSend={() => setTab('send')} />
+            <Assets
+              address={address}
+              network={network}
+              onSend={() => setTab('send')}
+              onSwap={() => setSwapOpen(true)}
+            />
           )}
           {tab === 'activity' && <Activity address={address} network={network} />}
           {tab === 'send' && (
