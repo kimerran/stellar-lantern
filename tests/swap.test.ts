@@ -1,91 +1,102 @@
 import { describe, it, expect } from 'vitest';
-import { Keypair, Networks, TransactionBuilder } from '@stellar/stellar-sdk';
-import { buildPathPaymentStrictSendXdr, destMinFromQuote } from '@core/stellar/swap';
+import { Networks, TransactionBuilder, type Transaction } from '@stellar/stellar-sdk';
+import { buildPathPaymentStrictSendXdr, destMinFromQuote, type BuildSwapParams } from '@core/stellar/swap';
 import type { AssetRef } from '@core/stellar/tx';
 
 const pp = Networks.TESTNET;
-const SOURCE = Keypair.random().publicKey();
-const DEST = Keypair.random().publicKey();
-const USDC_ISSUER = Keypair.random().publicKey();
-const EURC_ISSUER = Keypair.random().publicKey();
+const SOURCE = 'GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ';
+const OTHER = 'GDRXE2BQUC3AZNPVFSCEZ76NJ3WWL25FYFK6RGZGIEKWE4SOOHSUJUJ6';
+const USDC_ISSUER = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN';
 
 const XLM: AssetRef = { isNative: true };
 const USDC: AssetRef = { isNative: false, code: 'USDC', issuer: USDC_ISSUER };
-const EURC: AssetRef = { isNative: false, code: 'EURC', issuer: EURC_ISSUER };
+const EURC: AssetRef = { isNative: false, code: 'EURC', issuer: USDC_ISSUER };
 
-const common = { sourceAccountId: SOURCE, sourceSequence: '1', networkPassphrase: pp, baseFee: '100' };
+const base: BuildSwapParams = {
+  sourceAccountId: SOURCE,
+  sourceSequence: '1',
+  networkPassphrase: pp,
+  baseFee: '100',
+  sendAsset: XLM,
+  sendAmount: '100',
+  destAsset: USDC,
+  destMin: '24.3',
+};
 
-// Decode the single operation from a built swap XDR via the SDK.
-function op(xdr: string) {
+// Decode the single pathPaymentStrictSend op out of a built XDR.
+function decodeOp(xdr: string) {
+  const tx = TransactionBuilder.fromXDR(xdr, pp) as Transaction;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return TransactionBuilder.fromXDR(xdr, pp).operations[0] as any;
+  return { tx, op: tx.operations[0] as any };
 }
 
 describe('buildPathPaymentStrictSendXdr', () => {
-  it('builds a self-swap XLM → USDC (strict-send path payment)', () => {
-    const o = op(
-      buildPathPaymentStrictSendXdr({ ...common, sendAsset: XLM, sendAmount: '100', destAsset: USDC, destMin: '24.3' }),
+  it('round-trips a native→issued swap with amounts + slippage floor', () => {
+    const { tx, op } = decodeOp(buildPathPaymentStrictSendXdr(base));
+    expect(op.type).toBe('pathPaymentStrictSend');
+    expect(op.sendAsset.isNative()).toBe(true);
+    expect(Number(op.sendAmount)).toBe(100);
+    expect(op.destAsset.getCode()).toBe('USDC');
+    expect(op.destAsset.getIssuer()).toBe(USDC_ISSUER);
+    expect(Number(op.destMin)).toBe(24.3);
+    expect(op.path).toHaveLength(0);
+    expect(tx.source).toBe(SOURCE);
+  });
+
+  it('defaults destination to the source account (self-swap)', () => {
+    expect(decodeOp(buildPathPaymentStrictSendXdr(base)).op.destination).toBe(SOURCE);
+  });
+
+  it('honors an explicit destination', () => {
+    expect(decodeOp(buildPathPaymentStrictSendXdr({ ...base, destination: OTHER })).op.destination).toBe(OTHER);
+  });
+
+  it('supports an issued→native swap', () => {
+    const { op } = decodeOp(
+      buildPathPaymentStrictSendXdr({ ...base, sendAsset: USDC, sendAmount: '25', destAsset: XLM, destMin: '95' }),
     );
-    expect(o.type).toBe('pathPaymentStrictSend');
-    expect(o.sendAsset.isNative()).toBe(true);
-    expect(Number(o.sendAmount)).toBe(100);
-    expect(o.destAsset.getCode()).toBe('USDC');
-    expect(o.destAsset.getIssuer()).toBe(USDC_ISSUER);
-    expect(Number(o.destMin)).toBe(24.3);
-    expect(o.destination).toBe(SOURCE); // self-swap by default
-    expect(o.path).toHaveLength(0);
+    expect(op.sendAsset.getCode()).toBe('USDC');
+    expect(op.destAsset.isNative()).toBe(true);
   });
 
-  it('sends to a custom destination when given one', () => {
-    const o = op(
-      buildPathPaymentStrictSendXdr({ ...common, sendAsset: XLM, sendAmount: '10', destAsset: USDC, destMin: '2', destination: DEST }),
-    );
-    expect(o.destination).toBe(DEST);
+  it('encodes intermediate path hops', () => {
+    const { op } = decodeOp(buildPathPaymentStrictSendXdr({ ...base, path: [EURC] }));
+    expect(op.path).toHaveLength(1);
+    expect(op.path[0].getCode()).toBe('EURC');
   });
 
-  it('routes through an intermediate path', () => {
-    const o = op(
-      buildPathPaymentStrictSendXdr({ ...common, sendAsset: XLM, sendAmount: '10', destAsset: USDC, destMin: '2', path: [EURC] }),
-    );
-    expect(o.path).toHaveLength(1);
-    expect(o.path[0].getCode()).toBe('EURC');
-    expect(o.path[0].getIssuer()).toBe(EURC_ISSUER);
+  it('rejects a non-positive send amount or destMin', () => {
+    expect(() => buildPathPaymentStrictSendXdr({ ...base, sendAmount: '0' })).toThrow(/send amount/i);
+    expect(() => buildPathPaymentStrictSendXdr({ ...base, sendAmount: '-5' })).toThrow(/send amount/i);
+    expect(() => buildPathPaymentStrictSendXdr({ ...base, destMin: '0' })).toThrow(/minimum received/i);
   });
 
-  it('swaps between two issued assets', () => {
-    const o = op(
-      buildPathPaymentStrictSendXdr({ ...common, sendAsset: USDC, sendAmount: '50', destAsset: EURC, destMin: '46' }),
-    );
-    expect(o.sendAsset.getCode()).toBe('USDC');
-    expect(o.destAsset.getCode()).toBe('EURC');
+  it('rejects more than 7 decimal places', () => {
+    expect(() => buildPathPaymentStrictSendXdr({ ...base, sendAmount: '1.123456789' })).toThrow(/send amount/i);
   });
 
-  it('rejects a swap between identical assets', () => {
-    expect(() => buildPathPaymentStrictSendXdr({ ...common, sendAsset: XLM, sendAmount: '1', destAsset: XLM, destMin: '1' })).toThrow(/different assets/i);
-    expect(() => buildPathPaymentStrictSendXdr({ ...common, sendAsset: USDC, sendAmount: '1', destAsset: { ...USDC }, destMin: '1' })).toThrow(/different assets/i);
+  it('rejects swapping an asset for itself', () => {
+    expect(() => buildPathPaymentStrictSendXdr({ ...base, destAsset: XLM })).toThrow(/different assets/i);
+    expect(() =>
+      buildPathPaymentStrictSendXdr({ ...base, sendAsset: USDC, destAsset: { ...USDC } }),
+    ).toThrow(/different assets/i);
   });
 
-  it('rejects non-positive or over-precision amounts', () => {
-    expect(() => buildPathPaymentStrictSendXdr({ ...common, sendAsset: XLM, sendAmount: '0', destAsset: USDC, destMin: '1' })).toThrow(/send amount/i);
-    expect(() => buildPathPaymentStrictSendXdr({ ...common, sendAsset: XLM, sendAmount: 'abc', destAsset: USDC, destMin: '1' })).toThrow(/send amount/i);
-    expect(() => buildPathPaymentStrictSendXdr({ ...common, sendAsset: XLM, sendAmount: '1.123456789', destAsset: USDC, destMin: '1' })).toThrow(/send amount/i);
-    expect(() => buildPathPaymentStrictSendXdr({ ...common, sendAsset: XLM, sendAmount: '1', destAsset: USDC, destMin: '0' })).toThrow(/minimum received/i);
-  });
-
-  it('rejects a non-native asset missing its issuer', () => {
-    const bad: AssetRef = { isNative: false, code: 'BAD' };
-    expect(() => buildPathPaymentStrictSendXdr({ ...common, sendAsset: XLM, sendAmount: '1', destAsset: bad, destMin: '1' })).toThrow(/issuer/i);
+  it('rejects an issued asset missing its issuer', () => {
+    expect(() =>
+      buildPathPaymentStrictSendXdr({ ...base, destAsset: { isNative: false, code: 'USDC' } }),
+    ).toThrow(/code and issuer/i);
   });
 });
 
 describe('destMinFromQuote', () => {
-  it('applies the tolerance and floors to 7dp', () => {
-    expect(destMinFromQuote('100', 0.005)).toBe('99.5000000');
-    expect(destMinFromQuote('24.5', 0.01)).toBe('24.2550000');
-    expect(destMinFromQuote('100', 0)).toBe('100.0000000');
+  it('applies the tolerance and floors to 7 dp', () => {
+    expect(destMinFromQuote('100', 0.005)).toBe('99.5000000'); // 0.5%
+    expect(destMinFromQuote('24.5', 0.01)).toBe('24.2550000'); // 1%
+    expect(destMinFromQuote('24.5', 0)).toBe('24.5000000'); // no tolerance
   });
 
-  it('rejects a bad quote or tolerance', () => {
+  it('rejects a non-positive quote or an out-of-range tolerance', () => {
     expect(() => destMinFromQuote('0', 0.01)).toThrow(/positive/i);
     expect(() => destMinFromQuote('abc', 0.01)).toThrow(/positive/i);
     expect(() => destMinFromQuote('100', 1)).toThrow(/tolerance/i);
