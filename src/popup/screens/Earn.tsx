@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { NetworkConfig } from '@shared/constants';
 import { sendMessage } from '@shared/messages';
 import { getServer } from '@core/stellar/client';
@@ -12,6 +12,7 @@ import {
   type BlendReserve,
 } from '@core/blend/directory';
 import { toBaseUnits, prepareBlendSubmit } from '@core/blend/submit';
+import { readSuppliedPositions, type SuppliedPosition } from '@core/blend/positions';
 import type { BlendAction } from '@core/blend/pool';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
@@ -44,7 +45,9 @@ const actionVerb = (a: BlendAction) => (a === 'supply' ? 'Supply' : 'Withdraw');
 
 export function Earn({ address, network, onBack }: Props) {
   const kind = network.id === 'TESTNET' ? 'testnet' : 'public';
-  const pools = blendPoolsForNetwork(kind);
+  // Memoized so it's a stable dependency for the positions effect (otherwise a
+  // fresh array each render would re-trigger the fetch on every state update).
+  const pools = useMemo(() => blendPoolsForNetwork(kind), [kind]);
 
   const [step, setStep] = useState<Step>('pick');
   const [sel, setSel] = useState<Selection | null>(null);
@@ -56,6 +59,38 @@ export function Earn({ address, network, onBack }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [confirmText, setConfirmText] = useState('');
+
+  // Supplied-position readout per pool (fail-soft: null/absent → no readout).
+  const [positions, setPositions] = useState<Record<string, SuppliedPosition[]>>({});
+
+  // Read the user's current supplied balances so each reserve row can show what
+  // they've already got earning yield. Read-only + advisory — any failure just
+  // omits the readout and never blocks supply/withdraw.
+  useEffect(() => {
+    const rpcUrl = network.sorobanRpcUrl;
+    if (!rpcUrl || pools.length === 0) return;
+    let live = true;
+    (async () => {
+      for (const pool of pools) {
+        const supplied = await readSuppliedPositions(
+          pool.poolId,
+          address,
+          pool.reserves.map((r) => ({ code: r.code, assetId: r.assetId })),
+          { rpcUrl },
+        );
+        if (live && supplied) setPositions((prev) => ({ ...prev, [pool.id]: supplied }));
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [address, network.sorobanRpcUrl, pools]);
+
+  function suppliedDisplay(poolId: string, reserve: BlendReserve): string | null {
+    const found = positions[poolId]?.find((p) => p.code === reserve.code);
+    if (!found || BigInt(found.suppliedBase) <= 0n) return null;
+    return formatAmount((Number(found.suppliedBase) / 10 ** found.decimals).toString());
+  }
 
   function choose(pool: BlendPool, reserve: BlendReserve, action: BlendAction) {
     setSel({ pool, reserve, action });
@@ -330,15 +365,23 @@ export function Earn({ address, network, onBack }: Props) {
                     {pool.verified && <Icon name="verified" size={16} className="shrink-0 text-primary-container" />}
                   </div>
                   <ul className="space-y-2">
-                    {pool.reserves.map((r) => (
-                      <li key={r.assetId} className="flex items-center gap-2">
-                        <span className="w-14 shrink-0 font-mono text-label-md text-on-surface">{r.code}</span>
-                        <div className="grid flex-1 grid-cols-2 gap-2">
-                          <ActionButton label="Supply" icon="south_west" onClick={() => choose(pool, r, 'supply')} />
-                          <ActionButton label="Withdraw" icon="north_east" onClick={() => choose(pool, r, 'withdraw')} />
-                        </div>
-                      </li>
-                    ))}
+                    {pool.reserves.map((r) => {
+                      const supplied = suppliedDisplay(pool.id, r);
+                      return (
+                        <li key={r.assetId} className="flex items-center gap-2">
+                          <div className="w-16 shrink-0">
+                            <div className="font-mono text-label-md text-on-surface">{r.code}</div>
+                            {supplied && (
+                              <div className="text-label-sm text-primary-container">{supplied} earning</div>
+                            )}
+                          </div>
+                          <div className="grid flex-1 grid-cols-2 gap-2">
+                            <ActionButton label="Supply" icon="south_west" onClick={() => choose(pool, r, 'supply')} />
+                            <ActionButton label="Withdraw" icon="north_east" onClick={() => choose(pool, r, 'withdraw')} />
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </Card>
               </li>
