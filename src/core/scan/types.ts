@@ -35,6 +35,14 @@ export interface DecodedOp {
   // function is a contract invocation (not upload-wasm / create-contract).
   contractId?: string; // the C… contract address being invoked
   contractFunction?: string; // the invoked function name
+  // pathPayment (swap) — the "from" side + slippage bound the primary
+  // amount/assetCode (the dest side) don't capture. Strict-send: `sendAmount` is
+  // exact, `destMin` is the received floor. Strict-receive: `sendAmount` is the
+  // max spent, `amount` (dest) is exact so `destMin` is unset.
+  sendAssetCode?: string;
+  sendAmount?: string;
+  destAssetCode?: string;
+  destMin?: string;
 }
 
 export interface DecodedTx {

@@ -48,12 +48,27 @@ function mapOp(op: Record<string, unknown>): DecodedOp {
         assetCode: 'XLM',
       };
     case 'pathPaymentStrictSend':
-    case 'pathPaymentStrictReceive':
+      // Strict-send: spend an exact `sendAmount`, receive at least `destMin`.
       return {
         type,
         destination: str(op.destination),
-        amount: str(op.destAmount ?? op.sendAmount),
+        amount: str(op.sendAmount), // headline = what leaves the wallet
+        assetCode: assetCode(op.sendAsset),
+        sendAssetCode: assetCode(op.sendAsset),
+        sendAmount: str(op.sendAmount),
+        destAssetCode: assetCode(op.destAsset),
+        destMin: str(op.destMin),
+      };
+    case 'pathPaymentStrictReceive':
+      // Strict-receive: receive an exact `destAmount`, spend at most `sendMax`.
+      return {
+        type,
+        destination: str(op.destination),
+        amount: str(op.destAmount),
         assetCode: assetCode(op.destAsset),
+        sendAssetCode: assetCode(op.sendAsset),
+        sendAmount: str(op.sendMax),
+        destAssetCode: assetCode(op.destAsset),
       };
     case 'setOptions':
       return { type, ...decodeSetOptions(op) };
