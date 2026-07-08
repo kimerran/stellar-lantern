@@ -39,6 +39,15 @@ describe('challengeMatches', () => {
     expect(challengeMatches(clientData('webauthn.create', challenge), challenge)).toBe(false); // registration, not assertion
     expect(challengeMatches(enc.encode('garbage'), challenge)).toBe(false);
   });
+
+  // Regression: base64url re-padding must work for every byte length, not just
+  // the 32-byte (mod-3) tx-hash path. A ≡1 (mod 3) length (16, 31, 64…) yields a
+  // b64 length ≡ 2 (mod 4) needing TWO `=` — the earlier 2-char pad broke these.
+  it.each([1, 2, 3, 15, 16, 31, 32, 33, 64])('matches a %i-byte challenge', (len) => {
+    const c = new Uint8Array(len);
+    for (let i = 0; i < len; i++) c[i] = (i * 37 + 5) & 0xff;
+    expect(challengeMatches(clientData('webauthn.get', c), c)).toBe(true);
+  });
 });
 
 describe('webauthnSignedMessage', () => {

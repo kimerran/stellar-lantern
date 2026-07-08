@@ -34,7 +34,11 @@ export function parseClientData(clientDataJSON: Uint8Array): ClientData {
 
 // WebAuthn base64url: no padding, `-`/`_` for `+`/`/`.
 function base64urlToBytes(s: string): Uint8Array {
-  const b64 = s.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice((s.length + 3) % 4);
+  // Re-pad to a multiple of 4. The pad string must be 3 chars: a length ≡ 2
+  // (mod 4) needs TWO `=`, so a 2-char pad string under-pads it (e.g. a 16-byte
+  // challenge → 22 chars → needs `==`), which made atob throw and a valid
+  // assertion get rejected. `'==='.slice((len+3)%4)` yields 0/1/2 pads correctly.
+  const b64 = s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4);
   const bin = atob(b64);
   const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
