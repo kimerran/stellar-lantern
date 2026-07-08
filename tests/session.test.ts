@@ -48,7 +48,7 @@ describe('in-process session handler', () => {
     const res = await handle({ type: 'GET_STATUS' });
     expect(res).toEqual({
       ok: true,
-      data: { initialized: false, locked: true, address: null, biometricEnabled: false },
+      data: { initialized: false, locked: true, address: null, biometricEnabled: false, biometricAvailable: false },
     });
   });
 
