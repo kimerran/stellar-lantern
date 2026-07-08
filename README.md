@@ -19,7 +19,42 @@ npm run typecheck  # tsc --noEmit
 npm run lint       # eslint
 npm run test       # vitest run
 npm run icons      # regenerate extension icons
+npm run verify:flags # prove disabled features are stripped from the bundle
 ```
+
+## Build-time feature flags
+
+Optional / external / in-progress surfaces are gated at **build time** so a lean,
+auditable store build ships only what's enabled — a disabled feature's code (and
+its imports) **dead-code-eliminate** out of the bundle rather than shipping
+always-on. Flags are booleans, resolved from `VITE_FEATURE_*` env at build time;
+the single source of truth is [`src/shared/flag-defs.ts`](src/shared/flag-defs.ts)
+and every flag is documented in [`.env.example`](.env.example).
+
+| Flag (`VITE_FEATURE_…`) | Gates | Default |
+|---|---|---|
+| `SWAP` | Swap screen + SDEX/path-payment engine | **ON** |
+| `SWAP_AGGREGATOR` | Soroswap aggregator (not built) | **OFF** |
+| `EARN_BLEND` | Earn / Blend supply-withdraw | **ON** |
+| `ANCHORS` | Cash in / Cash out (SEP-24) | **ON** |
+| `BIOMETRIC_UNLOCK` | Biometric unlock surface (#23 M2a, in progress) | **OFF** |
+| `GEOVELOCITY` | Impossible-travel risk signal (needs a Cloudflare Worker) | **OFF** |
+| `MINIAPPS` | dApp mini-apps browser | **ON** |
+| `DEMO_AFFORDANCES` | `forceScenario` + the demo deny-list (demo only) | **OFF** |
+
+Read a flag's **behavior** via `FLAGS.<name>` (`src/shared/flags.ts`); for code
+that must **tree-shake** (strip an import), guard it with the matching
+`__FEATURE_<NAME>__` build literal (`src/feature-flags.d.ts`, injected by
+`vite.flags.ts`). To flip one, set the env var for the build, e.g.:
+
+```bash
+VITE_FEATURE_DEMO_AFFORDANCES=true npm run build   # canary build with demo bits
+VITE_FEATURE_SWAP=false npm run build              # store build without swaps
+```
+
+Both build targets (`build` → `dist/`, `build:mobile` → `dist-mobile/`) honor the
+same flags via a shared helper, and `npm run verify:flags` asserts an off flag's
+code is actually absent from the emitted bundle.
 
 ## Load in Chrome
 

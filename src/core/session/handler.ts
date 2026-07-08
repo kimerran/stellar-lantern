@@ -67,8 +67,11 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
         initialized: vault !== null,
         locked: session === null,
         address: session?.keypair.publicKey() ?? vault?.address ?? null,
-        biometricEnabled: await isBiometricEnabled(await getKV()),
-        biometricAvailable: await getBiometricStore().isAvailable(),
+        // Gated behind BIOMETRIC_UNLOCK (#81): a build with the flag off reports
+        // biometric fully unavailable, so the Unlock screen never offers it —
+        // keeping the in-progress (#23 M2a) surface out of store builds.
+        biometricEnabled: __FEATURE_BIOMETRIC_UNLOCK__ && (await isBiometricEnabled(await getKV())),
+        biometricAvailable: __FEATURE_BIOMETRIC_UNLOCK__ && (await getBiometricStore().isAvailable()),
       });
     }
 
