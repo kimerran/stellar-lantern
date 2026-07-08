@@ -26,7 +26,7 @@ describe('sendMessage native branch', () => {
     const res = await sendMessage({ type: 'GET_STATUS' });
     expect(res).toEqual({
       ok: true,
-      data: { initialized: false, locked: true, address: null, biometricEnabled: false },
+      data: { initialized: false, locked: true, address: null, biometricEnabled: false, biometricAvailable: false },
     });
   });
 });
