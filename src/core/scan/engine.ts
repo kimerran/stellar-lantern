@@ -38,8 +38,10 @@ export function scan({ xdr, networkPassphrase, context }: ScanInput): ScanVerdic
   const explanation = explainTransaction(decoded);
   const reasons: ScanReason[] = [];
 
-  // Demo override: force a verdict so each UI state is reviewable.
-  if (context.forceScenario) {
+  // Demo override: force a verdict so each UI state is reviewable. Gated behind
+  // DEMO_AFFORDANCES so a production build can't be told to fake a scan result
+  // (#81) — the whole branch dead-code-eliminates when the flag is off.
+  if (__FEATURE_DEMO_AFFORDANCES__ && context.forceScenario) {
     return forced(context.forceScenario, explanation);
   }
 
@@ -48,7 +50,10 @@ export function scan({ xdr, networkPassphrase, context }: ScanInput): ScanVerdic
   const spendable = Number(context.spendableXlm ?? '0');
 
   // ── Tier 0: rules + (mock) reputation ──
-  if (dest && DEMO_FLAGGED_ADDRESSES.has(dest)) {
+  // The hardcoded demo deny-list stands in for the real risk backend (#22); gate
+  // it behind DEMO_AFFORDANCES so it (and its addresses) compile out of a store
+  // build (#81). The real reputation feed replaces this branch later.
+  if (__FEATURE_DEMO_AFFORDANCES__ && dest && DEMO_FLAGGED_ADDRESSES.has(dest)) {
     reasons.push({
       code: 'reported_address',
       severity: 'high',
