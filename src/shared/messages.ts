@@ -8,6 +8,7 @@ export type WalletStatus = {
   locked: boolean; // no unlocked session in the worker
   address: string | null;
   biometricEnabled: boolean; // biometric unlock has been enrolled on this device
+  biometricAvailable: boolean; // the platform offers a biometric-gated store
 };
 
 export type Request =

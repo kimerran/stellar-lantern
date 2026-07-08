@@ -68,6 +68,7 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
         locked: session === null,
         address: session?.keypair.publicKey() ?? vault?.address ?? null,
         biometricEnabled: await isBiometricEnabled(await getKV()),
+        biometricAvailable: await getBiometricStore().isAvailable(),
       });
     }
 

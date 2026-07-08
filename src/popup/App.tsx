@@ -51,7 +51,14 @@ export function App() {
 
   // Locked — vault exists but no unlocked session in the worker.
   if (status.locked || !status.address) {
-    return <Unlock onUnlocked={refresh} onReset={refresh} />;
+    return (
+      <Unlock
+        onUnlocked={refresh}
+        onReset={refresh}
+        biometricEnabled={status.biometricEnabled}
+        biometricAvailable={status.biometricAvailable}
+      />
+    );
   }
 
   const address = status.address;
