@@ -33,8 +33,6 @@ export function Scan({ onBack }: { onBack: () => void }) {
     setResult(null);
   }
 
-  const flagged = [...DEMO_FLAGGED_ADDRESSES][0];
-
   return (
     <div className="flex h-full flex-col bg-background">
       <header className="flex h-14 shrink-0 items-center gap-2 bg-surface-container-low px-4">
@@ -89,55 +87,68 @@ export function Scan({ onBack }: { onBack: () => void }) {
           </p>
         </section>
 
-        <div className="h-px bg-outline-variant/30" />
-
-        {/* Demo gallery — preview the pre-sign warning states */}
-        <section className="space-y-3">
-          <div>
-            <h3 className="text-title-md text-on-surface">Preview pre-sign warnings</h3>
-            <p className="text-label-md text-on-surface-variant">
-              How Lantern gates the Sign button by risk level (demo).
-            </p>
-          </div>
-
-          {(['low', 'medium', 'high'] as RiskLevel[]).map((risk) => {
-            const v = sampleVerdict(risk);
-            return (
-              <div key={risk} className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <ScanBadge risk={risk} latencyMs={v.latencyMs} />
-                </div>
-                {risk === 'low' ? (
-                  <Card>
-                    <p className="text-label-md text-on-surface">{v.explanation}</p>
-                  </Card>
-                ) : (
-                  <RiskCallout risk={v.risk} reasons={v.reasons} explanation={v.explanation} />
-                )}
-              </div>
-            );
-          })}
-
-          <Card className="space-y-1">
-            <p className="text-label-sm uppercase tracking-wide text-on-surface-variant">Try it live</p>
-            <p className="text-label-md text-on-surface">
-              Send any amount to this demo-flagged address to trigger the high-risk block:
-            </p>
-            <button
-              onClick={() =>
-                navigator.clipboard.writeText(flagged!).then(
-                  () => showToast('Address copied'),
-                  () => showToast('Couldn’t copy address', 'error'),
-                )
-              }
-              className="flex items-center gap-1.5 font-mono text-label-md text-primary hover:text-primary-container"
-            >
-              {truncateAddress(flagged!, 6, 6)}
-              <Icon name="content_copy" size={14} />
-            </button>
-          </Card>
-        </section>
+        {/* Demo-only gallery — gated behind DEMO_AFFORDANCES so it (and its
+            sample verdicts + demo deny-list address) compile out of a store
+            build (#81). When the flag is off, this whole subtree DCEs and the
+            `sampleVerdict` / `DEMO_FLAGGED_ADDRESSES` imports tree-shake away. */}
+        {__FEATURE_DEMO_AFFORDANCES__ && <DemoWarnings showToast={showToast} />}
       </div>
     </div>
+  );
+}
+
+// Preview of the pre-sign warning states + the live demo-flagged address. Only
+// rendered under __FEATURE_DEMO_AFFORDANCES__ — see the gate in <Scan>.
+function DemoWarnings({ showToast }: { showToast: (message: string, variant?: 'error') => void }) {
+  const flagged = [...DEMO_FLAGGED_ADDRESSES][0];
+  return (
+    <>
+      <div className="h-px bg-outline-variant/30" />
+      <section className="space-y-3">
+        <div>
+          <h3 className="text-title-md text-on-surface">Preview pre-sign warnings</h3>
+          <p className="text-label-md text-on-surface-variant">
+            How Lantern gates the Sign button by risk level (demo).
+          </p>
+        </div>
+
+        {(['low', 'medium', 'high'] as RiskLevel[]).map((risk) => {
+          const v = sampleVerdict(risk);
+          return (
+            <div key={risk} className="space-y-2">
+              <div className="flex items-center gap-2">
+                <ScanBadge risk={risk} latencyMs={v.latencyMs} />
+              </div>
+              {risk === 'low' ? (
+                <Card>
+                  <p className="text-label-md text-on-surface">{v.explanation}</p>
+                </Card>
+              ) : (
+                <RiskCallout risk={v.risk} reasons={v.reasons} explanation={v.explanation} />
+              )}
+            </div>
+          );
+        })}
+
+        <Card className="space-y-1">
+          <p className="text-label-sm uppercase tracking-wide text-on-surface-variant">Try it live</p>
+          <p className="text-label-md text-on-surface">
+            Send any amount to this demo-flagged address to trigger the high-risk block:
+          </p>
+          <button
+            onClick={() =>
+              navigator.clipboard.writeText(flagged!).then(
+                () => showToast('Address copied'),
+                () => showToast('Couldn’t copy address', 'error'),
+              )
+            }
+            className="flex items-center gap-1.5 font-mono text-label-md text-primary hover:text-primary-container"
+          >
+            {truncateAddress(flagged!, 6, 6)}
+            <Icon name="content_copy" size={14} />
+          </button>
+        </Card>
+      </section>
+    </>
   );
 }
