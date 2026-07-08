@@ -12,6 +12,7 @@
 // then verify the biometric prompt on hardware (Keystore can't be exercised in CI).
 
 import type { BiometricStore } from './biometric-unlock';
+import { WRAPPING_KEY_BYTES } from './biometric';
 
 // Namespace for the stored credential (one wrapping key per install).
 const SERVER = 'lantern-biometric-unlock';
@@ -34,7 +35,7 @@ export function credentialToKey(credential: string): Uint8Array | null {
   } catch {
     return null;
   }
-  if (bin.length !== 32) return null; // not a 256-bit wrapping key
+  if (bin.length !== WRAPPING_KEY_BYTES) return null; // not a 256-bit wrapping key
   const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
@@ -63,7 +64,10 @@ export const nativeBiometricStore: BiometricStore = {
       const plugin = await loadPlugin();
       const res = await plugin.isAvailable();
       // Require both a usable biometric AND a secure lock screen (so the Keystore
-      // key is actually hardware-protected).
+      // key is actually hardware-protected). `deviceIsSecure` is treated as
+      // secure when ABSENT (`!== false`): older plugin versions omit the field,
+      // and a biometric being enrolled already implies a secure lock screen — so
+      // we only reject when the plugin explicitly reports `false`.
       return res.isAvailable === true && res.deviceIsSecure !== false;
     } catch {
       return false;
