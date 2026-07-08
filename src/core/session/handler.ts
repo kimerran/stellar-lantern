@@ -2,7 +2,15 @@ import '@shared/polyfills'; // must be first — sets Buffer/process/global befo
 import { Keypair, Horizon, TransactionBuilder } from '@stellar/stellar-sdk';
 import type { Request, Result, ResponseMap } from '@shared/messages';
 import { getSettings, getVault, setVault, clearVault } from '@shared/storage';
+import { getKV } from '@shared/kv';
 import { encryptSecret, decryptSecret, WrongPasswordError } from '@core/crypto/vault';
+import {
+  biometricUnlock,
+  enableBiometricUnlock,
+  disableBiometricUnlock,
+  isBiometricEnabled,
+} from '@core/crypto/biometric-unlock';
+import { getBiometricStore } from '@core/crypto/biometric-store';
 import {
   generateMnemonic,
   importFromInput,
@@ -38,6 +46,19 @@ function ok<K extends keyof ResponseMap>(data: ResponseMap[K]): Result<ResponseM
   return { ok: true, data };
 }
 
+// Map a fail-soft biometricUnlock reason to a typed Result the UI branches on to
+// fall back to the password field.
+function biometricFailure(reason: 'not-enrolled' | 'cancelled' | 'failed'): Result<never> {
+  switch (reason) {
+    case 'not-enrolled':
+      return { ok: false, error: 'Biometric unlock isn’t set up.', code: 'NOT_ENROLLED' };
+    case 'cancelled':
+      return { ok: false, error: 'Biometric check was cancelled.', code: 'BIOMETRIC_CANCELLED' };
+    case 'failed':
+      return { ok: false, error: 'Biometric unlock failed — use your password.', code: 'BIOMETRIC_FAILED' };
+  }
+}
+
 async function dispatch(req: Request): Promise<Result<unknown>> {
   switch (req.type) {
     case 'GET_STATUS': {
@@ -46,6 +67,7 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
         initialized: vault !== null,
         locked: session === null,
         address: session?.keypair.publicKey() ?? vault?.address ?? null,
+        biometricEnabled: await isBiometricEnabled(await getKV()),
       });
     }
 
@@ -81,6 +103,36 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
       session = { keypair, unlockedAt: Date.now() };
       await armAutoLock();
       return ok<'UNLOCK'>({ address: keypair.publicKey() });
+    }
+
+    case 'ENABLE_BIOMETRIC': {
+      // Enrol biometric unlock. Re-verify the password against the vault BEFORE
+      // wrapping it, so a wrong password can never be enrolled (decryptSecret
+      // throws WrongPasswordError → BAD_PASSWORD).
+      const vault = await getVault();
+      if (!vault) return { ok: false, error: 'No wallet found.', code: 'NOT_INITIALIZED' };
+      await decryptSecret(vault.cipher, req.password);
+      await enableBiometricUnlock(req.password, { store: getBiometricStore(), kv: await getKV() });
+      return ok<'ENABLE_BIOMETRIC'>({ ok: true });
+    }
+
+    case 'BIOMETRIC_UNLOCK': {
+      const vault = await getVault();
+      if (!vault) return { ok: false, error: 'No wallet found.', code: 'NOT_INITIALIZED' };
+      const result = await biometricUnlock({ store: getBiometricStore(), kv: await getKV() });
+      if (!result.ok) return biometricFailure(result.reason);
+      // Recovered password still runs the normal vault decrypt — a bad envelope
+      // can't yield access.
+      const secret = await decryptSecret(vault.cipher, result.password);
+      const keypair = keypairFromStoredSecret(secret);
+      session = { keypair, unlockedAt: Date.now() };
+      await armAutoLock();
+      return ok<'BIOMETRIC_UNLOCK'>({ address: keypair.publicKey() });
+    }
+
+    case 'DISABLE_BIOMETRIC': {
+      await disableBiometricUnlock({ store: getBiometricStore(), kv: await getKV() });
+      return ok<'DISABLE_BIOMETRIC'>({ ok: true });
     }
 
     case 'LOCK': {
