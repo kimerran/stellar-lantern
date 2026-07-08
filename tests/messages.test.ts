@@ -24,6 +24,9 @@ describe('sendMessage native branch', () => {
 
   it('routes to the in-process handler when running natively', async () => {
     const res = await sendMessage({ type: 'GET_STATUS' });
-    expect(res).toEqual({ ok: true, data: { initialized: false, locked: true, address: null } });
+    expect(res).toEqual({
+      ok: true,
+      data: { initialized: false, locked: true, address: null, biometricEnabled: false },
+    });
   });
 });

@@ -46,7 +46,10 @@ describe('in-process session handler', () => {
 
   it('reports uninitialized + locked before any wallet exists', async () => {
     const res = await handle({ type: 'GET_STATUS' });
-    expect(res).toEqual({ ok: true, data: { initialized: false, locked: true, address: null } });
+    expect(res).toEqual({
+      ok: true,
+      data: { initialized: false, locked: true, address: null, biometricEnabled: false },
+    });
   });
 
   it('creates a wallet, then unlock round-trips', async () => {
