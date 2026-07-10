@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { NetworkConfig } from '@shared/constants';
 import { sendMessage } from '@shared/messages';
 import { getServer } from '@core/stellar/client';
@@ -25,7 +25,10 @@ import { HoldToConfirm } from '../components/HoldToConfirm';
 interface Props {
   address: string;
   network: NetworkConfig;
-  onBack: () => void;
+  /** Overlay mode: closes the screen. Omitted when rendered inline as a tab. */
+  onBack?: () => void;
+  /** Render inline as a bottom-nav tab (no full-screen chrome / back header). */
+  embedded?: boolean;
 }
 
 type Step = 'pick' | 'form' | 'review' | 'success';
@@ -43,7 +46,7 @@ interface ReviewData {
 
 const actionVerb = (a: BlendAction) => (a === 'supply' ? 'Supply' : 'Withdraw');
 
-export function Earn({ address, network, onBack }: Props) {
+export function Earn({ address, network, onBack, embedded }: Props) {
   const kind = network.id === 'TESTNET' ? 'testnet' : 'public';
   // Memoized so it's a stable dependency for the positions effect (otherwise a
   // fresh array each render would re-trigger the fetch on every state update).
@@ -104,6 +107,22 @@ export function Earn({ address, network, onBack }: Props) {
     setReview(null);
     setConfirmText('');
     setError(null);
+  }
+
+  // "Done" / close. In overlay mode this closes the screen; embedded as a tab
+  // there's nowhere to go back to, so reset the flow to the pool picker.
+  function finish() {
+    if (embedded) {
+      setStep('pick');
+      setSel(null);
+      setAmount('');
+      setReview(null);
+      setConfirmText('');
+      setTxHash(null);
+      setError(null);
+    } else {
+      onBack?.();
+    }
   }
 
   // Build → simulate → assemble the Blend submit, then scan it, before signing.
@@ -187,10 +206,8 @@ export function Earn({ address, network, onBack }: Props) {
   // ── Success ──
   if (step === 'success' && txHash && sel) {
     return (
-      <div className="flex h-full flex-col bg-background">
-        <Header title={`${actionVerb(sel.action)} — ${sel.reserve.code}`} onBack={onBack} />
-        <main className="no-scrollbar flex-1 overflow-y-auto px-4 pb-6">
-          <div className="flex flex-col items-center pt-8 text-center">
+      <Shell title={`${actionVerb(sel.action)} — ${sel.reserve.code}`} onBack={finish} embedded={embedded}>
+        <div className="flex flex-col items-center pt-8 text-center">
             <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-primary-container/15">
               <Icon name="check_circle" filled size={48} className="text-primary-container drop-shadow-glow-amber" />
             </div>
@@ -211,13 +228,12 @@ export function Earn({ address, network, onBack }: Props) {
               >
                 View on Explorer
               </Button>
-              <Button fullWidth onClick={onBack}>
+              <Button fullWidth onClick={finish}>
                 Done
               </Button>
             </div>
           </div>
-        </main>
-      </div>
+      </Shell>
     );
   }
 
@@ -229,9 +245,12 @@ export function Earn({ address, network, onBack }: Props) {
     const acknowledged = !isHigh || native || confirmText.trim().toUpperCase() === 'CONFIRM';
 
     return (
-      <div className="flex h-full flex-col bg-background">
-        <Header title={`${actionVerb(sel.action)} — ${sel.reserve.code}`} onBack={backToForm} />
-        <main className="no-scrollbar flex-1 space-y-4 overflow-y-auto px-4 pb-6 pt-3">
+      <Shell
+        title={`${actionVerb(sel.action)} — ${sel.reserve.code}`}
+        onBack={backToForm}
+        embedded={embedded}
+        mainClass="space-y-4 pt-3"
+      >
           <div className="rounded-2xl bg-surface-container p-5 text-center shadow-layer-1">
             <p className="text-label-sm uppercase tracking-wide text-on-surface-variant">
               You’re {sel.action === 'supply' ? 'supplying' : 'withdrawing'}
@@ -295,17 +314,19 @@ export function Earn({ address, network, onBack }: Props) {
               {isHigh ? 'Sign Anyway' : `Confirm & ${actionVerb(sel.action)}`}
             </Button>
           )}
-        </main>
-      </div>
+      </Shell>
     );
   }
 
   // ── Amount form ──
   if (step === 'form' && sel) {
     return (
-      <div className="flex h-full flex-col bg-background">
-        <Header title={`${actionVerb(sel.action)} — ${sel.reserve.code}`} onBack={() => setStep('pick')} />
-        <main className="no-scrollbar flex-1 space-y-4 overflow-y-auto px-4 pb-6 pt-3">
+      <Shell
+        title={`${actionVerb(sel.action)} — ${sel.reserve.code}`}
+        onBack={() => setStep('pick')}
+        embedded={embedded}
+        mainClass="space-y-4 pt-3"
+      >
           <p className="text-body-md text-on-surface-variant">
             {sel.action === 'supply'
               ? `Supply ${sel.reserve.code} into ${sel.pool.name} to earn lending yield. You can withdraw anytime.`
@@ -335,16 +356,13 @@ export function Earn({ address, network, onBack }: Props) {
           <Button fullWidth onClick={toReview} loading={busy} trailingIcon="arrow_forward">
             Review
           </Button>
-        </main>
-      </div>
+      </Shell>
     );
   }
 
   // ── Pool / reserve picker ──
   return (
-    <div className="flex h-full flex-col bg-background">
-      <Header title="Earn yield" onBack={onBack} />
-      <main className="no-scrollbar flex-1 overflow-y-auto px-4 pb-6">
+    <Shell title="Earn yield" onBack={embedded ? undefined : onBack} embedded={embedded}>
         <p className="mb-3 mt-2 text-body-md text-on-surface-variant">
           Supply your assets to a Blend lending pool and earn yield — withdraw anytime.
         </p>
@@ -388,8 +406,7 @@ export function Earn({ address, network, onBack }: Props) {
             ))}
           </ul>
         )}
-      </main>
-    </div>
+    </Shell>
   );
 }
 
@@ -411,6 +428,49 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-3">
       <span className="text-label-md text-on-surface-variant">{label}</span>
       <span className="text-right text-label-md text-on-surface">{value}</span>
+    </div>
+  );
+}
+
+// Renders each step either as a full-screen overlay (with a back header) or,
+// when `embedded`, inline inside the bottom-nav tab — no full-screen chrome, and
+// a back affordance only for the deeper flow steps (form/review/success).
+function Shell({
+  title,
+  onBack,
+  embedded,
+  mainClass,
+  children,
+}: {
+  title: string;
+  onBack?: () => void;
+  embedded?: boolean;
+  mainClass?: string;
+  children: ReactNode;
+}) {
+  if (embedded) {
+    return (
+      <div className={`pt-2 ${mainClass ?? ''}`}>
+        <div className="mb-2 flex items-center gap-1">
+          {onBack && (
+            <button
+              onClick={onBack}
+              aria-label="Back"
+              className="-ml-2 flex h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-variant active:scale-95"
+            >
+              <Icon name="arrow_back" size={20} />
+            </button>
+          )}
+          <h2 className="truncate text-title-md text-on-surface">{title}</h2>
+        </div>
+        {children}
+      </div>
+    );
+  }
+  return (
+    <div className="flex h-full flex-col bg-background">
+      <Header title={title} onBack={onBack ?? (() => undefined)} />
+      <main className={`no-scrollbar flex-1 overflow-y-auto px-4 pb-6 ${mainClass ?? ''}`}>{children}</main>
     </div>
   );
 }

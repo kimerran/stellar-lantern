@@ -13,6 +13,7 @@ import { TxDetail } from './TxDetail';
 interface Props {
   address: string;
   network: NetworkConfig;
+  onBack: () => void;
 }
 
 const ICONS: Record<HistoryItem['direction'], { icon: string; cls: string }> = {
@@ -22,7 +23,7 @@ const ICONS: Record<HistoryItem['direction'], { icon: string; cls: string }> = {
   create: { icon: 'arrow_upward', cls: 'text-outline' },
 };
 
-export function Activity({ address, network }: Props) {
+export function Activity({ address, network, onBack }: Props) {
   const [items, setItems] = useState<HistoryItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,14 +70,29 @@ export function Activity({ address, network }: Props) {
   const groups = useMemo(() => groupByDate(items), [items]);
 
   if (selected) {
-    return <TxDetail item={selected} network={network} onBack={() => setSelected(null)} />;
+    return (
+      <div className="flex h-full flex-col bg-background">
+        <main className="no-scrollbar flex-1 overflow-y-auto px-4 pb-6">
+          <TxDetail item={selected} network={network} onBack={() => setSelected(null)} />
+        </main>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-4 pt-2">
-      <h2 className="px-1 text-title-md text-on-surface">Activity</h2>
-
-      {loading ? (
+    <div className="flex h-full flex-col bg-background">
+      <header className="flex h-14 shrink-0 items-center gap-2 bg-surface-container-low px-2">
+        <button
+          onClick={onBack}
+          aria-label="Back"
+          className="flex h-11 w-11 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-variant active:scale-95"
+        >
+          <Icon name="arrow_back" size={22} />
+        </button>
+        <h1 className="truncate text-title-md text-on-surface">Activity</h1>
+      </header>
+      <main className="no-scrollbar flex-1 space-y-4 overflow-y-auto px-4 pb-6 pt-2">
+        {loading ? (
         <div className="space-y-2">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="flex items-center gap-3 rounded-2xl bg-surface-container p-3">
@@ -122,6 +138,7 @@ export function Activity({ address, network }: Props) {
           )}
         </div>
       )}
+      </main>
     </div>
   );
 }

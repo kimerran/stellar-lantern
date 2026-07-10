@@ -1,10 +1,10 @@
 import { Icon } from './Icon';
 
-export type Tab = 'assets' | 'activity' | 'send' | 'apps';
+export type Tab = 'assets' | 'earn' | 'send' | 'apps';
 
 const ITEMS: { tab: Tab; label: string; icon: string }[] = [
   { tab: 'assets', label: 'Assets', icon: 'account_balance_wallet' },
-  { tab: 'activity', label: 'Activity', icon: 'history' },
+  { tab: 'earn', label: 'Earn', icon: 'savings' },
   { tab: 'send', label: 'Send', icon: 'send' },
   { tab: 'apps', label: 'Apps', icon: 'grid_view' },
 ];
