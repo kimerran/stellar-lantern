@@ -8,6 +8,8 @@ import { BottomNav, type Tab } from './components/BottomNav';
 import { Icon } from './components/Icon';
 import { useToast } from './components/Toast';
 import { Onboarding } from './screens/Onboarding';
+import { SmartAccount } from './screens/SmartAccount';
+import { usePasskeyAccount } from './hooks/usePasskeyAccount';
 import { Unlock } from './screens/Unlock';
 import { Assets } from './screens/Assets';
 import { Activity } from './screens/Activity';
@@ -31,6 +33,7 @@ function Splash() {
 export function App() {
   const { status, refresh, lock } = useWallet();
   const { settings, toggleNetwork } = useSettings();
+  const { passkeyAccount, refresh: refreshPasskey } = usePasskeyAccount();
   const [tab, setTab] = useState<Tab>('assets');
   const [scanOpen, setScanOpen] = useState(false);
   const [guardiansOpen, setGuardiansOpen] = useState(false);
@@ -42,11 +45,21 @@ export function App() {
 
   if (!status || !settings) return <Splash />;
 
+  // Passkey smart account (#53) — a parallel, seed-phrase-free account mode.
+  // It takes over the whole surface (no vault, no unlock — the passkey is the
+  // signer). Flag-gated so store builds carry none of this.
+  if (__FEATURE_PASSKEY__) {
+    if (passkeyAccount === undefined) return <Splash />;
+    if (passkeyAccount) {
+      return <SmartAccount account={passkeyAccount} onForget={refreshPasskey} />;
+    }
+  }
+
   const network = NETWORKS[settings.network];
 
   // Onboarding — no wallet yet.
   if (!status.initialized) {
-    return <Onboarding onDone={refresh} />;
+    return <Onboarding onDone={refresh} onPasskeyDone={refreshPasskey} />;
   }
 
   // Locked — vault exists but no unlocked session in the worker.
