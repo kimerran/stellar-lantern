@@ -33,6 +33,11 @@ export interface Settings {
   network: NetworkId;
   autoLockMinutes: number;
   horizonOverrides?: { testnet?: string; public?: string };
+  // Mini-app directory "favorites" / installs (#93): a list of MiniApp ids the
+  // user pinned to their "My apps" section. Plain, non-secret metadata — a
+  // bookmark, NOT elevated permissions. Lives in Settings so it live-updates
+  // across surfaces for free via onSettingsChanged.
+  favoriteApps?: string[];
 }
 
 // A single asset balance for display.

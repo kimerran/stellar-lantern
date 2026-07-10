@@ -4,8 +4,16 @@ import {
   miniAppSrc,
   normalizeUrl,
   displayOrigin,
+  isRemoteMiniApp,
   type MiniApp,
 } from '@core/miniapps/directory';
+import {
+  isFavorite,
+  orderedFavoriteApps,
+  getFavoriteAppIds,
+  toggleFavoriteApp,
+} from '@core/miniapps/favorites';
+import { onSettingsChanged } from '@shared/storage';
 import { BASE_FEE } from '@stellar/stellar-sdk';
 import { NETWORKS, type NetworkId } from '@shared/constants';
 import { formatAmount, truncateAddress } from '@shared/format';
@@ -45,7 +53,26 @@ export function Apps({ address, network }: { address: string; network: NetworkId
   const [urlText, setUrlText] = useState('');
   const [urlError, setUrlError] = useState(false);
 
+  // Favorited / "installed" app ids (#93). Loaded once, then kept live across
+  // surfaces via the settings pub-sub — favoriting an app in one window updates
+  // "My apps" everywhere. Favorites are a bookmark only; launch is unchanged.
+  const [favorites, setFavorites] = useState<string[]>([]);
+  useEffect(() => {
+    getFavoriteAppIds().then(setFavorites);
+    return onSettingsChanged((s) => setFavorites(s.favoriteApps ?? []));
+  }, []);
+  async function toggleFavorite(id: string) {
+    setFavorites(await toggleFavoriteApp(id));
+  }
+
   function launchApp(app: MiniApp) {
+    // Remote apps load in the opaque-origin sandbox (like the URL bar), reaching
+    // the wallet only through the scan-gated postMessage bridge. Bundled apps are
+    // first-party pages. Either way, "favoriting" changes nothing about this.
+    if (isRemoteMiniApp(app)) {
+      setOpen({ kind: 'url', src: miniAppSrc(app), title: app.name, origin: displayOrigin(app.url!) });
+      return;
+    }
     setOpen({
       kind: 'app',
       app,
@@ -68,6 +95,8 @@ export function Apps({ address, network }: { address: string; network: NetworkId
   if (open) {
     return <Browser open={open} address={address} network={network} onClose={() => setOpen(null)} />;
   }
+
+  const favoriteApps = orderedFavoriteApps(favorites);
 
   return (
     <div className="space-y-5 pt-1">
@@ -100,7 +129,31 @@ export function Apps({ address, network }: { address: string; network: NetworkId
         )}
       </section>
 
-      {/* Curated directory */}
+      {/* My apps — favorited/"installed" apps, pinned above the directory. Same
+          sandboxed launch as Discover; installing is a bookmark, not access. */}
+      {favoriteApps.length > 0 && (
+        <section className="space-y-3">
+          <div>
+            <h3 className="text-title-md text-on-surface">My apps</h3>
+            <p className="text-label-md text-on-surface-variant">
+              Apps you’ve added. Same sandboxed launch — a bookmark, not extra access.
+            </p>
+          </div>
+          <div className="space-y-2">
+            {favoriteApps.map((app) => (
+              <AppRow
+                key={app.id}
+                app={app}
+                favorited
+                onLaunch={() => launchApp(app)}
+                onToggleFavorite={() => toggleFavorite(app.id)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Discover — the curated directory */}
       <section className="space-y-3">
         <div>
           <h3 className="text-title-md text-on-surface">Discover apps</h3>
@@ -112,23 +165,13 @@ export function Apps({ address, network }: { address: string; network: NetworkId
 
         <div className="space-y-2">
           {MINI_APPS.map((app) => (
-            <Card key={app.id} onClick={() => launchApp(app)} className="flex items-center gap-3">
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-container-high text-primary-container">
-                <Icon name={app.icon} size={22} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-1.5">
-                  <span className="truncate text-title-sm text-on-surface">{app.name}</span>
-                  {app.verified && (
-                    <Icon name="verified" filled size={14} className="text-primary-container" />
-                  )}
-                </span>
-                <span className="block truncate text-label-md text-on-surface-variant">
-                  {app.tagline}
-                </span>
-              </span>
-              <Icon name="chevron_right" size={20} className="shrink-0 text-on-surface-variant" />
-            </Card>
+            <AppRow
+              key={app.id}
+              app={app}
+              favorited={isFavorite(favorites, app.id)}
+              onLaunch={() => launchApp(app)}
+              onToggleFavorite={() => toggleFavorite(app.id)}
+            />
           ))}
         </div>
 
@@ -137,6 +180,66 @@ export function Apps({ address, network }: { address: string; network: NetworkId
         </p>
       </section>
     </div>
+  );
+}
+
+// A directory row: launch on the left, an install/favorite toggle on the right.
+// The row is a plain container (not a Card button) so the favorite control can
+// be its own button — a button can't nest inside a button.
+function AppRow({
+  app,
+  favorited,
+  onLaunch,
+  onToggleFavorite,
+}: {
+  app: MiniApp;
+  favorited: boolean;
+  onLaunch: () => void;
+  onToggleFavorite: () => void;
+}) {
+  return (
+    <Card as="div" className="flex items-center gap-1">
+      <button
+        type="button"
+        onClick={onLaunch}
+        className="-m-1 flex min-w-0 flex-1 items-center gap-3 rounded-2xl p-1 text-left transition-colors hover:bg-surface-variant"
+      >
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-container-high text-primary-container">
+          <Icon name={app.icon} size={22} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5">
+            <span className="truncate text-title-sm text-on-surface">{app.name}</span>
+            {app.verified && (
+              <Icon name="verified" filled size={14} className="text-primary-container" />
+            )}
+            {app.demo && (
+              <span className="shrink-0 rounded-full bg-surface-container-high px-1.5 py-px text-label-sm text-on-surface-variant">
+                Demo
+              </span>
+            )}
+          </span>
+          <span className="block truncate text-label-md text-on-surface-variant">
+            {app.tagline}
+          </span>
+        </span>
+      </button>
+      <button
+        type="button"
+        onClick={onToggleFavorite}
+        aria-pressed={favorited}
+        aria-label={favorited ? `Remove ${app.name} from My apps` : `Add ${app.name} to My apps`}
+        title={favorited ? 'Remove from My apps' : 'Add to My apps'}
+        className="flex size-9 shrink-0 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-variant hover:text-on-surface active:scale-95"
+      >
+        <Icon
+          name={favorited ? 'bookmark' : 'bookmark_add'}
+          filled={favorited}
+          size={20}
+          className={favorited ? 'text-primary-container' : ''}
+        />
+      </button>
+    </Card>
   );
 }
 
