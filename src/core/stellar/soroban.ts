@@ -55,6 +55,77 @@ function parseAuth(results: unknown): string[] | undefined {
   return auth.length > 0 ? auth : undefined;
 }
 
+// Normalized `getLedgerEntries` result: present entries as (key, value) XDR
+// pairs; absent keys are simply missing from the list (not an error).
+export type LedgerEntriesResult =
+  | { ok: true; entries: { keyXdr: string; xdr: string }[]; latestLedger?: number }
+  | { ok: false; error: string };
+
+interface JsonRpcLedgerEntriesResponse {
+  error?: { message?: unknown };
+  result?: { entries?: unknown; latestLedger?: unknown };
+}
+
+/**
+ * Read ledger entries directly via a Soroban RPC node's `getLedgerEntries` —
+ * how we read contract state (e.g. a SAC balance) without needing a funded
+ * source account to simulate with. `keysXdr` are base64 `LedgerKey`s. Mirrors
+ * `simulateTransaction`'s transport conventions: injectable fetch, non-2xx
+ * throws, malformed bodies come back as `{ ok: false }`.
+ */
+export async function getLedgerEntries(
+  keysXdr: string[],
+  opts: SimulateOptions,
+): Promise<LedgerEntriesResult> {
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  const res = await fetchImpl(opts.rpcUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'getLedgerEntries',
+      params: { keys: keysXdr },
+    }),
+  });
+  if (!res.ok) throw new Error(`Soroban RPC getLedgerEntries failed (${res.status}).`);
+
+  let body: JsonRpcLedgerEntriesResponse;
+  try {
+    body = (await res.json()) as JsonRpcLedgerEntriesResponse;
+  } catch {
+    return { ok: false, error: 'Unreadable ledger-entries response.' };
+  }
+  if (!body || typeof body !== 'object') {
+    return { ok: false, error: 'Unreadable ledger-entries response.' };
+  }
+  if (body.error) {
+    const msg = body.error.message;
+    return { ok: false, error: typeof msg === 'string' && msg ? msg : 'Soroban RPC error.' };
+  }
+  const result = body.result;
+  if (!result || typeof result !== 'object') {
+    return { ok: false, error: 'Unreadable ledger-entries response.' };
+  }
+
+  const entries: { keyXdr: string; xdr: string }[] = [];
+  if (Array.isArray(result.entries)) {
+    for (const raw of result.entries) {
+      const entry = raw as { key?: unknown; xdr?: unknown } | null;
+      if (entry && typeof entry.key === 'string' && typeof entry.xdr === 'string') {
+        entries.push({ keyXdr: entry.key, xdr: entry.xdr });
+      }
+    }
+  }
+  return {
+    ok: true,
+    entries,
+    ...(typeof result.latestLedger === 'number' && Number.isFinite(result.latestLedger)
+      ? { latestLedger: result.latestLedger }
+      : {}),
+  };
+}
+
 /**
  * Simulate an already-built Soroban transaction via a Soroban RPC node's
  * `simulateTransaction` JSON-RPC method. `txXdr` is a finished base64 transaction
