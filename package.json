@@ -23,6 +23,7 @@
     "@capacitor/core": "^8.4.1",
     "@capacitor/preferences": "^8.0.1",
     "@capacitor/status-bar": "^8.0.2",
+    "@capgo/capacitor-native-biometric": "^8.0.0",
     "@noble/hashes": "1.8.0",
     "@stellar/stellar-sdk": "16.0.1",
     "bip39": "3.1.0",
