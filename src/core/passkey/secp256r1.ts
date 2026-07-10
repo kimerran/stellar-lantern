@@ -68,6 +68,32 @@ function readDerInt(der: Uint8Array, offset: number): { value: Uint8Array; next:
   return { value: out, next: end };
 }
 
+// P-256 group order n (and n/2), for low-S signature normalization.
+const P256_N = BigInt('0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551');
+const P256_HALF_N = P256_N >> 1n;
+
+/**
+ * Normalize a raw 64-byte r‖s ECDSA signature to its canonical low-S form
+ * (s ≤ n/2, flipping s → n−s when needed — both are valid ECDSA, but WebAuthn
+ * authenticators may emit either and on-chain verifiers can insist on low-S).
+ * Returns the input untouched when already low-S. Pure.
+ */
+export function normalizeLowS(rawSig: Uint8Array): Uint8Array {
+  if (rawSig.length !== P256_SIGNATURE_BYTES) {
+    throw new PasskeyFormatError('Signature must be 64 bytes of r‖s.');
+  }
+  let s = 0n;
+  for (let i = 32; i < 64; i++) s = (s << 8n) | BigInt(rawSig[i]!);
+  if (s <= P256_HALF_N) return rawSig;
+  let flipped = P256_N - s;
+  const out = Uint8Array.from(rawSig);
+  for (let i = 63; i >= 32; i--) {
+    out[i] = Number(flipped & 0xffn);
+    flipped >>= 8n;
+  }
+  return out;
+}
+
 /**
  * Convert an ASN.1-DER ECDSA signature (`SEQUENCE { INTEGER r, INTEGER s }`, as
  * WebAuthn assertions return) into the fixed 64-byte raw form (R32 ‖ S32) that

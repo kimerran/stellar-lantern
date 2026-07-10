@@ -22,6 +22,7 @@ export const FLAG_DEFS = {
   geovelocity: { envVar: 'VITE_FEATURE_GEOVELOCITY', literal: '__FEATURE_GEOVELOCITY__', default: false },
   miniapps: { envVar: 'VITE_FEATURE_MINIAPPS', literal: '__FEATURE_MINIAPPS__', default: true },
   demoAffordances: { envVar: 'VITE_FEATURE_DEMO_AFFORDANCES', literal: '__FEATURE_DEMO_AFFORDANCES__', default: false },
+  passkey: { envVar: 'VITE_FEATURE_PASSKEY', literal: '__FEATURE_PASSKEY__', default: false },
 } as const satisfies Record<string, FlagDef>;
 
 export type FlagKey = keyof typeof FLAG_DEFS;

@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { sendMessage } from '@shared/messages';
+import { isNativePlatform } from '@shared/kv';
 import { normalizeMnemonic } from '@core/wallet/wallet';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { Icon } from '../components/Icon';
 import { SeedGrid } from '../components/SeedGrid';
 import { WarningCallout } from '../components/WarningCallout';
+import { PasskeyOnboarding } from './PasskeyOnboarding';
 
 type Step =
   | 'welcome'
@@ -13,11 +15,19 @@ type Step =
   | 'create-confirm'
   | 'create-password'
   | 'import-input'
-  | 'import-password';
+  | 'import-password'
+  | 'passkey';
 
 const MIN_PASSWORD = 8;
 
-export function Onboarding({ onDone }: { onDone: () => void }) {
+export function Onboarding({
+  onDone,
+  onPasskeyDone,
+}: {
+  onDone: () => void;
+  /** Called when a passkey smart account was created instead of a vault (#53). */
+  onPasskeyDone?: () => void;
+}) {
   const [step, setStep] = useState<Step>('welcome');
   const [mnemonic, setMnemonic] = useState('');
   const [importInput, setImportInput] = useState('');
@@ -59,7 +69,22 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
 
   return (
     <div className="grid-bg flex h-full flex-col overflow-y-auto no-scrollbar bg-background px-5 py-6">
-      {step === 'welcome' && <Welcome busy={busy} onCreate={startCreate} onImport={() => setStep('import-input')} />}
+      {step === 'welcome' && (
+        <Welcome
+          busy={busy}
+          onCreate={startCreate}
+          onImport={() => setStep('import-input')}
+          onPasskey={
+            __FEATURE_PASSKEY__ && !isNativePlatform() && onPasskeyDone
+              ? () => setStep('passkey')
+              : undefined
+          }
+        />
+      )}
+
+      {step === 'passkey' && __FEATURE_PASSKEY__ && onPasskeyDone && (
+        <PasskeyOnboarding onBack={() => setStep('welcome')} onDone={onPasskeyDone} />
+      )}
 
       {step === 'create-seed' && (
         <SeedReveal words={words} onBack={() => setStep('welcome')} onNext={() => setStep('create-confirm')} />
@@ -99,10 +124,12 @@ function Welcome({
   busy,
   onCreate,
   onImport,
+  onPasskey,
 }: {
   busy: boolean;
   onCreate: () => void;
   onImport: () => void;
+  onPasskey?: () => void;
 }) {
   return (
     <div className="flex h-full flex-col">
@@ -122,6 +149,11 @@ function Welcome({
         <Button fullWidth variant="secondary" onClick={onImport} disabled={busy}>
           Import Wallet
         </Button>
+        {onPasskey && (
+          <Button fullWidth variant="secondary" onClick={onPasskey} disabled={busy} trailingIcon="fingerprint">
+            Create with Passkey · Testnet
+          </Button>
+        )}
       </div>
     </div>
   );

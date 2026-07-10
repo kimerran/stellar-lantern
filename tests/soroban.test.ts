@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { simulateTransaction, SOROBAN_TESTNET_RPC } from '@core/stellar/soroban';
+import { getLedgerEntries, simulateTransaction, SOROBAN_TESTNET_RPC } from '@core/stellar/soroban';
 
 const RPC = 'https://soroban-testnet.stellar.org';
 // A stand-in for an already-built transaction envelope XDR (this module never
@@ -137,5 +137,22 @@ describe('simulateTransaction', () => {
 
   it('exposes a default testnet RPC constant', () => {
     expect(SOROBAN_TESTNET_RPC).toBe('https://soroban-testnet.stellar.org');
+  });
+});
+
+describe('getLedgerEntries', () => {
+  it('throws on a non-2xx transport response', async () => {
+    const { impl } = jsonFetch({}, { ok: false, status: 503 });
+    await expect(getLedgerEntries(['AAAA'], { rpcUrl: RPC, fetchImpl: impl })).rejects.toThrow(/503/);
+  });
+
+  it('drops malformed entries but keeps well-formed ones', async () => {
+    const { impl } = jsonFetch({
+      jsonrpc: '2.0',
+      id: 1,
+      result: { entries: [{ key: 'k1', xdr: 'x1' }, { key: 42 }, null], latestLedger: 99 },
+    });
+    const res = await getLedgerEntries(['k1'], { rpcUrl: RPC, fetchImpl: impl });
+    expect(res).toEqual({ ok: true, entries: [{ keyXdr: 'k1', xdr: 'x1' }], latestLedger: 99 });
   });
 });
