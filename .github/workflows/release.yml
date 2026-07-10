@@ -24,7 +24,7 @@ env:
   VITE_FEATURE_ANCHORS: 'true'         # SEP-24 cash in/out (#24) — shipped
   VITE_FEATURE_MINIAPPS: 'true'        # dApp mini-apps — shipped
   VITE_FEATURE_SWAP_AGGREGATOR: 'false' # Soroswap aggregator — not built (#71)
-  VITE_FEATURE_BIOMETRIC_UNLOCK: 'false' # #23 M2a — device-unverified, off until demoed
+  VITE_FEATURE_BIOMETRIC_UNLOCK: 'true'  # #23 M2a — active on Android; inert on web (store unavailable)
   VITE_FEATURE_GEOVELOCITY: 'false'    # #70 — no code (closed not-planned)
   VITE_FEATURE_DEMO_AFFORDANCES: 'false' # demo-only bits — never in a release build
 

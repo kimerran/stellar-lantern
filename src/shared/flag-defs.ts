@@ -18,7 +18,7 @@ export const FLAG_DEFS = {
   swapAggregator: { envVar: 'VITE_FEATURE_SWAP_AGGREGATOR', literal: '__FEATURE_SWAP_AGGREGATOR__', default: false },
   earnBlend: { envVar: 'VITE_FEATURE_EARN_BLEND', literal: '__FEATURE_EARN_BLEND__', default: true },
   anchors: { envVar: 'VITE_FEATURE_ANCHORS', literal: '__FEATURE_ANCHORS__', default: true },
-  biometricUnlock: { envVar: 'VITE_FEATURE_BIOMETRIC_UNLOCK', literal: '__FEATURE_BIOMETRIC_UNLOCK__', default: false },
+  biometricUnlock: { envVar: 'VITE_FEATURE_BIOMETRIC_UNLOCK', literal: '__FEATURE_BIOMETRIC_UNLOCK__', default: true },
   geovelocity: { envVar: 'VITE_FEATURE_GEOVELOCITY', literal: '__FEATURE_GEOVELOCITY__', default: false },
   miniapps: { envVar: 'VITE_FEATURE_MINIAPPS', literal: '__FEATURE_MINIAPPS__', default: true },
   demoAffordances: { envVar: 'VITE_FEATURE_DEMO_AFFORDANCES', literal: '__FEATURE_DEMO_AFFORDANCES__', default: false },
