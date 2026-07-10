@@ -5,6 +5,7 @@ import {
   PasskeyFormatError,
   P256_PUBLIC_KEY_BYTES,
   P256_SIGNATURE_BYTES,
+  normalizeLowS,
 } from '@core/passkey/secp256r1';
 
 // A P-256 keypair fixture (the shape a WebAuthn passkey produces), built with
@@ -69,5 +70,59 @@ describe('derToRawEcdsaSignature', () => {
     expect(() => derToRawEcdsaSignature(new Uint8Array([0x31, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x01]))).toThrow(PasskeyFormatError); // not a SEQUENCE
     expect(() => derToRawEcdsaSignature(new Uint8Array([0x30, 0x04, 0x03, 0x01, 0x01, 0x02, 0x01, 0x01]))).toThrow(PasskeyFormatError); // r not an INTEGER
     expect(() => derToRawEcdsaSignature(new Uint8Array([0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x01, 0xff]))).toThrow(PasskeyFormatError); // trailing byte
+  });
+});
+
+describe('normalizeLowS', () => {
+  const N = BigInt('0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551');
+  const HALF_N = N >> 1n;
+
+  const toBytes32 = (n: bigint): Uint8Array => {
+    const out = new Uint8Array(32);
+    for (let i = 31; i >= 0; i--) {
+      out[i] = Number(n & 0xffn);
+      n >>= 8n;
+    }
+    return out;
+  };
+  const sOf = (sig: Uint8Array): bigint =>
+    sig.subarray(32).reduce((acc, b) => (acc << 8n) | BigInt(b), 0n);
+
+  it('flips a high-S signature to n - s', () => {
+    const s = HALF_N + 12345n; // definitely high
+    const sig = new Uint8Array(64);
+    sig.set(toBytes32(1n), 0); // r = 1 (untouched)
+    sig.set(toBytes32(s), 32);
+    const normalized = normalizeLowS(sig);
+    expect(sOf(normalized)).toBe(N - s);
+    expect(Buffer.from(normalized.subarray(0, 32)).equals(Buffer.from(sig.subarray(0, 32)))).toBe(true);
+  });
+
+  it('returns a low-S signature unchanged', () => {
+    const sig = new Uint8Array(64);
+    sig.set(toBytes32(7n), 0);
+    sig.set(toBytes32(HALF_N), 32); // s == n/2 counts as low
+    expect(Buffer.from(normalizeLowS(sig)).equals(Buffer.from(sig))).toBe(true);
+  });
+
+  it('a forced-high-S real signature still verifies after normalization', async () => {
+    // Take the fixture signature; force s high (s' = n - s is also valid ECDSA
+    // pre-normalization); normalizeLowS must give back a verifying signature.
+    const s = sOf(rawSig);
+    const high = new Uint8Array(rawSig);
+    high.set(toBytes32(N - s), 32);
+    const normalized = normalizeLowS(high);
+    expect(sOf(normalized) <= HALF_N).toBe(true);
+    const ok = await crypto.subtle.verify(
+      { name: 'ECDSA', hash: 'SHA-256' },
+      keyPair.publicKey,
+      normalized,
+      message,
+    );
+    expect(ok).toBe(true);
+  });
+
+  it('rejects a wrong-length signature', () => {
+    expect(() => normalizeLowS(new Uint8Array(63))).toThrow(PasskeyFormatError);
   });
 });
