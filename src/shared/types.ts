@@ -16,6 +16,19 @@ export interface VaultCipher {
   ciphertext: string; // base64 — encrypts the mnemonic/seed
 }
 
+// A passkey smart account (#53): a Soroban contract whose signer is a device
+// passkey. Everything here is PUBLIC (the contract address, the WebAuthn
+// credential id, the public key) — there is no secret to protect, which is the
+// point: the signing key never leaves the authenticator.
+export interface PasskeyAccountRecord {
+  version: 1;
+  network: 'TESTNET'; // passkey accounts are testnet-only for now (friendbot fees)
+  contractId: string; // C… smart-account address
+  credentialId: string; // base64url WebAuthn credential id
+  publicKey: string; // hex, 65-byte SEC1 P-256 public key
+  rpId: string; // relying-party id the credential was registered under
+}
+
 export interface Settings {
   network: NetworkId;
   autoLockMinutes: number;

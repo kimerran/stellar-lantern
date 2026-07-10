@@ -1,10 +1,12 @@
-import type { Settings, StoredVault } from './types';
+import type { PasskeyAccountRecord, Settings, StoredVault } from './types';
 import { DEFAULT_AUTOLOCK_MINUTES, DEFAULT_NETWORK } from './constants';
 import { getKV, isNativePlatform } from './kv';
 
-// Only the encrypted vault and non-secret settings live here (SPEC §7).
+// Only the encrypted vault and non-secret settings live here (SPEC §7). The
+// passkey account record (#53) is all-public data — see PasskeyAccountRecord.
 const VAULT_KEY = 'lantern.vault';
 const SETTINGS_KEY = 'lantern.settings';
+const PASSKEY_ACCOUNT_KEY = 'lantern.passkeyAccount';
 
 function parse<T>(raw: string | null): T | null {
   if (raw == null) return null;
@@ -28,6 +30,21 @@ export async function setVault(vault: StoredVault): Promise<void> {
 export async function clearVault(): Promise<void> {
   const kv = await getKV();
   await kv.remove(VAULT_KEY);
+}
+
+export async function getPasskeyAccount(): Promise<PasskeyAccountRecord | null> {
+  const kv = await getKV();
+  return parse<PasskeyAccountRecord>(await kv.get(PASSKEY_ACCOUNT_KEY));
+}
+
+export async function setPasskeyAccount(record: PasskeyAccountRecord): Promise<void> {
+  const kv = await getKV();
+  await kv.set(PASSKEY_ACCOUNT_KEY, JSON.stringify(record));
+}
+
+export async function clearPasskeyAccount(): Promise<void> {
+  const kv = await getKV();
+  await kv.remove(PASSKEY_ACCOUNT_KEY);
 }
 
 const DEFAULT_SETTINGS: Settings = {
