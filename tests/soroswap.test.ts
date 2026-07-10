@@ -148,6 +148,26 @@ describe('fetchSoroswapQuote', () => {
       expect(await fetchSoroswapQuote({ config: cfg({ fetchImpl: impl }), ...args })).toBeNull();
     }
   });
+
+  // Regression: the live API returns 201 (not 200) on a successful quote — so the
+  // client must accept the whole 2xx range (`res.ok`), never gate on `=== 200`.
+  // Verified live against a mainnet XLM→USDC quote.
+  it('accepts a 201 Created quote (the live success status), not just 200', async () => {
+    const { impl } = stub([{ ok: true, status: 201, body: { amountOut: '57027999', platform: 'aggregator' } }]);
+    const quote = await fetchSoroswapQuote({ config: cfg({ fetchImpl: impl }), ...args });
+    expect(quote).not.toBeNull();
+    expect(quote!.amountOut).toBe('5.7027999');
+    expect(quote!.platform).toBe('aggregator');
+  });
+
+  // Regression: on a network with no Soroswap liquidity (e.g. testnet) the API
+  // returns 400 {"title":"No path found",...}, not a 2xx empty result. The client
+  // must fail soft to null so the Swap screen falls back to the native SDEX engine.
+  // Verified live against a testnet XLM→USDC quote (empty /protocols).
+  it('fails soft to null on a 400 "No path found" (no-liquidity network)', async () => {
+    const { impl } = stub([{ ok: false, status: 400, body: { title: 'No path found', detail: 'No path found', error: 'Quote Failed' } }]);
+    expect(await fetchSoroswapQuote({ config: cfg({ fetchImpl: impl }), ...args })).toBeNull();
+  });
 });
 
 describe('buildSoroswapSwapXdr', () => {
