@@ -1,7 +1,7 @@
 // No-mnemonic passkey onboarding (#53): registered passkey → funded ephemeral
 // deployer → wasm upload → CreateContractV2, fully offline via injected fakes.
 import { describe, expect, it } from 'vitest';
-import { Networks, SorobanDataBuilder, TransactionBuilder, xdr } from '@stellar/stellar-sdk';
+import { SorobanDataBuilder, TransactionBuilder } from '@stellar/stellar-sdk';
 import { createPasskeyAccount, type OnboardStep } from '@core/passkey/onboard';
 import { PASSKEY_ACCOUNT_WASM_HASH_HEX } from '@core/passkey/contractWasm';
 import type { CredentialsApi } from '@core/passkey/webauthn';
