@@ -2,12 +2,13 @@
 // Mirrors the `getKV` / `__setKV` seam in shared/kv.ts: the session handler asks
 // for a `BiometricStore` here without knowing the platform.
 //
-// The real native adapter (Android Keystore, and later extension WebAuthn-PRF) is
-// a follow-up slice — it will replace `UNAVAILABLE` for its platform. Until then
-// every platform gets the unavailable store, so biometric unlock stays inert
-// (never enrols, unlock reports "cancelled") rather than pretending to work.
+// Native (Capacitor) → the real Keystore/Keychain adapter (secp-hardware-backed,
+// device-verified). Extension/web → still unavailable (a WebAuthn-PRF adapter is
+// a later follow-up), so biometric unlock stays inert there rather than pretending.
 
+import { isNativePlatform } from '@shared/kv';
 import type { BiometricStore } from './biometric-unlock';
+import { nativeBiometricStore } from './biometric-store-native';
 
 const UNAVAILABLE: BiometricStore = {
   isAvailable: () => Promise.resolve(false),
@@ -18,9 +19,10 @@ const UNAVAILABLE: BiometricStore = {
 
 let override: BiometricStore | null = null;
 
-/** The biometric store for the current platform (unavailable until an adapter lands). */
+/** The biometric store for the current platform (unavailable off native for now). */
 export function getBiometricStore(): BiometricStore {
-  return override ?? UNAVAILABLE;
+  if (override) return override;
+  return isNativePlatform() ? nativeBiometricStore : UNAVAILABLE;
 }
 
 /** Test seam — inject a fake store (mirrors `__setKV`). Pass `null` to reset. */
