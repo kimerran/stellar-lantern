@@ -38,7 +38,7 @@ export function App() {
   const [scanOpen, setScanOpen] = useState(false);
   const [guardiansOpen, setGuardiansOpen] = useState(false);
   const [cashOpen, setCashOpen] = useState(false);
-  const [earnOpen, setEarnOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
   const [swapOpen, setSwapOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const showToast = useToast();
@@ -110,9 +110,9 @@ export function App() {
     return <CashInOut address={address} network={network} onBack={() => setCashOpen(false)} />;
   }
 
-  // Full-screen Earn (Blend supply/withdraw) overlay.
-  if (earnOpen) {
-    return <Earn address={address} network={network} onBack={() => setEarnOpen(false)} />;
+  // Full-screen Activity (transaction history) overlay — opened from the app bar.
+  if (activityOpen) {
+    return <Activity address={address} network={network} onBack={() => setActivityOpen(false)} />;
   }
 
   // Full-screen Swap (SDEX path-payment) overlay.
@@ -137,7 +137,7 @@ export function App() {
         onOpenScan={() => setScanOpen(true)}
         onOpenGuardians={() => setGuardiansOpen(true)}
         onOpenCashInOut={() => setCashOpen(true)}
-        onOpenEarn={() => setEarnOpen(true)}
+        onOpenActivity={() => setActivityOpen(true)}
         onExpand={isExpanded || isNativePlatform() ? undefined : openExpanded}
       />
 
@@ -153,9 +153,16 @@ export function App() {
               onSwap={() => setSwapOpen(true)}
             />
           )}
-          {tab === 'activity' && <Activity address={address} network={network} />}
+          {tab === 'earn' && <Earn address={address} network={network} embedded />}
           {tab === 'send' && (
-            <Send address={address} network={network} onDone={() => setTab('activity')} />
+            <Send
+              address={address}
+              network={network}
+              onDone={() => {
+                setTab('assets');
+                setActivityOpen(true);
+              }}
+            />
           )}
           {tab === 'apps' && <Apps address={address} network={settings.network} />}
         </div>
