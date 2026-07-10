@@ -6,9 +6,11 @@ import { sendMessage } from '@shared/messages';
 import { getServer, loadAccountState } from '@core/stellar/client';
 import { buildPathPaymentStrictSendXdr, destMinFromQuote } from '@core/stellar/swap';
 import { fetchStrictSendPaths } from '@core/stellar/paths';
+import { fetchSoroswapQuote, buildSoroswapSwapXdr, pickBestEngine, type SoroswapConfig } from '@core/stellar/soroswap';
 import { computeMaxXlm, type AssetRef } from '@core/stellar/tx';
 import { scan } from '@core/scan/engine';
 import type { ScanVerdict } from '@core/scan/types';
+import { FLAGS } from '@shared/flags';
 import { isNativePlatform } from '@shared/kv';
 import { formatAmount } from '@shared/format';
 import { Button } from '../components/Button';
@@ -29,6 +31,29 @@ type Step = 'form' | 'review' | 'success';
 // Default slippage tolerance — the received floor is quote × (1 − this).
 const SLIPPAGE = 0.005; // 0.5%
 
+// The optional Soroswap aggregator (best-price routing across Soroswap/Aqua/
+// Phoenix/SDEX) — gated behind the `swapAggregator` feature flag AND a build-time
+// API key. Absent → the wallet uses only the native SDEX path-payment engine, so
+// nothing here can block a swap; the aggregator only takes over when configured
+// and quoting a strictly better rate. Revenue share (feeBps) is sent only when a
+// referral wallet is also configured, as the API requires.
+function soroswapConfig(network: NetworkConfig): SoroswapConfig | null {
+  if (!FLAGS.swapAggregator) return null;
+  const env = import.meta.env as unknown as Record<string, string | undefined>;
+  const apiKey = env.VITE_SOROSWAP_API_KEY;
+  if (!apiKey) return null;
+  const referralId = env.VITE_SOROSWAP_REFERRAL_ID;
+  const feeBps = referralId && env.VITE_SOROSWAP_FEE_BPS ? Number(env.VITE_SOROSWAP_FEE_BPS) : undefined;
+  return {
+    apiKey,
+    network: network.id === 'PUBLIC' ? 'mainnet' : 'testnet',
+    networkPassphrase: network.passphrase,
+    slippageBps: Math.round(SLIPPAGE * 10_000),
+    referralId,
+    feeBps,
+  };
+}
+
 const keyOf = (b: AssetBalance) => (b.isNative ? 'XLM' : `${b.code}:${b.issuer}`);
 const refOf = (b: AssetBalance): AssetRef =>
   b.isNative ? { isNative: true } : { isNative: false, code: b.code, issuer: b.issuer };
@@ -40,6 +65,8 @@ interface ReviewData {
   destCode: string;
   quoted: string; // expected received
   destMin: string; // slippage floor
+  engine: 'sdex' | 'soroswap'; // which route won the best-price comparison
+  platform: string | null; // aggregator sub-route (e.g. 'aggregator'), if any
   verdict: ScanVerdict;
 }
 
@@ -113,39 +140,74 @@ export function Swap({ address, network, onBack }: Props) {
     try {
       const sendAsset = refOf(sendBal);
       const destAsset = refOf(destBal);
-      const quote = await fetchStrictSendPaths({
-        horizonUrl: network.horizonUrl,
-        sendAsset,
-        sendAmount: amount,
-        destAsset,
-      });
-      if (!quote) {
+
+      // Quote the native SDEX path and the Soroswap aggregator (if configured) in
+      // parallel. The aggregator only wins when it quotes a strictly better rate;
+      // any aggregator failure (or no key) silently leaves the native engine.
+      const soroCfg = soroswapConfig(network);
+      const [nativeQuote, soroQuote] = await Promise.all([
+        fetchStrictSendPaths({ horizonUrl: network.horizonUrl, sendAsset, sendAmount: amount, destAsset }).catch(() => null),
+        soroCfg ? fetchSoroswapQuote({ config: soroCfg, sendAsset, sendAmount: amount, destAsset }) : Promise.resolve(null),
+      ]);
+
+      const nativeReceive = nativeQuote?.destAmount ?? null;
+      const soroReceive = soroQuote?.amountOut ?? null;
+      if (!nativeReceive && !soroReceive) {
         setError('No swap route available for this pair right now (not enough liquidity).');
         return;
       }
-      const destMin = destMinFromQuote(quote.destAmount, SLIPPAGE);
 
-      const server = getServer(network);
-      const sourceAccount = await server.loadAccount(address);
-      let baseFee = BASE_FEE;
-      try {
-        const fetched = await server.fetchBaseFee();
-        baseFee = String(Math.min(Math.max(fetched, Number(BASE_FEE)), 100_000));
-      } catch {
-        /* keep BASE_FEE */
+      let engine: 'sdex' | 'soroswap' = !nativeReceive ? 'soroswap' : pickBestEngine(nativeReceive, soroReceive);
+      let xdr: string | null = null;
+      let quoted = '';
+      let destMin = '';
+      let platform: string | null = null;
+
+      // Aggregator route: the API returns a ready-to-sign XDR (its own slippage
+      // floor enforced on-chain via slippageBps). If the build fails, drop to SDEX.
+      if (engine === 'soroswap' && soroQuote && soroCfg) {
+        xdr = await buildSoroswapSwapXdr({ config: soroCfg, quote: soroQuote, from: address });
+        if (xdr) {
+          quoted = soroQuote.amountOut;
+          destMin = destMinFromQuote(soroQuote.amountOut, SLIPPAGE); // shown for parity; enforced on-chain
+          platform = soroQuote.platform;
+        } else {
+          engine = 'sdex';
+        }
       }
 
-      const xdr = buildPathPaymentStrictSendXdr({
-        sourceAccountId: address,
-        sourceSequence: sourceAccount.sequenceNumber(),
-        networkPassphrase: network.passphrase,
-        baseFee,
-        sendAsset,
-        sendAmount: amount,
-        destAsset,
-        destMin,
-        path: quote.path,
-      });
+      // Native SDEX path payment (also the fallback when the aggregator can't build).
+      if (!xdr) {
+        if (!nativeReceive || !nativeQuote) {
+          setError('Couldn’t build the swap. Try again in a moment.');
+          return;
+        }
+        engine = 'sdex';
+        quoted = nativeQuote.destAmount;
+        destMin = destMinFromQuote(nativeQuote.destAmount, SLIPPAGE);
+
+        const server = getServer(network);
+        const sourceAccount = await server.loadAccount(address);
+        let baseFee = BASE_FEE;
+        try {
+          const fetched = await server.fetchBaseFee();
+          baseFee = String(Math.min(Math.max(fetched, Number(BASE_FEE)), 100_000));
+        } catch {
+          /* keep BASE_FEE */
+        }
+
+        xdr = buildPathPaymentStrictSendXdr({
+          sourceAccountId: address,
+          sourceSequence: sourceAccount.sequenceNumber(),
+          networkPassphrase: network.passphrase,
+          baseFee,
+          sendAsset,
+          sendAmount: amount,
+          destAsset,
+          destMin,
+          path: nativeQuote.path,
+        });
+      }
 
       const verdict = scan({
         xdr,
@@ -162,8 +224,10 @@ export function Swap({ address, network, onBack }: Props) {
         sendCode: sendBal.code,
         sendAmount: amount,
         destCode: destBal.code,
-        quoted: quote.destAmount,
+        quoted,
         destMin,
+        engine,
+        platform,
         verdict,
       });
       setConfirmText('');
@@ -272,6 +336,7 @@ export function Swap({ address, network, onBack }: Props) {
             <Row label="You send" value={`${formatAmount(review.sendAmount)} ${review.sendCode}`} />
             <Row label="Expected" value={`~${formatAmount(review.quoted)} ${review.destCode}`} />
             <Row label={`Minimum received (${(SLIPPAGE * 100).toFixed(1)}% slippage)`} value={`${formatAmount(review.destMin)} ${review.destCode}`} />
+            <Row label="Route" value={review.engine === 'soroswap' ? 'Soroswap — best price' : 'Stellar DEX'} />
             <Row label="Network" value={network.label} />
           </Card>
 
