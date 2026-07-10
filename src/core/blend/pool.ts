@@ -51,6 +51,20 @@ export const BLEND_REQUEST_TYPE = {
 
 export const BLEND_SUBMIT_FN = 'submit';
 
+// Full-withdraw sentinel (#92). Blend's `Withdraw` caps the amount to the user's
+// actual bToken balance (`pool/src/pool/actions.rs`: if the requested amount
+// exceeds the position, it burns the whole position and pays out its exact
+// underlying), so passing an amount ≥ the balance withdraws everything and leaves
+// **no dust** — the balance keeps accruing between quote and submit, so a rounded
+// display value would strand a sliver. We use u64::MAX rather than i128::MAX on
+// purpose: the contract converts the requested amount to bTokens by ceil-dividing
+// `amount × SCALAR_12`, and i128::MAX × 1e12 would overflow i128 and panic, whereas
+// u64::MAX × 1e12 ≈ 1.8e31 stays well under i128::MAX (~1.7e38) while still dwarfing
+// any real position. This is a plain i128 base-unit string — it flows through the
+// exact same `buildBlendSubmitXdr` → simulate → scan → SIGN_AND_SUBMIT path as any
+// other amount (no gate is bypassed).
+export const BLEND_WITHDRAW_ALL_AMOUNT = (2n ** 64n - 1n).toString();
+
 // The two actions this wallet surface supports for the yield MVP.
 export type BlendAction = 'supply' | 'withdraw';
 

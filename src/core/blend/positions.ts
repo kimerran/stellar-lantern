@@ -42,12 +42,12 @@ export interface SuppliedPosition {
   decimals: number;
 }
 
-interface ReserveRef {
+export interface ReserveRef {
   code: string;
   assetId: string;
 }
 
-interface RpcOpts {
+export interface RpcOpts {
   rpcUrl: string;
   fetchImpl?: typeof fetch;
 }
@@ -56,8 +56,9 @@ interface RpcOpts {
 const SIM_SOURCE = 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF';
 
 // Simulate a single read-only view call and return the decoded native return
-// value, or null on any RPC error / contract error / undecodable body.
-async function simulateView(
+// value, or null on any RPC error / contract error / undecodable body. Exported so
+// the sibling APY reader (`apr.ts`) reuses the exact same read-only simulate path.
+export async function simulateView(
   poolId: string,
   fn: string,
   arg: xdr.ScVal,

@@ -13,7 +13,8 @@ import {
 } from '@core/blend/directory';
 import { toBaseUnits, prepareBlendSubmit } from '@core/blend/submit';
 import { readSuppliedPositions, type SuppliedPosition } from '@core/blend/positions';
-import type { BlendAction } from '@core/blend/pool';
+import { readReserveApys } from '@core/blend/apr';
+import { type BlendAction, BLEND_WITHDRAW_ALL_AMOUNT } from '@core/blend/pool';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { Card } from '../components/Card';
@@ -62,26 +63,30 @@ export function Earn({ address, network, onBack, embedded }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [confirmText, setConfirmText] = useState('');
+  // True when the withdraw amount was prefilled via "Withdraw all" — submit sends the
+  // full-balance sentinel (leaves no dust) instead of the displayed underlying, which
+  // keeps accruing between quote and submit. Cleared the moment the user edits.
+  const [withdrawAll, setWithdrawAll] = useState(false);
 
   // Supplied-position readout per pool (fail-soft: null/absent → no readout).
   const [positions, setPositions] = useState<Record<string, SuppliedPosition[]>>({});
+  // Estimated supply APY per pool → asset code (fail-soft: null/absent → "—").
+  const [apys, setApys] = useState<Record<string, Record<string, number | null>>>({});
 
-  // Read the user's current supplied balances so each reserve row can show what
-  // they've already got earning yield. Read-only + advisory — any failure just
-  // omits the readout and never blocks supply/withdraw.
+  // Read the user's current supplied balances (per reserve) and each reserve's
+  // estimated supply APY. Read-only + advisory — any failure just omits the readout
+  // and never blocks supply/withdraw.
   useEffect(() => {
     const rpcUrl = network.sorobanRpcUrl;
     if (!rpcUrl || pools.length === 0) return;
     let live = true;
     (async () => {
       for (const pool of pools) {
-        const supplied = await readSuppliedPositions(
-          pool.poolId,
-          address,
-          pool.reserves.map((r) => ({ code: r.code, assetId: r.assetId })),
-          { rpcUrl },
-        );
+        const refs = pool.reserves.map((r) => ({ code: r.code, assetId: r.assetId }));
+        const supplied = await readSuppliedPositions(pool.poolId, address, refs, { rpcUrl });
         if (live && supplied) setPositions((prev) => ({ ...prev, [pool.id]: supplied }));
+        const rates = await readReserveApys(pool.poolId, refs, { rpcUrl });
+        if (live && rates) setApys((prev) => ({ ...prev, [pool.id]: rates }));
       }
     })();
     return () => {
@@ -89,15 +94,26 @@ export function Earn({ address, network, onBack, embedded }: Props) {
     };
   }, [address, network.sorobanRpcUrl, pools]);
 
-  function suppliedDisplay(poolId: string, reserve: BlendReserve): string | null {
-    const found = positions[poolId]?.find((p) => p.code === reserve.code);
+  function suppliedPosition(poolId: string, code: string): SuppliedPosition | null {
+    const found = positions[poolId]?.find((p) => p.code === code);
     if (!found || BigInt(found.suppliedBase) <= 0n) return null;
+    return found;
+  }
+
+  function suppliedDisplay(poolId: string, reserve: BlendReserve): string | null {
+    const found = suppliedPosition(poolId, reserve.code);
+    if (!found) return null;
     return formatAmount((Number(found.suppliedBase) / 10 ** found.decimals).toString());
+  }
+
+  function apyFor(poolId: string, code: string): number | null | undefined {
+    return apys[poolId]?.[code];
   }
 
   function choose(pool: BlendPool, reserve: BlendReserve, action: BlendAction) {
     setSel({ pool, reserve, action });
     setAmount('');
+    setWithdrawAll(false);
     setError(null);
     setStep('form');
   }
@@ -141,11 +157,18 @@ export function Earn({ address, network, onBack, embedded }: Props) {
     setError(null);
     try {
       let base: string;
-      try {
-        base = toBaseUnits(amount, sel.reserve.decimals);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Invalid amount.');
-        return;
+      if (sel.action === 'withdraw' && withdrawAll) {
+        // Full-balance withdraw: send the sentinel so Blend burns the whole position
+        // and leaves no dust (the displayed underlying keeps accruing and would round
+        // short). Still simulated + scanned + gated below like any other amount.
+        base = BLEND_WITHDRAW_ALL_AMOUNT;
+      } else {
+        try {
+          base = toBaseUnits(amount, sel.reserve.decimals);
+        } catch (e) {
+          setError(e instanceof Error ? e.message : 'Invalid amount.');
+          return;
+        }
       }
 
       const server = getServer(network);
@@ -258,6 +281,11 @@ export function Earn({ address, network, onBack, embedded }: Props) {
             <p className={`mt-2 text-headline-lg ${isHigh ? 'text-on-surface-variant' : 'text-primary glow-amber-text'}`}>
               {formatAmount(amount)} {sel.reserve.code}
             </p>
+            {sel.action === 'withdraw' && withdrawAll && (
+              <p className="mt-1 text-label-sm text-on-surface-variant">
+                Full balance — withdraws everything, no dust left.
+              </p>
+            )}
           </div>
 
           <div aria-live="polite" aria-atomic="true">
@@ -320,6 +348,10 @@ export function Earn({ address, network, onBack, embedded }: Props) {
 
   // ── Amount form ──
   if (step === 'form' && sel) {
+    const position = suppliedPosition(sel.pool.id, sel.reserve.code);
+    const maxDisplay =
+      position && (Number(position.suppliedBase) / 10 ** position.decimals).toString();
+    const estApy = apyFor(sel.pool.id, sel.reserve.code);
     return (
       <Shell
         title={`${actionVerb(sel.action)} — ${sel.reserve.code}`}
@@ -332,12 +364,32 @@ export function Earn({ address, network, onBack, embedded }: Props) {
               ? `Supply ${sel.reserve.code} into ${sel.pool.name} to earn lending yield. You can withdraw anytime.`
               : `Withdraw ${sel.reserve.code} you previously supplied to ${sel.pool.name}.`}
           </p>
+
+          <div className="flex items-center justify-between rounded-2xl bg-surface-container p-3.5 shadow-layer-1">
+            <span className="text-label-md text-on-surface-variant">Est. APY</span>
+            <span className="font-mono text-title-sm text-primary glow-amber-text">{formatApy(estApy)}</span>
+          </div>
+
           <div>
             <div className="mb-2 flex items-center justify-between">
               <label htmlFor="earn-amount" className="text-label-sm uppercase tracking-wide text-on-surface-variant">
                 Amount
               </label>
-              <span className="text-label-sm text-on-surface-variant">{sel.reserve.code}</span>
+              {sel.action === 'withdraw' && maxDisplay ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAmount(maxDisplay);
+                    setWithdrawAll(true);
+                    setError(null);
+                  }}
+                  className="rounded-md border border-primary-container/40 px-2 py-0.5 text-label-sm font-semibold text-primary-container transition-colors hover:bg-primary-container/10 active:scale-95"
+                >
+                  MAX · {formatAmount(maxDisplay)} {sel.reserve.code}
+                </button>
+              ) : (
+                <span className="text-label-sm text-on-surface-variant">{sel.reserve.code}</span>
+              )}
             </div>
             <div className="flex items-center gap-2 rounded-lg border border-outline-variant bg-surface-container-high px-3 py-2 focus-within:border-primary-container focus-within:shadow-focus-amber">
               <input
@@ -345,10 +397,18 @@ export function Earn({ address, network, onBack, embedded }: Props) {
                 inputMode="decimal"
                 placeholder="0.00"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                onChange={(e) => {
+                  setAmount(e.target.value.replace(/[^0-9.]/g, ''));
+                  setWithdrawAll(false);
+                }}
                 className="w-full bg-transparent text-right font-mono text-headline-lg text-on-surface placeholder:text-outline focus:outline-none"
               />
             </div>
+            {sel.action === 'withdraw' && withdrawAll && (
+              <p className="mt-1.5 text-right text-label-sm text-primary-container">
+                Withdrawing your full balance — no dust left.
+              </p>
+            )}
           </div>
 
           {error && <p role="alert" className="text-center text-label-md text-error">{error}</p>}
@@ -361,6 +421,16 @@ export function Earn({ address, network, onBack, embedded }: Props) {
   }
 
   // ── Pool / reserve picker ──
+  // Collect every reserve the user is currently earning on, across pools, for the hero.
+  const earning = pools.flatMap((pool) =>
+    pool.reserves.flatMap((r) => {
+      const supplied = suppliedDisplay(pool.id, r);
+      return supplied
+        ? [{ key: `${pool.id}:${r.code}`, code: r.code, poolName: pool.name, supplied, apy: apyFor(pool.id, r.code) }]
+        : [];
+    }),
+  );
+
   return (
     <Shell title="Earn yield" onBack={embedded ? undefined : onBack} embedded={embedded}>
         <p className="mb-3 mt-2 text-body-md text-on-surface-variant">
@@ -371,42 +441,103 @@ export function Earn({ address, network, onBack, embedded }: Props) {
             Blend pools aren’t available on {network.label} yet. Switch to Testnet to try it.
           </Card>
         ) : (
-          <ul className="space-y-3">
-            {pools.map((pool) => (
-              <li key={pool.id}>
-                <Card className="space-y-3 p-4">
+          <>
+            {earning.length > 0 ? (
+              <section className="mt-3 overflow-hidden rounded-3xl bg-surface-container shadow-layer-1 ring-1 ring-primary-container/25">
+                <div className="bg-gradient-to-b from-primary-container/15 to-transparent px-4 pb-4 pt-4">
                   <div className="flex items-center gap-2">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-container/20">
-                      <Icon name="savings" size={18} className="text-primary-container" />
-                    </div>
-                    <span className="truncate text-title-sm text-on-surface">{pool.name}</span>
-                    {pool.verified && <Icon name="verified" size={16} className="shrink-0 text-primary-container" />}
+                    <Icon name="savings" size={18} className="text-primary-container drop-shadow-glow-amber" />
+                    <h2 className="text-label-sm uppercase tracking-wide text-on-surface-variant">Your positions</h2>
                   </div>
-                  <ul className="space-y-2">
-                    {pool.reserves.map((r) => {
-                      const supplied = suppliedDisplay(pool.id, r);
-                      return (
-                        <li key={r.assetId} className="flex items-center gap-2">
-                          <div className="w-16 shrink-0">
-                            <div className="font-mono text-label-md text-on-surface">{r.code}</div>
-                            {supplied && (
-                              <div className="text-label-sm text-primary-container">{supplied} earning</div>
-                            )}
+                  <p className="mt-1 text-title-md text-primary glow-amber-text">
+                    Earning on {earning.length} {earning.length === 1 ? 'asset' : 'assets'}
+                  </p>
+                  <ul className="mt-3 space-y-2">
+                    {earning.map((e) => (
+                      <li
+                        key={e.key}
+                        className="flex items-center justify-between rounded-2xl bg-surface-container-high/60 px-3 py-2"
+                      >
+                        <div>
+                          <div className="font-mono text-label-lg text-on-surface">
+                            {e.supplied} {e.code}
                           </div>
-                          <div className="grid flex-1 grid-cols-2 gap-2">
-                            <ActionButton label="Supply" icon="south_west" onClick={() => choose(pool, r, 'supply')} />
-                            <ActionButton label="Withdraw" icon="north_east" onClick={() => choose(pool, r, 'withdraw')} />
-                          </div>
-                        </li>
-                      );
-                    })}
+                          <div className="text-label-sm text-on-surface-variant">{e.poolName}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-mono text-label-lg text-primary-container">{formatApy(e.apy)}</div>
+                          <div className="text-label-sm text-on-surface-variant">est. APY</div>
+                        </div>
+                      </li>
+                    ))}
                   </ul>
-                </Card>
-              </li>
-            ))}
-          </ul>
+                </div>
+              </section>
+            ) : (
+              <Card className="mt-3 flex items-center gap-3 p-4">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-container/15">
+                  <Icon name="savings" size={18} className="text-primary-container" />
+                </div>
+                <p className="text-body-md text-on-surface-variant">
+                  Nothing earning yet — supply an asset to start.
+                </p>
+              </Card>
+            )}
+
+            <SectionLabel>Available pools</SectionLabel>
+            <ul className="space-y-3">
+              {pools.map((pool) => (
+                <li key={pool.id}>
+                  <Card className="space-y-3 p-4">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-container/20">
+                        <Icon name="savings" size={18} className="text-primary-container" />
+                      </div>
+                      <span className="truncate text-title-sm text-on-surface">{pool.name}</span>
+                      {pool.verified && <Icon name="verified" size={16} className="shrink-0 text-primary-container" />}
+                    </div>
+                    <ul className="space-y-2">
+                      {pool.reserves.map((r) => {
+                        const supplied = suppliedDisplay(pool.id, r);
+                        return (
+                          <li key={r.assetId} className="flex items-center gap-2">
+                            <div className="w-24 shrink-0">
+                              <div className="font-mono text-label-md text-on-surface">{r.code}</div>
+                              <div className="text-label-sm text-primary-container">
+                                {formatApy(apyFor(pool.id, r.code))} est. APY
+                              </div>
+                              {supplied && (
+                                <div className="text-label-sm text-on-surface-variant">{supplied} earning</div>
+                              )}
+                            </div>
+                            <div className="grid flex-1 grid-cols-2 gap-2">
+                              <ActionButton label="Supply" icon="south_west" onClick={() => choose(pool, r, 'supply')} />
+                              <ActionButton label="Withdraw" icon="north_east" onClick={() => choose(pool, r, 'withdraw')} />
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </Card>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
     </Shell>
+  );
+}
+
+// Format an estimated APY fraction (0.0432 → "4.32%") for display; "—" when the
+// rate is unavailable (fail-soft), matching the position readout's honesty.
+function formatApy(apy: number | null | undefined): string {
+  if (apy == null || !Number.isFinite(apy)) return '—';
+  return `${(apy * 100).toFixed(2)}%`;
+}
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <h2 className="mb-2 mt-5 text-label-sm uppercase tracking-wide text-on-surface-variant">{children}</h2>
   );
 }
 
