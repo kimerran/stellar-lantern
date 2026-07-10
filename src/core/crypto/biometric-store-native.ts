@@ -52,16 +52,24 @@ interface NativeBiometricPlugin {
 
 // Variable specifier + @vite-ignore so the bundler doesn't try to resolve the
 // (optional, device-only) package at build time.
-async function loadPlugin(): Promise<NativeBiometricPlugin> {
+//
+// The plugin is a Capacitor `registerPlugin` proxy that intercepts *every*
+// property access — including `then`. If it were `await`ed directly (i.e. this
+// function resolved straight to the proxy), the promise machinery would probe
+// `proxy.then` and the web shim throws `UNIMPLEMENTED`, surfacing as an unhandled
+// rejection that escapes the callers' try/catch. So we box the proxy in a plain,
+// non-thenable object and destructure it at the call site — the proxy is never
+// itself awaited, only its (awaited) method calls are.
+async function loadPlugin(): Promise<{ plugin: NativeBiometricPlugin }> {
   const pkg: string = '@capgo/capacitor-native-biometric';
   const mod = (await import(/* @vite-ignore */ pkg)) as { NativeBiometric: NativeBiometricPlugin };
-  return mod.NativeBiometric;
+  return { plugin: mod.NativeBiometric };
 }
 
 export const nativeBiometricStore: BiometricStore = {
   async isAvailable(): Promise<boolean> {
     try {
-      const plugin = await loadPlugin();
+      const { plugin } = await loadPlugin();
       const res = await plugin.isAvailable();
       // Require both a usable biometric AND a secure lock screen (so the Keystore
       // key is actually hardware-protected). `deviceIsSecure` is treated as
@@ -75,13 +83,13 @@ export const nativeBiometricStore: BiometricStore = {
   },
 
   async setKey(key: Uint8Array): Promise<void> {
-    const plugin = await loadPlugin();
+    const { plugin } = await loadPlugin();
     await plugin.setCredentials({ username: USERNAME, password: keyToCredential(key), server: SERVER });
   },
 
   async getKey(): Promise<Uint8Array | null> {
     try {
-      const plugin = await loadPlugin();
+      const { plugin } = await loadPlugin();
       // The biometric prompt. Rejects on cancel / lockout / no-hardware.
       await plugin.verifyIdentity({
         reason: 'Unlock your Lantern wallet',
@@ -98,7 +106,7 @@ export const nativeBiometricStore: BiometricStore = {
 
   async clearKey(): Promise<void> {
     try {
-      const plugin = await loadPlugin();
+      const { plugin } = await loadPlugin();
       await plugin.deleteCredentials({ server: SERVER });
     } catch {
       /* nothing stored — already clear */
