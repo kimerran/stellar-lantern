@@ -32,11 +32,12 @@ describe('FLAGS defaults', () => {
     expect(FLAGS.earnBlend).toBe(true);
     expect(FLAGS.anchors).toBe(true);
     expect(FLAGS.miniapps).toBe(true);
+    // Biometric unlock (#23 M2a) is ON: active on Android, inert on web/extension.
+    expect(FLAGS.biometricUnlock).toBe(true);
   });
 
   it('defaults external / unfinished / demo features OFF', () => {
     expect(FLAGS.swapAggregator).toBe(false);
-    expect(FLAGS.biometricUnlock).toBe(false);
     expect(FLAGS.geovelocity).toBe(false);
     expect(FLAGS.demoAffordances).toBe(false);
   });

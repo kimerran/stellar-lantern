@@ -58,7 +58,7 @@ and every flag is documented in [`.env.example`](.env.example).
 | `SWAP_AGGREGATOR` | Soroswap aggregator (not built) | **OFF** |
 | `EARN_BLEND` | Earn / Blend supply-withdraw | **ON** |
 | `ANCHORS` | Cash in / Cash out (SEP-24) | **ON** |
-| `BIOMETRIC_UNLOCK` | Biometric unlock surface (#23 M2a, in progress) | **OFF** |
+| `BIOMETRIC_UNLOCK` | Biometric unlock (#23 M2a) — active on Android, inert on web/extension | **ON** |
 | `GEOVELOCITY` | Impossible-travel risk signal (needs a Cloudflare Worker) | **OFF** |
 | `MINIAPPS` | dApp mini-apps browser | **ON** |
 | `DEMO_AFFORDANCES` | `forceScenario` + the demo deny-list (demo only) | **OFF** |
