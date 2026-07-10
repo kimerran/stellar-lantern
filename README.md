@@ -62,6 +62,7 @@ and every flag is documented in [`.env.example`](.env.example).
 | `GEOVELOCITY` | Impossible-travel risk signal (needs a Cloudflare Worker) | **OFF** |
 | `MINIAPPS` | dApp mini-apps browser | **ON** |
 | `DEMO_AFFORDANCES` | `forceScenario` + the demo deny-list (demo only) | **OFF** |
+| `PASSKEY` | Passkey smart accounts — seed-phrase-free Soroban account (#53, testnet) | **OFF** |
 
 Read a flag's **behavior** via `FLAGS.<name>` (`src/shared/flags.ts`); for code
 that must **tree-shake** (strip an import), guard it with the matching
