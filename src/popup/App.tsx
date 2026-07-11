@@ -184,7 +184,9 @@ export function App() {
               address={address}
               network={network}
               onSend={() => setTab('send')}
+              onReceive={() => setReceiveOpen(true)}
               onSwap={() => setSwapOpen(true)}
+              onEarn={() => setTab('earn')}
             />
           )}
           {tab === 'earn' && <Earn address={address} network={network} embedded />}
