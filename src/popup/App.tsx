@@ -39,10 +39,8 @@ export function App() {
   const [scanOpen, setScanOpen] = useState(false);
   const [guardiansOpen, setGuardiansOpen] = useState(false);
   const [cashOpen, setCashOpen] = useState(false);
-  const [activityOpen, setActivityOpen] = useState(false);
   const [swapOpen, setSwapOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const showToast = useToast();
 
   if (!status || !settings) return <Splash />;
@@ -112,11 +110,6 @@ export function App() {
     return <CashInOut address={address} network={network} onBack={() => setCashOpen(false)} />;
   }
 
-  // Full-screen Activity (transaction history) overlay — opened from the app bar.
-  if (activityOpen) {
-    return <Activity address={address} network={network} onBack={() => setActivityOpen(false)} />;
-  }
-
   // Full-screen Swap (SDEX path-payment) overlay.
   if (swapOpen) {
     return <Swap address={address} network={network} onBack={() => setSwapOpen(false)} />;
@@ -127,51 +120,12 @@ export function App() {
     return <Receive address={address} onBack={() => setReceiveOpen(false)} />;
   }
 
-  // Full-screen Settings / account hub (#110) — the home for everything that
-  // used to crowd the app bar's icon row, grouped with progressive disclosure.
-  if (settingsOpen) {
-    return (
-      <Settings
-        address={address}
-        settings={settings}
-        onBack={() => setSettingsOpen(false)}
-        onCopyAddress={copyAddress}
-        onOpenReceive={() => {
-          setSettingsOpen(false);
-          setReceiveOpen(true);
-        }}
-        onOpenActivity={() => {
-          setSettingsOpen(false);
-          setActivityOpen(true);
-        }}
-        onOpenGuardians={() => {
-          setSettingsOpen(false);
-          setGuardiansOpen(true);
-        }}
-        onOpenScan={() => {
-          setSettingsOpen(false);
-          setScanOpen(true);
-        }}
-        onOpenCashInOut={() => {
-          setSettingsOpen(false);
-          setCashOpen(true);
-        }}
-        onLock={lock}
-        setNetwork={setNetwork}
-        setAutoLock={setAutoLock}
-        setHorizonOverrides={setHorizonOverrides}
-        setRpcOverrides={setRpcOverrides}
-      />
-    );
-  }
-
   return (
     <div className="flex h-full flex-col bg-background">
       <AppBar
         address={address}
         network={settings.network}
         onCopyAddress={copyAddress}
-        onOpenSettings={() => setSettingsOpen(true)}
         onExpand={isExpanded || isNativePlatform() ? undefined : openExpanded}
       />
 
@@ -194,17 +148,33 @@ export function App() {
             <Send
               address={address}
               network={network}
-              onDone={() => {
-                setTab('assets');
-                setActivityOpen(true);
-              }}
+              onDone={() => setTab('activity')}
             />
           )}
           {tab === 'apps' && <Apps address={address} network={settings.network} />}
+          {tab === 'activity' && <Activity address={address} network={network} embedded />}
+          {tab === 'settings' && (
+            <Settings
+              address={address}
+              settings={settings}
+              embedded
+              onCopyAddress={copyAddress}
+              onOpenReceive={() => setReceiveOpen(true)}
+              onOpenGuardians={() => setGuardiansOpen(true)}
+              onOpenScan={() => setScanOpen(true)}
+              onOpenCashInOut={() => setCashOpen(true)}
+              onLock={lock}
+              setNetwork={setNetwork}
+              setAutoLock={setAutoLock}
+              setHorizonOverrides={setHorizonOverrides}
+              setRpcOverrides={setRpcOverrides}
+            />
+          )}
         </div>
       </main>
 
-      <BottomNav active={tab} onChange={setTab} />
+      {/* Send/Earn are Home sub-views, so keep Home highlighted while they're open. */}
+      <BottomNav active={tab === 'send' || tab === 'earn' ? 'assets' : tab} onChange={setTab} />
     </div>
   );
 }

@@ -7,17 +7,17 @@ interface AppBarProps {
   address: string;
   network: NetworkId;
   onCopyAddress: () => void;
-  onOpenSettings: () => void;
   /** When provided (popup mode), shows an "open in full tab" button. */
   onExpand?: () => void;
 }
 
-// Top app bar (BRAND §4.3): decluttered to identity + network badge + a single
-// gear → Settings entry (#110). The old six-icon action row (Receive · Activity ·
-// Cash · Guardians · Security · Lock) now lives, grouped, in the Settings hub.
-// The network badge stays always-visible for the BRAND §8 testnet/mainnet
-// distinction, but is display-only — the toggle moved into Settings › Network.
-export function AppBar({ address, network, onCopyAddress, onOpenSettings, onExpand }: AppBarProps) {
+// Top app bar (BRAND §4.3): decluttered to just identity + network badge (#110).
+// The old six-icon action row (Receive · Activity · Cash · Guardians · Security ·
+// Lock) is re-homed into the Settings hub, which is now a bottom-nav tab; the
+// everyday actions lead the Home screen. The network badge stays always-visible
+// for the BRAND §8 testnet/mainnet distinction, but is display-only — the toggle
+// lives in Settings › Network.
+export function AppBar({ address, network, onCopyAddress, onExpand }: AppBarProps) {
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 bg-surface-container-low px-2">
       <div className="ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-container/20">
@@ -46,14 +46,6 @@ export function AppBar({ address, network, onCopyAddress, onOpenSettings, onExpa
             <Icon name="open_in_full" size={20} />
           </button>
         )}
-        <button
-          onClick={onOpenSettings}
-          aria-label="Settings"
-          title="Settings"
-          className="flex h-11 w-11 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-variant hover:text-on-surface active:scale-95"
-        >
-          <Icon name="settings" size={20} />
-        </button>
       </div>
     </header>
   );
