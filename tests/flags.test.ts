@@ -34,10 +34,12 @@ describe('FLAGS defaults', () => {
     expect(FLAGS.miniapps).toBe(true);
     // Biometric unlock (#23 M2a) is ON: active on Android, inert on web/extension.
     expect(FLAGS.biometricUnlock).toBe(true);
+    // Soroswap aggregator (#71) is ON: fail-soft — inert without an API key, so it
+    // falls back to the native SDEX engine until VITE_SOROSWAP_API_KEY is set.
+    expect(FLAGS.swapAggregator).toBe(true);
   });
 
   it('defaults external / unfinished / demo features OFF', () => {
-    expect(FLAGS.swapAggregator).toBe(false);
     expect(FLAGS.geovelocity).toBe(false);
     expect(FLAGS.demoAffordances).toBe(false);
   });
