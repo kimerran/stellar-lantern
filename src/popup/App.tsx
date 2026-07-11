@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useWallet } from './hooks/useWallet';
 import { useSettings } from './hooks/useSettings';
-import { NETWORKS } from '@shared/constants';
+import { resolveNetworkConfig } from '@shared/network';
 import { isNativePlatform } from '@shared/kv';
 import { AppBar } from './components/AppBar';
 import { BottomNav, type Tab } from './components/BottomNav';
@@ -21,6 +21,7 @@ import { Guardians } from './screens/Guardians';
 import { CashInOut } from './screens/CashInOut';
 import { Earn } from './screens/Earn';
 import { Receive } from './screens/Receive';
+import { Settings } from './screens/Settings';
 
 function Splash() {
   return (
@@ -32,7 +33,7 @@ function Splash() {
 
 export function App() {
   const { status, refresh, lock } = useWallet();
-  const { settings, toggleNetwork } = useSettings();
+  const { settings, setNetwork, setAutoLock, setHorizonOverrides, setRpcOverrides } = useSettings();
   const { passkeyAccount, refresh: refreshPasskey } = usePasskeyAccount();
   const [tab, setTab] = useState<Tab>('assets');
   const [scanOpen, setScanOpen] = useState(false);
@@ -41,6 +42,7 @@ export function App() {
   const [activityOpen, setActivityOpen] = useState(false);
   const [swapOpen, setSwapOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const showToast = useToast();
 
   if (!status || !settings) return <Splash />;
@@ -55,7 +57,7 @@ export function App() {
     }
   }
 
-  const network = NETWORKS[settings.network];
+  const network = resolveNetworkConfig(settings);
 
   // Onboarding — no wallet yet.
   if (!status.initialized) {
@@ -125,19 +127,51 @@ export function App() {
     return <Receive address={address} onBack={() => setReceiveOpen(false)} />;
   }
 
+  // Full-screen Settings / account hub (#110) — the home for everything that
+  // used to crowd the app bar's icon row, grouped with progressive disclosure.
+  if (settingsOpen) {
+    return (
+      <Settings
+        address={address}
+        settings={settings}
+        onBack={() => setSettingsOpen(false)}
+        onCopyAddress={copyAddress}
+        onOpenReceive={() => {
+          setSettingsOpen(false);
+          setReceiveOpen(true);
+        }}
+        onOpenActivity={() => {
+          setSettingsOpen(false);
+          setActivityOpen(true);
+        }}
+        onOpenGuardians={() => {
+          setSettingsOpen(false);
+          setGuardiansOpen(true);
+        }}
+        onOpenScan={() => {
+          setSettingsOpen(false);
+          setScanOpen(true);
+        }}
+        onOpenCashInOut={() => {
+          setSettingsOpen(false);
+          setCashOpen(true);
+        }}
+        onLock={lock}
+        setNetwork={setNetwork}
+        setAutoLock={setAutoLock}
+        setHorizonOverrides={setHorizonOverrides}
+        setRpcOverrides={setRpcOverrides}
+      />
+    );
+  }
+
   return (
     <div className="flex h-full flex-col bg-background">
       <AppBar
         address={address}
         network={settings.network}
-        onToggleNetwork={toggleNetwork}
-        onLock={lock}
         onCopyAddress={copyAddress}
-        onOpenReceive={() => setReceiveOpen(true)}
-        onOpenScan={() => setScanOpen(true)}
-        onOpenGuardians={() => setGuardiansOpen(true)}
-        onOpenCashInOut={() => setCashOpen(true)}
-        onOpenActivity={() => setActivityOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
         onExpand={isExpanded || isNativePlatform() ? undefined : openExpanded}
       />
 

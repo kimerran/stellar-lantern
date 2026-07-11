@@ -31,6 +31,12 @@ let autoLockTimer: ReturnType<typeof setTimeout> | null = null;
 async function armAutoLock(): Promise<void> {
   if (autoLockTimer) clearTimeout(autoLockTimer);
   const { autoLockMinutes } = await getSettings();
+  // 0 / non-positive means "never auto-lock" — arming setTimeout(0) would lock
+  // the wallet immediately, so leave the timer disarmed instead.
+  if (!(autoLockMinutes > 0)) {
+    autoLockTimer = null;
+    return;
+  }
   autoLockTimer = setTimeout(() => lock(), autoLockMinutes * 60_000);
 }
 
