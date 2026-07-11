@@ -38,4 +38,9 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Biometric unlock (#23 M2a / #94): BiometricPrompt via
+         @capgo/capacitor-native-biometric. USE_BIOMETRIC covers API 28+;
+         USE_FINGERPRINT is the legacy fallback for API 23–27. -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <uses-permission android:name="android.permission.USE_FINGERPRINT" />
 </manifest>
