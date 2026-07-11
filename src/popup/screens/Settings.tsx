@@ -12,10 +12,12 @@ import { useToast } from '../components/Toast';
 interface Props {
   address: string;
   settings: SettingsType;
-  onBack: () => void;
+  /** Overlay mode: back header returns here. Omitted when embedded as a tab. */
+  onBack?: () => void;
+  /** Rendered inline inside a bottom-nav tab (no full-screen chrome). */
+  embedded?: boolean;
   onCopyAddress: () => void;
   onOpenReceive: () => void;
-  onOpenActivity: () => void;
   onOpenGuardians: () => void;
   onOpenScan: () => void;
   onOpenCashInOut: () => void;
@@ -47,9 +49,9 @@ export function Settings({
   address,
   settings,
   onBack,
+  embedded,
   onCopyAddress,
   onOpenReceive,
-  onOpenActivity,
   onOpenGuardians,
   onOpenScan,
   onOpenCashInOut,
@@ -59,10 +61,8 @@ export function Settings({
   setHorizonOverrides,
   setRpcOverrides,
 }: Props) {
-  return (
-    <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="Settings" onBack={onBack} />
-      <main className="no-scrollbar flex-1 overflow-y-auto px-4 pb-8">
+  const content = (
+    <>
         <Section title="Account">
           <button
             onClick={onCopyAddress}
@@ -79,8 +79,6 @@ export function Settings({
           </button>
           <Divider />
           <NavRow icon="qr_code_2" label="Receive" hint="Address & QR code" onClick={onOpenReceive} />
-          <Divider />
-          <NavRow icon="history" label="Activity" hint="Transaction history" onClick={onOpenActivity} />
         </Section>
 
         <Section title="Security">
@@ -120,7 +118,24 @@ export function Settings({
             <span className="flex-1 text-body-md">Lock wallet</span>
           </button>
         </Section>
-      </main>
+    </>
+  );
+
+  // Embedded as a bottom-nav tab: App provides the app bar + scroll container.
+  if (embedded) {
+    return (
+      <div className="pb-4">
+        <h1 className="px-1 pt-1 text-title-md text-on-surface">Settings</h1>
+        {content}
+      </div>
+    );
+  }
+
+  // Overlay mode: full-screen with a back header.
+  return (
+    <div className="flex h-full flex-col bg-background">
+      <ScreenHeader title="Settings" onBack={onBack} />
+      <main className="no-scrollbar flex-1 overflow-y-auto px-4 pb-8">{content}</main>
     </div>
   );
 }
@@ -300,7 +315,7 @@ function AdvancedEndpoints({
   );
 }
 
-function ScreenHeader({ title, onBack }: { title: string; onBack: () => void }) {
+function ScreenHeader({ title, onBack }: { title: string; onBack?: () => void }) {
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 bg-surface-container-low px-2">
       <button

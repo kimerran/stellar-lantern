@@ -1,12 +1,15 @@
 import { Icon } from './Icon';
 
-export type Tab = 'assets' | 'earn' | 'send' | 'apps';
+// 'earn' / 'send' are reached as Home quick-actions (#110 slice 2), not nav tabs,
+// so they're valid view states but absent from the bottom-nav item set below.
+export type Tab = 'assets' | 'apps' | 'activity' | 'settings' | 'earn' | 'send';
 
+// Final action-forward nav (#110 slice 3): Home · Apps · Activity · Settings.
 const ITEMS: { tab: Tab; label: string; icon: string }[] = [
-  { tab: 'assets', label: 'Assets', icon: 'account_balance_wallet' },
-  { tab: 'earn', label: 'Earn', icon: 'savings' },
-  { tab: 'send', label: 'Send', icon: 'send' },
+  { tab: 'assets', label: 'Home', icon: 'home' },
   { tab: 'apps', label: 'Apps', icon: 'grid_view' },
+  { tab: 'activity', label: 'Activity', icon: 'history' },
+  { tab: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
 // Bottom nav (BRAND §4.3 / §6.6). Active item = amber pill with glow + filled icon.
