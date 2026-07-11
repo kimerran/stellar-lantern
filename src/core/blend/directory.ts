@@ -31,6 +31,13 @@ export interface BlendPool {
   reserves: BlendReserve[];
   /** Curated/verified in the demo directory (shows a badge). */
   verified: boolean;
+  /**
+   * A Lantern-OPERATED pool (deployed by us via the Blend factory) — as opposed
+   * to a third-party Blend pool we merely list (#109). Drives the "Lantern"
+   * branding badge and first-in-list ordering in the Earn picker, so users see
+   * our pool as ours. Absent/false = a listed third-party pool.
+   */
+  lantern?: boolean;
 }
 
 // Blend v2 testnet reserve assets (blend-utils testnet.contracts.json), confirmed
@@ -39,6 +46,28 @@ const TESTNET_USDC = 'CAQCFVLOBK5GIULPNZRGATJJMIZL5BSP7X5YJVMGCPTUEPFM4AVSRCJU';
 const TESTNET_XLM = 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC';
 
 export const BLEND_POOLS: BlendPool[] = [
+  {
+    // Lantern's OWN Blend pool (#109): deployed by us via the Blend v2 factory
+    // (poolFactoryV2 CDV6RX4C…) with curated USDC + XLM reserves, using the
+    // shared testnet oracle. Both reserves validated live against
+    // soroban-testnet `get_reserve`, and supply/withdraw round-tripped through
+    // the pool `submit` entrypoint. Re-deploy with scripts/deploy-lantern-pool.sh
+    // and update this poolId after a testnet reset (deployments are reset
+    // periodically). Deployed tx: 836a0efc… (supply), status set to on-ice(3)
+    // so supply/withdraw (Earn) are enabled without a backstop (borrow is not in
+    // scope). Mainnet is intentionally OMITTED until a real mainnet pool exists —
+    // no placeholder address ships.
+    id: 'lantern-earn',
+    name: 'Lantern Earn',
+    network: 'testnet',
+    poolId: 'CC4KSBTTPCKZUYBXB47SSZGXTKO6G23Y6LJOIR6YCOJVTGJZEYJCHBOH',
+    reserves: [
+      { code: 'USDC', assetId: TESTNET_USDC, decimals: 7 },
+      { code: 'XLM', assetId: TESTNET_XLM, decimals: 7 },
+    ],
+    verified: true,
+    lantern: true,
+  },
   {
     id: 'blend-v2-testnet',
     name: 'Blend V2 Testnet Pool',
@@ -57,7 +86,11 @@ export function findBlendPool(id: string): BlendPool | undefined {
 }
 
 export function blendPoolsForNetwork(network: BlendPool['network']): BlendPool[] {
-  return BLEND_POOLS.filter((p) => p.network === network);
+  // Lantern's own pools sort first so they read as the primary, branded option
+  // above any listed third-party pools (#109). Stable within each group.
+  return BLEND_POOLS.filter((p) => p.network === network).sort(
+    (a, b) => Number(Boolean(b.lantern)) - Number(Boolean(a.lantern)),
+  );
 }
 
 /** Look up a reserve in a pool by asset code (case-insensitive). */
