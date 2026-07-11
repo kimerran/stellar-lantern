@@ -1,13 +1,17 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { crx } from '@crxjs/vite-plugin';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { fileURLToPath, URL } from 'node:url';
 import manifest from './manifest.config';
+import { flagDefines } from './vite.flags';
 
 // stellar-sdk / bip39 / stellar-hd-wallet expect Node globals (Buffer, process).
 // node-polyfills supplies them for the browser/service-worker bundle.
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  // Build-time feature flags (#81): inline `__FEATURE_*__` so disabled features
+  // dead-code-eliminate. Same helper as vite.config.mobile.ts (no drift).
+  define: flagDefines(loadEnv(mode, process.cwd(), 'VITE_FEATURE_')),
   plugins: [
     react(),
     nodePolyfills({ globals: { Buffer: true, global: true, process: true } }),
@@ -29,4 +33,4 @@ export default defineConfig({
     target: 'esnext',
     sourcemap: true,
   },
-});
+}));

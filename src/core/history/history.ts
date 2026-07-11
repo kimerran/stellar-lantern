@@ -86,6 +86,27 @@ export function toHistoryItem(op: RawOperation, walletAddress: string): HistoryI
   };
 }
 
+// Distinct addresses the wallet most recently *sent* to, newest first — powers
+// the Send screen's recent-recipients shortcut. Considers only successful
+// outgoing operations (payments + account creations); ignores incoming, swaps
+// (no single clear recipient), failures, and missing counterparties. Pure so it
+// can be unit-tested and reused off any already-decoded history page.
+export function recentRecipients(items: HistoryItem[], limit = 3): string[] {
+  const sorted = [...items].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const seen = new Set<string>();
+  const recipients: string[] = [];
+  for (const item of sorted) {
+    if (!item.successful) continue;
+    if (item.direction !== 'sent' && item.direction !== 'create') continue;
+    const addr = item.counterparty;
+    if (!addr || seen.has(addr)) continue;
+    seen.add(addr);
+    recipients.push(addr);
+    if (recipients.length >= limit) break;
+  }
+  return recipients;
+}
+
 // Fetch one page of payment-type operations, newest first. Pass a cursor for
 // pagination (Load More).
 export async function fetchHistory(

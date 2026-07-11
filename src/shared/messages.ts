@@ -7,6 +7,8 @@ export type WalletStatus = {
   initialized: boolean; // a vault exists in storage
   locked: boolean; // no unlocked session in the worker
   address: string | null;
+  biometricEnabled: boolean; // biometric unlock has been enrolled on this device
+  biometricAvailable: boolean; // the platform offers a biometric-gated store
 };
 
 export type Request =
@@ -15,16 +17,31 @@ export type Request =
   | { type: 'CREATE_WALLET'; mnemonic: string; password: string }
   | { type: 'IMPORT_WALLET'; input: string; password: string }
   | { type: 'UNLOCK'; password: string }
+  // Biometric unlock (#23 M2a): enrol with the just-verified password, unlock via
+  // the device biometric prompt, or turn it off. Enrolment re-checks the password.
+  | { type: 'ENABLE_BIOMETRIC'; password: string }
+  | { type: 'BIOMETRIC_UNLOCK' }
+  | { type: 'DISABLE_BIOMETRIC' }
   | { type: 'LOCK' }
   | { type: 'PING' } // resets the auto-lock idle timer
   | { type: 'SIGN_AND_SUBMIT'; xdr: string; networkPassphrase: string; horizonUrl: string }
+  | { type: 'SIGN_ONLY'; xdr: string; networkPassphrase: string }
+  | { type: 'SUBMIT_ONLY'; xdr: string; networkPassphrase: string; horizonUrl: string }
   | { type: 'SIGN_MESSAGE'; message: string }
   | { type: 'RESET_WALLET' };
 
 // Every response is a Result so the UI can branch on success without try/catch.
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string; code?: ErrorCode };
 
-export type ErrorCode = 'LOCKED' | 'BAD_PASSWORD' | 'NOT_INITIALIZED' | 'VALIDATION' | 'NETWORK';
+export type ErrorCode =
+  | 'LOCKED'
+  | 'BAD_PASSWORD'
+  | 'NOT_INITIALIZED'
+  | 'VALIDATION'
+  | 'NETWORK'
+  | 'NOT_ENROLLED' // biometric unlock isn't set up
+  | 'BIOMETRIC_CANCELLED' // the biometric prompt was dismissed / unavailable
+  | 'BIOMETRIC_FAILED'; // enrolled but the stored key no longer matches (re-enrol)
 
 export type ResponseMap = {
   GET_STATUS: WalletStatus;
@@ -32,9 +49,14 @@ export type ResponseMap = {
   CREATE_WALLET: { address: string };
   IMPORT_WALLET: { address: string };
   UNLOCK: { address: string };
+  ENABLE_BIOMETRIC: { ok: true };
+  BIOMETRIC_UNLOCK: { address: string };
+  DISABLE_BIOMETRIC: { ok: true };
   LOCK: { ok: true };
   PING: { ok: true };
   SIGN_AND_SUBMIT: { hash: string };
+  SIGN_ONLY: { signedXdr: string };
+  SUBMIT_ONLY: { hash: string };
   SIGN_MESSAGE: { signature: string };
   RESET_WALLET: { ok: true };
 };

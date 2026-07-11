@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { toHistoryItem, type RawOperation } from '@core/history/history';
+import { toHistoryItem, recentRecipients, type RawOperation } from '@core/history/history';
+import type { HistoryItem } from '@shared/types';
 
 const ME = 'GDRXE2BQUC3AZNPVFSCEZ76NJ3WWL25FYFK6RGZGIEKWE4SOOHSUJUJ6';
 const OTHER = 'GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ';
+const A = 'GABC000000000000000000000000000000000000000000000000000A';
+const B = 'GDEF000000000000000000000000000000000000000000000000000B';
 
 const base = {
   id: '1',
@@ -51,5 +54,61 @@ describe('toHistoryItem direction classification', () => {
     const item = toHistoryItem(op, ME);
     expect(item.direction).toBe('swap');
     expect(item.title).toBe('Swap');
+  });
+});
+
+function historyItem(overrides: Partial<HistoryItem>): HistoryItem {
+  return {
+    id: '1',
+    hash: 'h',
+    direction: 'sent',
+    title: 'Sent XLM',
+    counterparty: OTHER,
+    amount: '1',
+    signedAmount: '-1',
+    assetCode: 'XLM',
+    createdAt: '2023-01-01T00:00:00Z',
+    successful: true,
+    ...overrides,
+  };
+}
+
+describe('recentRecipients', () => {
+  it('returns distinct sent-to addresses, newest first', () => {
+    const items = [
+      historyItem({ counterparty: A, createdAt: '2023-03-01T00:00:00Z' }),
+      historyItem({ counterparty: B, createdAt: '2023-02-01T00:00:00Z' }),
+      historyItem({ counterparty: A, createdAt: '2023-01-01T00:00:00Z' }), // older duplicate
+    ];
+    expect(recentRecipients(items)).toEqual([A, B]);
+  });
+
+  it('sorts by createdAt regardless of input order', () => {
+    const items = [
+      historyItem({ counterparty: A, createdAt: '2023-01-01T00:00:00Z' }),
+      historyItem({ counterparty: B, createdAt: '2023-05-01T00:00:00Z' }),
+      historyItem({ counterparty: A, createdAt: '2023-04-01T00:00:00Z' }),
+    ];
+    expect(recentRecipients(items)).toEqual([B, A]);
+  });
+
+  it('includes outgoing account creations but ignores incoming, swaps, and failures', () => {
+    const items = [
+      historyItem({ direction: 'create', counterparty: A, createdAt: '2023-04-01T00:00:00Z' }),
+      historyItem({ direction: 'received', counterparty: B, createdAt: '2023-03-01T00:00:00Z' }),
+      historyItem({ direction: 'swap', counterparty: B, createdAt: '2023-02-01T00:00:00Z' }),
+      historyItem({ direction: 'sent', counterparty: B, successful: false, createdAt: '2023-01-01T00:00:00Z' }),
+    ];
+    expect(recentRecipients(items)).toEqual([A]);
+  });
+
+  it('skips null counterparties and respects the limit', () => {
+    const items = [
+      historyItem({ counterparty: A, createdAt: '2023-05-01T00:00:00Z' }),
+      historyItem({ counterparty: null, createdAt: '2023-04-01T00:00:00Z' }),
+      historyItem({ counterparty: B, createdAt: '2023-03-01T00:00:00Z' }),
+      historyItem({ counterparty: OTHER, createdAt: '2023-02-01T00:00:00Z' }),
+    ];
+    expect(recentRecipients(items, 2)).toEqual([A, B]);
   });
 });

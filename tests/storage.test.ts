@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { __setKV, type KV } from '@shared/kv';
-import { getVault, setVault, clearVault, getSettings, setSettings } from '@shared/storage';
-import type { StoredVault } from '@shared/types';
+import { getVault, setVault, clearVault, getSettings, setSettings, onSettingsChanged } from '@shared/storage';
+import type { Settings, StoredVault } from '@shared/types';
 
 function memoryKV(): KV {
   const store = new Map<string, string>();
@@ -69,5 +69,35 @@ describe('storage over the kv port', () => {
     const next = await setSettings({ network: 'PUBLIC' });
     expect(next.network).toBe('PUBLIC');
     expect((await getSettings()).network).toBe('PUBLIC');
+  });
+});
+
+describe('onSettingsChanged: in-process fan-out on native', () => {
+  beforeEach(() => {
+    (globalThis as any).Capacitor = { isNativePlatform: () => true };
+    __setKV(memoryKV());
+  });
+  afterEach(() => {
+    delete (globalThis as any).Capacitor;
+    __setKV(null);
+  });
+
+  it('notifies subscribers with the new settings when they change', async () => {
+    const seen: Settings[] = [];
+    onSettingsChanged((s) => seen.push(s));
+    await setSettings({ network: 'PUBLIC' });
+    expect(seen.at(-1)?.network).toBe('PUBLIC');
+    await setSettings({ autoLockMinutes: 5 });
+    expect(seen.at(-1)).toMatchObject({ network: 'PUBLIC', autoLockMinutes: 5 });
+    expect(seen).toHaveLength(2);
+  });
+
+  it('stops notifying after unsubscribe', async () => {
+    const seen: Settings[] = [];
+    const unsubscribe = onSettingsChanged((s) => seen.push(s));
+    await setSettings({ network: 'PUBLIC' });
+    unsubscribe();
+    await setSettings({ network: 'TESTNET' });
+    expect(seen).toHaveLength(1);
   });
 });

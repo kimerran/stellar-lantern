@@ -1,0 +1,105 @@
+name: Release build (main)
+
+# On every merge to main (the release branch), build all *working* features into
+# the shipped artifacts: the Chrome extension zip + the Android APK. "Working"
+# is defined by the build-time feature flags (#81) — shipped-core ON, and
+# anything external / unfinished / demo-only OFF so it dead-code-eliminates out
+# of a release build. android.yml stays the per-PR check; this is the main build.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A newer push to main supersedes an in-flight release build.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+# Working-feature flag set for the release build. Set explicitly (not relying on
+# the source defaults) so what ships from main is reproducible and reviewable
+# here. Flip a flag ON once its feature is verified end-to-end.
+env:
+  VITE_FEATURE_SWAP: 'true'            # in-wallet swaps (#71) — shipped
+  VITE_FEATURE_EARN_BLEND: 'true'      # Blend supply/withdraw (#21) — shipped
+  VITE_FEATURE_ANCHORS: 'true'         # SEP-24 cash in/out (#24) — shipped
+  VITE_FEATURE_MINIAPPS: 'true'        # dApp mini-apps — shipped
+  VITE_FEATURE_SWAP_AGGREGATOR: 'true' # Soroswap aggregator (#71) — on; needs SOROSWAP_API_KEY secret, else falls back to native SDEX
+  VITE_FEATURE_BIOMETRIC_UNLOCK: 'true'  # #23 M2a — active on Android; inert on web (store unavailable)
+  VITE_FEATURE_GEOVELOCITY: 'false'    # #70 — no code (closed not-planned)
+  VITE_FEATURE_DEMO_AFFORDANCES: 'false' # demo-only bits — never in a release build
+  VITE_FEATURE_PASSKEY: 'false'        # #53 — passkey smart accounts; experimental, testnet-only, off in release
+  # Soroswap aggregator config (values/secrets, not feature flags). The API key is
+  # a secret; the referral wallet + fee are optional — revenue share is only
+  # charged when BOTH are set. All unset → the aggregator falls back to native SDEX.
+  VITE_SOROSWAP_API_KEY: ${{ secrets.SOROSWAP_API_KEY }}
+  VITE_SOROSWAP_REFERRAL_ID: ${{ vars.SOROSWAP_REFERRAL_ID }}
+  VITE_SOROSWAP_FEE_BPS: ${{ vars.SOROSWAP_FEE_BPS }}
+
+jobs:
+  release-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Release gates — verify before building the shipped artifacts.
+      - name: Test
+        run: npm test
+
+      - name: Prove disabled features are stripped
+        run: npm run verify:flags
+
+      # ── Chrome extension (dist/ → release/*.zip) ──
+      - name: Build & package extension
+        run: npm run package
+
+      # ── Android APK (dist-mobile/ → app-debug.apk) ──
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle*', 'android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Build mobile web assets
+        run: npm run build:mobile
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build debug APK
+        run: cd android && ./gradlew assembleDebug --no-daemon
+
+      # ── Publish both release artifacts ──
+      - name: Upload extension zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-release
+          path: release/*.zip
+          if-no-files-found: error
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

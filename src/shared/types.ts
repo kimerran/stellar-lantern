@@ -16,10 +16,28 @@ export interface VaultCipher {
   ciphertext: string; // base64 — encrypts the mnemonic/seed
 }
 
+// A passkey smart account (#53): a Soroban contract whose signer is a device
+// passkey. Everything here is PUBLIC (the contract address, the WebAuthn
+// credential id, the public key) — there is no secret to protect, which is the
+// point: the signing key never leaves the authenticator.
+export interface PasskeyAccountRecord {
+  version: 1;
+  network: 'TESTNET'; // passkey accounts are testnet-only for now (friendbot fees)
+  contractId: string; // C… smart-account address
+  credentialId: string; // base64url WebAuthn credential id
+  publicKey: string; // hex, 65-byte SEC1 P-256 public key
+  rpId: string; // relying-party id the credential was registered under
+}
+
 export interface Settings {
   network: NetworkId;
   autoLockMinutes: number;
   horizonOverrides?: { testnet?: string; public?: string };
+  // Mini-app directory "favorites" / installs (#93): a list of MiniApp ids the
+  // user pinned to their "My apps" section. Plain, non-secret metadata — a
+  // bookmark, NOT elevated permissions. Lives in Settings so it live-updates
+  // across surfaces for free via onSettingsChanged.
+  favoriteApps?: string[];
 }
 
 // A single asset balance for display.
@@ -35,6 +53,17 @@ export interface AccountState {
   balances: AssetBalance[];
   // subentry count used for reserve math (native only)
   subentryCount: number;
+}
+
+// An account's on-chain signers + thresholds (for the guardians view).
+export interface AccountSigner {
+  key: string;
+  weight: number;
+}
+export interface AccountThresholds {
+  low: number;
+  med: number;
+  high: number;
 }
 
 export type TxDirection = 'sent' | 'received' | 'swap' | 'create';

@@ -9,7 +9,11 @@ interface AppBarProps {
   onToggleNetwork: () => void;
   onLock: () => void;
   onCopyAddress: () => void;
+  onOpenReceive: () => void;
   onOpenScan: () => void;
+  onOpenGuardians: () => void;
+  onOpenCashInOut: () => void;
+  onOpenActivity: () => void;
   /** When provided (popup mode), shows an "open in full tab" button. */
   onExpand?: () => void;
 }
@@ -21,13 +25,21 @@ export function AppBar({
   onToggleNetwork,
   onLock,
   onCopyAddress,
+  onOpenReceive,
   onOpenScan,
+  onOpenGuardians,
+  onOpenCashInOut,
+  onOpenActivity,
   onExpand,
 }: AppBarProps) {
   const actions = [
     ...(onExpand
       ? [{ onClick: onExpand, icon: 'open_in_full', label: 'Open in full tab', hover: 'hover:text-on-surface' }]
       : []),
+    { onClick: onOpenReceive, icon: 'qr_code_2', label: 'Receive', hover: 'hover:text-primary-container' },
+    { onClick: onOpenActivity, icon: 'history', label: 'Activity', hover: 'hover:text-primary-container' },
+    { onClick: onOpenCashInOut, icon: 'currency_exchange', label: 'Cash in / Cash out', hover: 'hover:text-primary-container' },
+    { onClick: onOpenGuardians, icon: 'shield_person', label: 'Guardians & recovery', hover: 'hover:text-primary-container' },
     { onClick: onOpenScan, icon: 'security', label: 'Security & scam check', hover: 'hover:text-primary-container' },
     { onClick: onLock, icon: 'lock', label: 'Lock wallet', hover: 'hover:text-on-surface' },
   ];

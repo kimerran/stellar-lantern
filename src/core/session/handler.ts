@@ -2,7 +2,15 @@ import '@shared/polyfills'; // must be first — sets Buffer/process/global befo
 import { Keypair, Horizon, TransactionBuilder } from '@stellar/stellar-sdk';
 import type { Request, Result, ResponseMap } from '@shared/messages';
 import { getSettings, getVault, setVault, clearVault } from '@shared/storage';
+import { getKV } from '@shared/kv';
 import { encryptSecret, decryptSecret, WrongPasswordError } from '@core/crypto/vault';
+import {
+  biometricUnlock,
+  enableBiometricUnlock,
+  disableBiometricUnlock,
+  isBiometricEnabled,
+} from '@core/crypto/biometric-unlock';
+import { getBiometricStore } from '@core/crypto/biometric-store';
 import {
   generateMnemonic,
   importFromInput,
@@ -38,6 +46,19 @@ function ok<K extends keyof ResponseMap>(data: ResponseMap[K]): Result<ResponseM
   return { ok: true, data };
 }
 
+// Map a fail-soft biometricUnlock reason to a typed Result the UI branches on to
+// fall back to the password field.
+function biometricFailure(reason: 'not-enrolled' | 'cancelled' | 'failed'): Result<never> {
+  switch (reason) {
+    case 'not-enrolled':
+      return { ok: false, error: 'Biometric unlock isn’t set up.', code: 'NOT_ENROLLED' };
+    case 'cancelled':
+      return { ok: false, error: 'Biometric check was cancelled.', code: 'BIOMETRIC_CANCELLED' };
+    case 'failed':
+      return { ok: false, error: 'Biometric unlock failed — use your password.', code: 'BIOMETRIC_FAILED' };
+  }
+}
+
 async function dispatch(req: Request): Promise<Result<unknown>> {
   switch (req.type) {
     case 'GET_STATUS': {
@@ -46,6 +67,11 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
         initialized: vault !== null,
         locked: session === null,
         address: session?.keypair.publicKey() ?? vault?.address ?? null,
+        // Gated behind BIOMETRIC_UNLOCK (#81): a build with the flag off reports
+        // biometric fully unavailable, so the Unlock screen never offers it —
+        // keeping the in-progress (#23 M2a) surface out of store builds.
+        biometricEnabled: __FEATURE_BIOMETRIC_UNLOCK__ && (await isBiometricEnabled(await getKV())),
+        biometricAvailable: __FEATURE_BIOMETRIC_UNLOCK__ && (await getBiometricStore().isAvailable()),
       });
     }
 
@@ -83,6 +109,36 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
       return ok<'UNLOCK'>({ address: keypair.publicKey() });
     }
 
+    case 'ENABLE_BIOMETRIC': {
+      // Enrol biometric unlock. Re-verify the password against the vault BEFORE
+      // wrapping it, so a wrong password can never be enrolled (decryptSecret
+      // throws WrongPasswordError → BAD_PASSWORD).
+      const vault = await getVault();
+      if (!vault) return { ok: false, error: 'No wallet found.', code: 'NOT_INITIALIZED' };
+      await decryptSecret(vault.cipher, req.password);
+      await enableBiometricUnlock(req.password, { store: getBiometricStore(), kv: await getKV() });
+      return ok<'ENABLE_BIOMETRIC'>({ ok: true });
+    }
+
+    case 'BIOMETRIC_UNLOCK': {
+      const vault = await getVault();
+      if (!vault) return { ok: false, error: 'No wallet found.', code: 'NOT_INITIALIZED' };
+      const result = await biometricUnlock({ store: getBiometricStore(), kv: await getKV() });
+      if (!result.ok) return biometricFailure(result.reason);
+      // Recovered password still runs the normal vault decrypt — a bad envelope
+      // can't yield access.
+      const secret = await decryptSecret(vault.cipher, result.password);
+      const keypair = keypairFromStoredSecret(secret);
+      session = { keypair, unlockedAt: Date.now() };
+      await armAutoLock();
+      return ok<'BIOMETRIC_UNLOCK'>({ address: keypair.publicKey() });
+    }
+
+    case 'DISABLE_BIOMETRIC': {
+      await disableBiometricUnlock({ store: getBiometricStore(), kv: await getKV() });
+      return ok<'DISABLE_BIOMETRIC'>({ ok: true });
+    }
+
     case 'LOCK': {
       lock();
       return ok<'LOCK'>({ ok: true });
@@ -103,6 +159,35 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
       const server = new Horizon.Server(req.horizonUrl);
       const res = await server.submitTransaction(tx);
       return ok<'SIGN_AND_SUBMIT'>({ hash: res.hash });
+    }
+
+    case 'SIGN_ONLY': {
+      if (!session) {
+        return { ok: false, error: 'Wallet is locked.', code: 'LOCKED' };
+      }
+      await armAutoLock();
+      // Sign but DO NOT submit — hand the signed XDR back to the caller. Any
+      // signatures already on the envelope are preserved (fromXDR keeps them,
+      // sign() appends ours), so this doubles as a co-signing primitive: a
+      // guardian adds their signature to a partially-signed recovery tx without
+      // broadcasting it, and SEP-10 signs a challenge tx that is returned, never
+      // submitted. Consumers: guardian recovery (#23), anchor SEP-10 auth (#24).
+      const tx = TransactionBuilder.fromXDR(req.xdr, req.networkPassphrase);
+      tx.sign(session.keypair);
+      return ok<'SIGN_ONLY'>({ signedXdr: tx.toXDR() });
+    }
+
+    case 'SUBMIT_ONLY': {
+      // Broadcast an ALREADY-signed transaction without adding our signature.
+      // Used by guardian recovery (#23): the recovering device collects K
+      // guardian co-signatures and submits the merged tx — but its own key is
+      // NOT a signer on the account being recovered, so signing here would
+      // attach an unused signature and Horizon would reject the tx
+      // (tx_bad_auth_extra). No unlock needed — this only broadcasts.
+      const tx = TransactionBuilder.fromXDR(req.xdr, req.networkPassphrase);
+      const server = new Horizon.Server(req.horizonUrl);
+      const res = await server.submitTransaction(tx);
+      return ok<'SUBMIT_ONLY'>({ hash: res.hash });
     }
 
     case 'SIGN_MESSAGE': {

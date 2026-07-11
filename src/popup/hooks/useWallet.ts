@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { sendMessage, type WalletStatus } from '@shared/messages';
+import { isNativePlatform } from '@shared/kv';
 
 // Tracks the wallet's lifecycle (initialized / locked / address) by talking to
 // the background worker. The popup NEVER holds the decrypted secret.
@@ -33,6 +34,32 @@ export function useWallet() {
       window.removeEventListener('keydown', ping);
     };
   }, []);
+
+  // On native (Capacitor), lock the moment the app is backgrounded instead of
+  // waiting for the idle timer — the OS can keep the process (and the in-memory
+  // session) alive indefinitely while backgrounded, so the idle window alone
+  // leaves the wallet unlocked behind the app switcher / lock screen.
+  useEffect(() => {
+    if (!isNativePlatform()) return;
+    let cancelled = false;
+    let removeListener: (() => void) | undefined;
+    void (async () => {
+      try {
+        const { App } = await import('@capacitor/app');
+        const handle = await App.addListener('pause', () => {
+          void lock();
+        });
+        if (cancelled) void handle.remove();
+        else removeListener = () => void handle.remove();
+      } catch {
+        /* @capacitor/app unavailable — the idle auto-lock timer still applies */
+      }
+    })();
+    return () => {
+      cancelled = true;
+      removeListener?.();
+    };
+  }, [lock]);
 
   return { status, refresh, lock, setStatus };
 }

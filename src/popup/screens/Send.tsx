@@ -5,7 +5,9 @@ import type { AssetBalance } from '@shared/types';
 import { sendMessage } from '@shared/messages';
 import { getServer, loadAccountState, destinationFunded } from '@core/stellar/client';
 import { buildTransferXdr, computeMaxXlm, memoByteLength, type AssetRef } from '@core/stellar/tx';
+import { fetchHistory, recentRecipients } from '@core/history/history';
 import { isValidPublicKey } from '@core/wallet/wallet';
+import { isNativePlatform } from '@shared/kv';
 import { MAX_MEMO_BYTES } from '@shared/constants';
 import { formatAmount, truncateAddress } from '@shared/format';
 import { scan } from '@core/scan/engine';
@@ -16,6 +18,7 @@ import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { ScanBadge } from '../components/ScanBadge';
 import { RiskCallout } from '../components/RiskCallout';
+import { HoldToConfirm } from '../components/HoldToConfirm';
 
 interface Props {
   address: string;
@@ -40,6 +43,7 @@ export function Send({ address, network, onDone }: Props) {
   const [subentryCount, setSubentryCount] = useState(0);
 
   const [to, setTo] = useState('');
+  const [recipients, setRecipients] = useState<string[]>([]);
   const [assetKey, setAssetKey] = useState('XLM');
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
@@ -76,6 +80,22 @@ export function Send({ address, network, onDone }: Props) {
       setBalances(s.balances);
       setSubentryCount(s.subentryCount);
     });
+  }, [network, address]);
+
+  // Recent recipients shortcut — derived from decoded tx history. Best-effort:
+  // an unfunded account (no history) or a network hiccup just yields no chips.
+  useEffect(() => {
+    let cancelled = false;
+    void fetchHistory(network, address)
+      .then((page) => {
+        if (!cancelled) setRecipients(recentRecipients(page.items).filter((r) => r !== address));
+      })
+      .catch(() => {
+        /* no history available — show no shortcuts */
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [network, address]);
 
   const selected = useMemo(
@@ -234,7 +254,9 @@ export function Send({ address, network, onDone }: Props) {
   // ── Review (with Lantern scan) ──
   if (step === 'review' && review) {
     const isHigh = verdict?.action === 'block_confirm';
-    const acknowledged = !isHigh || confirmText.trim().toUpperCase() === 'CONFIRM';
+    // Mobile replaces the typed-CONFIRM gate with a press-and-hold button.
+    const native = isNativePlatform();
+    const acknowledged = !isHigh || native || confirmText.trim().toUpperCase() === 'CONFIRM';
 
     return (
       <div className="space-y-4 pt-2">
@@ -287,8 +309,9 @@ export function Send({ address, network, onDone }: Props) {
           <ReviewRow label="Network" value={network.label} />
         </Card>
 
-        {/* High-risk friction: type-to-confirm (spec §2, §7 Phase 4) */}
-        {isHigh && !scanning && (
+        {/* High-risk friction: type-to-confirm on desktop/extension (spec §2,
+            §7 Phase 4). Mobile uses the press-and-hold button below instead. */}
+        {isHigh && !scanning && !native && (
           <div className="space-y-2">
             <p className="text-label-sm text-error">
               To proceed anyway, type <span className="font-mono font-semibold">CONFIRM</span> below.
@@ -308,17 +331,26 @@ export function Send({ address, network, onDone }: Props) {
         </p>
       )}
 
-        <Button
-          fullWidth
-          onClick={confirm}
-          loading={submitting}
-          disabled={scanning || !acknowledged}
-          variant={isHigh ? 'secondary' : 'primary'}
-          trailingIcon="lock"
-          className={isHigh ? '!border-error/50 !text-error' : ''}
-        >
-          {isHigh ? 'Sign Anyway' : 'Confirm & Send'}
-        </Button>
+        {isHigh && native && !scanning ? (
+          <HoldToConfirm
+            label={submitting ? 'Sending…' : 'Hold to Sign Anyway'}
+            danger
+            onConfirm={confirm}
+            disabled={submitting}
+          />
+        ) : (
+          <Button
+            fullWidth
+            onClick={confirm}
+            loading={submitting}
+            disabled={scanning || !acknowledged}
+            variant={isHigh ? 'secondary' : 'primary'}
+            trailingIcon="lock"
+            className={isHigh ? '!border-error/50 !text-error' : ''}
+          >
+            {isHigh ? 'Sign Anyway' : 'Confirm & Send'}
+          </Button>
+        )}
       </div>
     );
   }
@@ -352,6 +384,30 @@ export function Send({ address, network, onDone }: Props) {
           </button>
         </div>
       </div>
+
+      {/* Recent recipients — one tap to refill the destination. */}
+      {recipients.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-label-sm uppercase tracking-wide text-on-surface-variant">Recent</p>
+          <div className="flex flex-wrap gap-2">
+            {recipients.map((r) => (
+              <button
+                key={r}
+                type="button"
+                aria-label={`Send to recent recipient ${truncateAddress(r, 4, 4)}`}
+                onClick={() => {
+                  setTo(r);
+                  setError(null);
+                }}
+                className="flex items-center gap-1 rounded-full border border-outline-variant px-2.5 py-1 font-mono text-label-sm text-on-surface-variant transition-colors hover:border-primary-container hover:text-on-surface active:scale-95"
+              >
+                <Icon name="history" size={13} />
+                {truncateAddress(r, 4, 4)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Asset selector */}
       <div>

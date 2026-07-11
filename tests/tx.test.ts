@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { Networks, TransactionBuilder } from '@stellar/stellar-sdk';
-import { buildTransferXdr, computeMaxXlm, memoByteLength } from '@core/stellar/tx';
+import { buildSetOptionsXdr, buildTransferXdr, computeMaxXlm, memoByteLength } from '@core/stellar/tx';
+import { decodeTransaction } from '@core/scan/decode';
 
 const SOURCE = 'GDRXE2BQUC3AZNPVFSCEZ76NJ3WWL25FYFK6RGZGIEKWE4SOOHSUJUJ6';
 const DEST = 'GBK4XQYHX7K3X2R7L4K4Z2K3X2R7L4K4Z2K3X2R7L4K4Z2K3X2R7L4K4'; // placeholder
 const DEST_VALID = 'GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ';
+const GUARDIAN = 'GDVEU3DD4KOFECV66VIHWEZOYX4ZKR3WV27L464SIIPOU2IUI3JCZA57';
 
 const common = {
   sourceAccountId: SOURCE,
@@ -58,6 +60,41 @@ describe('buildTransferXdr', () => {
   it('counts memo bytes (not characters)', () => {
     expect(memoByteLength('hello')).toBe(5);
     expect(memoByteLength('héllo')).toBe(6); // é is 2 bytes in UTF-8
+  });
+});
+
+describe('buildSetOptionsXdr', () => {
+  const opts = { ...common };
+
+  it('adds a guardian signer (round-trips through the scan decode)', () => {
+    const xdr = buildSetOptionsXdr({ ...opts, signer: { ed25519PublicKey: GUARDIAN, weight: 1 } });
+    const op = decodeTransaction(xdr, Networks.TESTNET)?.operations[0];
+    expect(op?.type).toBe('setOptions');
+    expect(op?.signerKey).toBe(GUARDIAN);
+    expect(op?.signerWeight).toBe(1);
+  });
+
+  it('removes a signer with weight 0', () => {
+    const xdr = buildSetOptionsXdr({ ...opts, signer: { ed25519PublicKey: GUARDIAN, weight: 0 } });
+    const op = decodeTransaction(xdr, Networks.TESTNET)?.operations[0];
+    expect(op?.signerWeight).toBe(0);
+  });
+
+  it('sets thresholds and master weight, emitting only the changed fields', () => {
+    const xdr = buildSetOptionsXdr({ ...opts, masterWeight: 1, lowThreshold: 1, medThreshold: 2, highThreshold: 2 });
+    const op = decodeTransaction(xdr, Networks.TESTNET)?.operations[0];
+    expect(op).toMatchObject({ masterWeight: 1, lowThreshold: 1, medThreshold: 2, highThreshold: 2 });
+    // A field we didn't set must stay unset (not silently zeroed).
+    expect(op?.signerKey).toBeUndefined();
+  });
+
+  it('throws when no signer or threshold change is requested', () => {
+    expect(() => buildSetOptionsXdr({ ...opts })).toThrow(/at least one/i);
+  });
+
+  it('rejects an out-of-range weight', () => {
+    expect(() => buildSetOptionsXdr({ ...opts, signer: { ed25519PublicKey: GUARDIAN, weight: 300 } })).toThrow(/255/);
+    expect(() => buildSetOptionsXdr({ ...opts, highThreshold: -1 })).toThrow(/between/i);
   });
 });
 
