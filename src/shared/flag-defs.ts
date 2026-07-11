@@ -15,7 +15,7 @@ export interface FlagDef {
 
 export const FLAG_DEFS = {
   swap: { envVar: 'VITE_FEATURE_SWAP', literal: '__FEATURE_SWAP__', default: true },
-  swapAggregator: { envVar: 'VITE_FEATURE_SWAP_AGGREGATOR', literal: '__FEATURE_SWAP_AGGREGATOR__', default: false },
+  swapAggregator: { envVar: 'VITE_FEATURE_SWAP_AGGREGATOR', literal: '__FEATURE_SWAP_AGGREGATOR__', default: true },
   earnBlend: { envVar: 'VITE_FEATURE_EARN_BLEND', literal: '__FEATURE_EARN_BLEND__', default: true },
   anchors: { envVar: 'VITE_FEATURE_ANCHORS', literal: '__FEATURE_ANCHORS__', default: true },
   biometricUnlock: { envVar: 'VITE_FEATURE_BIOMETRIC_UNLOCK', literal: '__FEATURE_BIOMETRIC_UNLOCK__', default: true },
