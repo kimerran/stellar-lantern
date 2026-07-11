@@ -23,10 +23,17 @@ env:
   VITE_FEATURE_EARN_BLEND: 'true'      # Blend supply/withdraw (#21) — shipped
   VITE_FEATURE_ANCHORS: 'true'         # SEP-24 cash in/out (#24) — shipped
   VITE_FEATURE_MINIAPPS: 'true'        # dApp mini-apps — shipped
-  VITE_FEATURE_SWAP_AGGREGATOR: 'false' # Soroswap aggregator — not built (#71)
+  VITE_FEATURE_SWAP_AGGREGATOR: 'true' # Soroswap aggregator (#71) — on; needs SOROSWAP_API_KEY secret, else falls back to native SDEX
   VITE_FEATURE_BIOMETRIC_UNLOCK: 'true'  # #23 M2a — active on Android; inert on web (store unavailable)
   VITE_FEATURE_GEOVELOCITY: 'false'    # #70 — no code (closed not-planned)
   VITE_FEATURE_DEMO_AFFORDANCES: 'false' # demo-only bits — never in a release build
+  VITE_FEATURE_PASSKEY: 'false'        # #53 — passkey smart accounts; experimental, testnet-only, off in release
+  # Soroswap aggregator config (values/secrets, not feature flags). The API key is
+  # a secret; the referral wallet + fee are optional — revenue share is only
+  # charged when BOTH are set. All unset → the aggregator falls back to native SDEX.
+  VITE_SOROSWAP_API_KEY: ${{ secrets.SOROSWAP_API_KEY }}
+  VITE_SOROSWAP_REFERRAL_ID: ${{ vars.SOROSWAP_REFERRAL_ID }}
+  VITE_SOROSWAP_FEE_BPS: ${{ vars.SOROSWAP_FEE_BPS }}
 
 jobs:
   release-build:
