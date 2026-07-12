@@ -99,4 +99,38 @@ describe('handler — biometric unlock', () => {
     lock();
     expect(await handle({ type: 'BIOMETRIC_UNLOCK' })).toMatchObject({ ok: false, code: 'NOT_ENROLLED' });
   });
+
+  it('RESET_WALLET purges the biometric envelope (#127)', async () => {
+    await createWallet('pw');
+    await handle({ type: 'ENABLE_BIOMETRIC', password: 'pw' });
+    expect(fs.hasKey()).toBe(true);
+
+    expect(await handle({ type: 'RESET_WALLET' })).toEqual({ ok: true, data: { ok: true } });
+
+    // The wrapping key is gone from the native store AND the KV enrolment flag
+    // is cleared — a fresh state, no stale wrapped password lingering.
+    expect(fs.hasKey()).toBe(false);
+    expect((await handle({ type: 'GET_STATUS' }) as { data: { biometricEnabled: boolean } }).data.biometricEnabled).toBe(false);
+  });
+
+  it('RESET_WALLET still succeeds when nothing is enrolled (fail-soft)', async () => {
+    await createWallet('pw');
+    expect(await handle({ type: 'RESET_WALLET' })).toEqual({ ok: true, data: { ok: true } });
+    expect(fs.hasKey()).toBe(false);
+  });
+
+  it('IMPORT_WALLET overwrite purges a prior wallet’s biometric enrolment (#127)', async () => {
+    await createWallet('pw');
+    await handle({ type: 'ENABLE_BIOMETRIC', password: 'pw' });
+    expect(fs.hasKey()).toBe(true);
+
+    // Re-import over the existing vault — a different wallet with a new password.
+    const mnemonic = (await handle({ type: 'GENERATE_MNEMONIC', strength: 128 }) as { data: { mnemonic: string } }).data.mnemonic;
+    const imported = await handle({ type: 'IMPORT_WALLET', input: mnemonic, password: 'new-pw' });
+    expect(imported).toMatchObject({ ok: true });
+
+    // The old wallet's wrapped password must not persist over the new vault.
+    expect(fs.hasKey()).toBe(false);
+    expect((await handle({ type: 'GET_STATUS' }) as { data: { biometricEnabled: boolean } }).data.biometricEnabled).toBe(false);
+  });
 });

@@ -52,6 +52,22 @@ function ok<K extends keyof ResponseMap>(data: ResponseMap[K]): Result<ResponseM
   return { ok: true, data };
 }
 
+// Fail-soft purge of any biometric enrolment — removes the wrapped key from the
+// native store AND the KV enrolment blob, so a destroyed/overwritten vault never
+// leaves a stale wrapped password behind (#127). Must never break the reset or
+// import it guards: if nothing is enrolled or the native store throws, swallow it
+// so the vault operation still succeeds. Gated behind __FEATURE_BIOMETRIC_UNLOCK__
+// so it is dead-code-eliminated from builds without the flag (matches GET_STATUS).
+async function purgeBiometricEnrollment(): Promise<void> {
+  if (!__FEATURE_BIOMETRIC_UNLOCK__) return;
+  try {
+    await disableBiometricUnlock({ store: getBiometricStore(), kv: await getKV() });
+  } catch {
+    // Nothing enrolled, or the native store is unavailable/threw — a purge that
+    // can't run must not abort the surrounding vault destruction/overwrite.
+  }
+}
+
 // Map a fail-soft biometricUnlock reason to a typed Result the UI branches on to
 // fall back to the password field.
 function biometricFailure(reason: 'not-enrolled' | 'cancelled' | 'failed'): Result<never> {
@@ -99,6 +115,10 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
       const { keypair, secretToStore } = importFromInput(req.input);
       const cipher = await encryptSecret(secretToStore, req.password);
       const address = keypair.publicKey();
+      // A re-import is effectively a new wallet — purge any prior wallet's
+      // biometric enrolment so an old wrapped password can never persist over
+      // the overwritten vault (#127). Atomic-with-overwrite and fail-soft.
+      await purgeBiometricEnrollment();
       await setVault({ version: 1, address, cipher });
       session = { keypair, unlockedAt: Date.now() };
       await armAutoLock();
@@ -211,6 +231,10 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
     case 'RESET_WALLET': {
       lock();
       await clearVault();
+      // Destroy the biometric envelope alongside the vault — clearVault() alone
+      // leaves the wrapped key + KV enrolment flag behind as stale state (#127).
+      // Fail-soft: a reset must still succeed if nothing is enrolled.
+      await purgeBiometricEnrollment();
       return ok<'RESET_WALLET'>({ ok: true });
     }
   }
