@@ -12,8 +12,13 @@ import {
   type BlendReserve,
 } from '@core/blend/directory';
 import { toBaseUnits, prepareBlendSubmit } from '@core/blend/submit';
-import { readSuppliedPositions, type SuppliedPosition } from '@core/blend/positions';
-import { readReserveApys } from '@core/blend/apr';
+import {
+  readSupplyMap,
+  readReserves,
+  suppliedPositionsFromReserves,
+  type SuppliedPosition,
+} from '@core/blend/positions';
+import { reserveApysFromReserves } from '@core/blend/apr';
 import { type BlendAction, BLEND_WITHDRAW_ALL_AMOUNT } from '@core/blend/pool';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
@@ -80,14 +85,25 @@ export function Earn({ address, network, onBack, embedded }: Props) {
     const rpcUrl = network.sorobanRpcUrl;
     if (!rpcUrl || pools.length === 0) return;
     let live = true;
+    // Per pool, fetch `get_positions` once and each reserve's `get_reserve` once —
+    // in parallel — then derive BOTH the supplied-position and est.-APY readouts
+    // from that single shared read (no duplicate `get_reserve`). Pools run in
+    // parallel too. Fail-soft is unchanged: null/absent → the readout is omitted.
     (async () => {
-      for (const pool of pools) {
-        const refs = pool.reserves.map((r) => ({ code: r.code, assetId: r.assetId }));
-        const supplied = await readSuppliedPositions(pool.poolId, address, refs, { rpcUrl });
-        if (live && supplied) setPositions((prev) => ({ ...prev, [pool.id]: supplied }));
-        const rates = await readReserveApys(pool.poolId, refs, { rpcUrl });
-        if (live && rates) setApys((prev) => ({ ...prev, [pool.id]: rates }));
-      }
+      await Promise.all(
+        pools.map(async (pool) => {
+          const refs = pool.reserves.map((r) => ({ code: r.code, assetId: r.assetId }));
+          const [supply, reserves] = await Promise.all([
+            readSupplyMap(pool.poolId, address, { rpcUrl }),
+            readReserves(pool.poolId, refs, { rpcUrl }),
+          ]);
+          if (!live) return;
+          const supplied = suppliedPositionsFromReserves(refs, reserves, supply);
+          if (supplied) setPositions((prev) => ({ ...prev, [pool.id]: supplied }));
+          const rates = reserveApysFromReserves(refs, reserves);
+          if (rates) setApys((prev) => ({ ...prev, [pool.id]: rates }));
+        }),
+      );
     })();
     return () => {
       live = false;
