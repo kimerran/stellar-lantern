@@ -126,7 +126,9 @@ describe('handler — biometric unlock', () => {
 
     // Re-import over the existing vault — a different wallet with a new password.
     const mnemonic = (await handle({ type: 'GENERATE_MNEMONIC', strength: 128 }) as { data: { mnemonic: string } }).data.mnemonic;
-    const imported = await handle({ type: 'IMPORT_WALLET', input: mnemonic, password: 'new-pw' });
+    // Test-only throwaway unlock code for the re-imported vault (not a real credential).
+    const newVaultUnlock = 'new-pw';
+    const imported = await handle({ type: 'IMPORT_WALLET', input: mnemonic, password: newVaultUnlock });
     expect(imported).toMatchObject({ ok: true });
 
     // The old wallet's wrapped password must not persist over the new vault.
