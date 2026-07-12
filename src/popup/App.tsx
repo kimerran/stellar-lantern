@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { useWallet } from './hooks/useWallet';
 import { useSettings } from './hooks/useSettings';
 import { resolveNetworkConfig } from '@shared/network';
@@ -7,21 +7,26 @@ import { AppBar } from './components/AppBar';
 import { BottomNav, type Tab } from './components/BottomNav';
 import { Icon } from './components/Icon';
 import { useToast } from './components/Toast';
-import { Onboarding } from './screens/Onboarding';
-import { SmartAccount } from './screens/SmartAccount';
 import { usePasskeyAccount } from './hooks/usePasskeyAccount';
+// First-paint path stays eager: splash → unlock/onboarding → home (assets),
+// plus Settings which shares the home shell. (#127)
+import { Onboarding } from './screens/Onboarding';
 import { Unlock } from './screens/Unlock';
 import { Assets } from './screens/Assets';
-import { Activity } from './screens/Activity';
-import { Send } from './screens/Send';
-import { Swap } from './screens/Swap';
-import { Scan } from './screens/Scan';
-import { Apps } from './screens/Apps';
-import { Guardians } from './screens/Guardians';
-import { CashInOut } from './screens/CashInOut';
-import { Earn } from './screens/Earn';
-import { Receive } from './screens/Receive';
 import { Settings } from './screens/Settings';
+
+// Heavier secondary screens are code-split so first paint doesn't pay for
+// features the user may never open. Named exports → mapped to `default`. (#127)
+const SmartAccount = lazy(() => import('./screens/SmartAccount').then((m) => ({ default: m.SmartAccount })));
+const Activity = lazy(() => import('./screens/Activity').then((m) => ({ default: m.Activity })));
+const Send = lazy(() => import('./screens/Send').then((m) => ({ default: m.Send })));
+const Swap = lazy(() => import('./screens/Swap').then((m) => ({ default: m.Swap })));
+const Scan = lazy(() => import('./screens/Scan').then((m) => ({ default: m.Scan })));
+const Apps = lazy(() => import('./screens/Apps').then((m) => ({ default: m.Apps })));
+const Guardians = lazy(() => import('./screens/Guardians').then((m) => ({ default: m.Guardians })));
+const CashInOut = lazy(() => import('./screens/CashInOut').then((m) => ({ default: m.CashInOut })));
+const Earn = lazy(() => import('./screens/Earn').then((m) => ({ default: m.Earn })));
+const Receive = lazy(() => import('./screens/Receive').then((m) => ({ default: m.Receive })));
 
 function Splash() {
   return (
@@ -42,8 +47,12 @@ export function App() {
   const [swapOpen, setSwapOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const showToast = useToast();
+  // Memoized so the NetworkConfig only rebuilds when settings change, instead of
+  // on every render. Computed at the top (before any early return) to respect the
+  // Rules of Hooks; `settings` may be null on first paint, so guard for it. (#127)
+  const network = useMemo(() => (settings ? resolveNetworkConfig(settings) : null), [settings]);
 
-  if (!status || !settings) return <Splash />;
+  if (!status || !settings || !network) return <Splash />;
 
   // Passkey smart account (#53) — a parallel, seed-phrase-free account mode.
   // It takes over the whole surface (no vault, no unlock — the passkey is the
@@ -51,11 +60,13 @@ export function App() {
   if (__FEATURE_PASSKEY__) {
     if (passkeyAccount === undefined) return <Splash />;
     if (passkeyAccount) {
-      return <SmartAccount account={passkeyAccount} onForget={refreshPasskey} />;
+      return (
+        <Suspense fallback={<Splash />}>
+          <SmartAccount account={passkeyAccount} onForget={refreshPasskey} />
+        </Suspense>
+      );
     }
   }
-
-  const network = resolveNetworkConfig(settings);
 
   // Onboarding — no wallet yet.
   if (!status.initialized) {
@@ -97,27 +108,47 @@ export function App() {
 
   // Full-screen Security overlay (paste-to-check + warning previews).
   if (scanOpen) {
-    return <Scan onBack={() => setScanOpen(false)} />;
+    return (
+      <Suspense fallback={<Splash />}>
+        <Scan onBack={() => setScanOpen(false)} />
+      </Suspense>
+    );
   }
 
   // Full-screen Guardians & Recovery overlay.
   if (guardiansOpen) {
-    return <Guardians address={address} network={network} onBack={() => setGuardiansOpen(false)} />;
+    return (
+      <Suspense fallback={<Splash />}>
+        <Guardians address={address} network={network} onBack={() => setGuardiansOpen(false)} />
+      </Suspense>
+    );
   }
 
   // Full-screen Cash in / Cash out (anchor deposit/withdraw) overlay.
   if (cashOpen) {
-    return <CashInOut address={address} network={network} onBack={() => setCashOpen(false)} />;
+    return (
+      <Suspense fallback={<Splash />}>
+        <CashInOut address={address} network={network} onBack={() => setCashOpen(false)} />
+      </Suspense>
+    );
   }
 
   // Full-screen Swap (SDEX path-payment) overlay.
   if (swapOpen) {
-    return <Swap address={address} network={network} onBack={() => setSwapOpen(false)} />;
+    return (
+      <Suspense fallback={<Splash />}>
+        <Swap address={address} network={network} onBack={() => setSwapOpen(false)} />
+      </Suspense>
+    );
   }
 
   // Full-screen Receive (address QR code) overlay.
   if (receiveOpen) {
-    return <Receive address={address} onBack={() => setReceiveOpen(false)} />;
+    return (
+      <Suspense fallback={<Splash />}>
+        <Receive address={address} onBack={() => setReceiveOpen(false)} />
+      </Suspense>
+    );
   }
 
   return (
@@ -132,6 +163,7 @@ export function App() {
       <main className="no-scrollbar relative flex-1 overflow-y-auto">
         {/* top/bottom fade overlays (BRAND §4.3) */}
         <div className="pointer-events-none sticky top-0 z-10 h-3 bg-gradient-to-b from-background to-transparent" />
+        <Suspense fallback={<Splash />}>
         <div className="px-4 pb-4">
           {tab === 'assets' && (
             <Assets
@@ -171,6 +203,7 @@ export function App() {
             />
           )}
         </div>
+        </Suspense>
       </main>
 
       {/* Send/Earn are Home sub-views, so keep Home highlighted while they're open. */}
