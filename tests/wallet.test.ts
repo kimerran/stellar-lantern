@@ -6,6 +6,14 @@ import {
   importFromInput,
   isValidPublicKey,
 } from '@core/wallet/wallet';
+import {
+  validateMnemonic as ourValidate,
+  mnemonicToSeedSync as ourSeed,
+} from '@core/wallet/mnemonic';
+import {
+  validateMnemonic as bip39Validate,
+  mnemonicToSeedSync as bip39Seed,
+} from 'bip39';
 
 // SEP-0005 official test vector (test 1, account 0).
 const SEP5_MNEMONIC =
@@ -48,5 +56,28 @@ describe('wallet derivation', () => {
   it('validates public keys', () => {
     expect(isValidPublicKey(SEP5_ACCOUNT0_PUBLIC)).toBe(true);
     expect(isValidPublicKey('GINVALID')).toBe(false);
+  });
+});
+
+// Guards the English-only bip39 port (src/core/wallet/mnemonic.ts) against the
+// upstream `bip39` package: behaviour must stay byte-for-byte identical for
+// English mnemonics even though the port drops the other 9 wordlists.
+describe('bip39 English parity', () => {
+  it('derives the same seed as bip39 for the SEP-0005 vector', () => {
+    expect(ourSeed(SEP5_MNEMONIC).toString('hex')).toBe(bip39Seed(SEP5_MNEMONIC).toString('hex'));
+  });
+
+  it('agrees with bip39 on generated + tampered mnemonics', () => {
+    for (const strength of [128, 256] as const) {
+      const m = generateMnemonic(strength);
+      expect(ourValidate(m)).toBe(true);
+      expect(bip39Validate(m)).toBe(true);
+      expect(ourSeed(m).toString('hex')).toBe(bip39Seed(m).toString('hex'));
+      // Flip the last word to a different valid English word -> bad checksum.
+      const words = m.split(' ');
+      words[words.length - 1] = words[words.length - 1] === 'zoo' ? 'zone' : 'zoo';
+      const tampered = words.join(' ');
+      expect(ourValidate(tampered)).toBe(bip39Validate(tampered));
+    }
   });
 });
