@@ -98,7 +98,10 @@ const authenticatorKeys = await crypto.subtle.generateKey(
 );
 
 /** A fake authenticator that signs whatever challenge it is asked (or a fixed wrong one). */
-function fakeAuthenticator(opts: { wrongChallenge?: Uint8Array } = {}): CredentialsApi {
+function fakeAuthenticator(
+  opts: { wrongChallenge?: Uint8Array; origin?: string } = {},
+): CredentialsApi {
+  const origin = opts.origin ?? 'https://lantern.test';
   return {
     create: async () => {
       throw new Error('not used in these tests');
@@ -108,7 +111,7 @@ function fakeAuthenticator(opts: { wrongChallenge?: Uint8Array } = {}): Credenti
       const asked = new Uint8Array(pk.challenge as ArrayBuffer | Uint8Array as Uint8Array);
       const challenge = opts.wrongChallenge ?? asked;
       const clientDataJSON = new TextEncoder().encode(
-        JSON.stringify({ type: 'webauthn.get', challenge: b64url(challenge), origin: 'https://lantern.test' }),
+        JSON.stringify({ type: 'webauthn.get', challenge: b64url(challenge), origin }),
       );
       const authData = new Uint8Array(37);
       authData.set(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('lantern.test'))), 0);
@@ -244,5 +247,57 @@ describe('signAuthEntriesWithPasskey', () => {
         credentials: fakeAuthenticator({ wrongChallenge: new Uint8Array(32).fill(9) }),
       }),
     ).rejects.toThrow(/different challenge/);
+  });
+
+  it('rejects an assertion whose origin is not allowed (audit finding #5 / #127)', async () => {
+    // The authenticator signs the correct challenge, but from a foreign origin —
+    // the wired origin check must stop it at the local pre-trust gate. The default
+    // allowlist is ['https://' + rpId] = ['https://lantern.test'].
+    const txXdr = wrapInTx([makeEntry(SMART_ACCOUNT, '7')]);
+    await expect(
+      signAuthEntriesWithPasskey({
+        txXdr,
+        networkPassphrase: PASSPHRASE,
+        smartAccountId: SMART_ACCOUNT,
+        rpId: 'lantern.test',
+        credentialId: CREDENTIAL_ID,
+        signatureExpirationLedger: EXPIRATION,
+        credentials: fakeAuthenticator({ origin: 'https://evil.example' }),
+      }),
+    ).rejects.toThrow(/different challenge or origin/);
+  });
+
+  it('rejects a legitimate origin when the rpId-derived default does not cover it', async () => {
+    // rpId says lantern.test (default origin https://lantern.test) but the
+    // authenticator's origin is a platform origin — rejected unless allowedOrigins
+    // is widened, proving the default binds strictly to the rpId.
+    const txXdr = wrapInTx([makeEntry(SMART_ACCOUNT, '8')]);
+    await expect(
+      signAuthEntriesWithPasskey({
+        txXdr,
+        networkPassphrase: PASSPHRASE,
+        smartAccountId: SMART_ACCOUNT,
+        rpId: 'lantern.test',
+        credentialId: CREDENTIAL_ID,
+        signatureExpirationLedger: EXPIRATION,
+        credentials: fakeAuthenticator({ origin: 'chrome-extension://abc123' }),
+      }),
+    ).rejects.toThrow(/different challenge or origin/);
+  });
+
+  it('accepts a non-default origin when the caller supplies a matching allowedOrigins', async () => {
+    // A caller can override the default to permit a platform/extension origin.
+    const txXdr = wrapInTx([makeEntry(SMART_ACCOUNT, '9')]);
+    const { signed } = await signAuthEntriesWithPasskey({
+      txXdr,
+      networkPassphrase: PASSPHRASE,
+      smartAccountId: SMART_ACCOUNT,
+      rpId: 'lantern.test',
+      credentialId: CREDENTIAL_ID,
+      signatureExpirationLedger: EXPIRATION,
+      allowedOrigins: ['chrome-extension://abc123'],
+      credentials: fakeAuthenticator({ origin: 'chrome-extension://abc123' }),
+    });
+    expect(signed).toBe(1);
   });
 });
