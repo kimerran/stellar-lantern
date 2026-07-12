@@ -51,4 +51,35 @@ describe('Blend pool directory', () => {
     expect(findReserve(pool, 'XLM')?.code).toBe('XLM');
     expect(findReserve(pool, 'DOGE')).toBeUndefined();
   });
+
+  // #109 — Lantern's own Blend pool.
+  it('ships a Lantern-operated testnet pool with USDC + XLM reserves', () => {
+    const lantern = findBlendPool('lantern-earn');
+    expect(lantern).toBeDefined();
+    expect(lantern!.lantern).toBe(true);
+    expect(lantern!.verified).toBe(true);
+    expect(lantern!.network).toBe('testnet');
+    expect(lantern!.reserves.map((r) => r.code).sort()).toEqual(['USDC', 'XLM']);
+    expect(isValidContractId(lantern!.poolId)).toBe(true);
+  });
+
+  it('orders Lantern pools first in the Earn picker, ahead of third-party pools', () => {
+    const testnet = blendPoolsForNetwork('testnet');
+    expect(testnet[0]!.lantern).toBe(true);
+    // A listed third-party pool still appears (no ABI regression), just after ours.
+    const thirdParty = testnet.find((p) => !p.lantern);
+    expect(thirdParty).toBeDefined();
+    expect(testnet.indexOf(thirdParty!)).toBeGreaterThan(0);
+  });
+
+  it('brands exactly the Lantern-operated pools (third-party pools are not flagged)', () => {
+    for (const p of BLEND_POOLS) {
+      if (p.id === 'lantern-earn') expect(p.lantern).toBe(true);
+      else expect(Boolean(p.lantern)).toBe(false);
+    }
+  });
+
+  it('never ships a mainnet placeholder pool (#109: no fake addresses)', () => {
+    expect(blendPoolsForNetwork('public')).toEqual([]);
+  });
 });

@@ -24,5 +24,13 @@ export function useSettings() {
     setLocal(await setSettings({ autoLockMinutes }));
   }, []);
 
-  return { settings, setNetwork, toggleNetwork, setAutoLock };
+  const setHorizonOverrides = useCallback(async (horizonOverrides: Settings['horizonOverrides']) => {
+    setLocal(await setSettings({ horizonOverrides }));
+  }, []);
+
+  const setRpcOverrides = useCallback(async (rpcOverrides: Settings['rpcOverrides']) => {
+    setLocal(await setSettings({ rpcOverrides }));
+  }, []);
+
+  return { settings, setNetwork, toggleNetwork, setAutoLock, setHorizonOverrides, setRpcOverrides };
 }

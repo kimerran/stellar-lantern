@@ -12,10 +12,12 @@ interface Props {
   address: string;
   network: NetworkConfig;
   onSend: () => void;
+  onReceive: () => void;
   onSwap: () => void;
+  onEarn: () => void;
 }
 
-export function Assets({ address, network, onSend, onSwap }: Props) {
+export function Assets({ address, network, onSend, onReceive, onSwap, onEarn }: Props) {
   const [state, setState] = useState<AccountState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +62,15 @@ export function Assets({ address, network, onSend, onSwap }: Props) {
   return (
     <div className="space-y-4 pt-2">
       {/* Available balance block */}
-      <section className="rounded-2xl bg-surface-container px-4 py-5 text-center shadow-layer-1">
+      <section className="relative rounded-2xl bg-surface-container px-4 py-5 text-center shadow-layer-1">
+        <button
+          onClick={() => load()}
+          aria-label="Refresh balances"
+          title="Refresh"
+          className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-variant hover:text-on-surface active:scale-95"
+        >
+          <Icon name="refresh" size={18} />
+        </button>
         <p className="text-label-sm uppercase tracking-wide text-on-surface-variant">Available Balance</p>
         {loading ? (
           <Shimmer className="mx-auto mt-3 h-12 w-40" />
@@ -74,18 +84,16 @@ export function Assets({ address, network, onSend, onSwap }: Props) {
             <span className="text-title-md font-semibold text-on-surface-variant">XLM</span>
           </p>
         )}
-        <div className="mt-4 flex justify-center gap-2">
-          <Button onClick={onSend} leadingIcon="send">
-            Send
-          </Button>
-          <Button variant="secondary" onClick={onSwap} leadingIcon="swap_horiz">
-            Swap
-          </Button>
-          <Button variant="secondary" onClick={() => load()} leadingIcon="refresh">
-            Refresh
-          </Button>
-        </div>
       </section>
+
+      {/* Action-forward quick actions (#110): the primary surface leads with
+          Send · Receive · Swap · Earn, each reachable in a single tap. */}
+      <nav aria-label="Quick actions" className="grid grid-cols-4 gap-2">
+        <QuickAction icon="send" label="Send" onClick={onSend} />
+        <QuickAction icon="qr_code_2" label="Receive" onClick={onReceive} />
+        <QuickAction icon="swap_horiz" label="Swap" onClick={onSwap} />
+        <QuickAction icon="savings" label="Earn" onClick={onEarn} />
+      </nav>
 
       {error && (
         <p role="alert" className="text-center text-label-md text-error">
@@ -141,6 +149,21 @@ export function Assets({ address, network, onSend, onSwap }: Props) {
         )
       )}
     </div>
+  );
+}
+
+// A single home quick-action: a tappable amber-tinted icon tile with a label.
+function QuickAction({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex flex-col items-center gap-1.5 rounded-2xl bg-surface-container px-2 py-3 text-on-surface transition-colors hover:bg-surface-variant active:scale-95"
+    >
+      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary-container/20 text-primary-container">
+        <Icon name={icon} size={22} />
+      </span>
+      <span className="text-label-md">{label}</span>
+    </button>
   );
 }
 

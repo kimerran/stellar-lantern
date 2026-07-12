@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useWallet } from './hooks/useWallet';
 import { useSettings } from './hooks/useSettings';
-import { NETWORKS } from '@shared/constants';
+import { resolveNetworkConfig } from '@shared/network';
 import { isNativePlatform } from '@shared/kv';
 import { AppBar } from './components/AppBar';
 import { BottomNav, type Tab } from './components/BottomNav';
@@ -21,6 +21,7 @@ import { Guardians } from './screens/Guardians';
 import { CashInOut } from './screens/CashInOut';
 import { Earn } from './screens/Earn';
 import { Receive } from './screens/Receive';
+import { Settings } from './screens/Settings';
 
 function Splash() {
   return (
@@ -32,13 +33,12 @@ function Splash() {
 
 export function App() {
   const { status, refresh, lock } = useWallet();
-  const { settings, toggleNetwork } = useSettings();
+  const { settings, setNetwork, setAutoLock, setHorizonOverrides, setRpcOverrides } = useSettings();
   const { passkeyAccount, refresh: refreshPasskey } = usePasskeyAccount();
   const [tab, setTab] = useState<Tab>('assets');
   const [scanOpen, setScanOpen] = useState(false);
   const [guardiansOpen, setGuardiansOpen] = useState(false);
   const [cashOpen, setCashOpen] = useState(false);
-  const [activityOpen, setActivityOpen] = useState(false);
   const [swapOpen, setSwapOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const showToast = useToast();
@@ -55,7 +55,7 @@ export function App() {
     }
   }
 
-  const network = NETWORKS[settings.network];
+  const network = resolveNetworkConfig(settings);
 
   // Onboarding — no wallet yet.
   if (!status.initialized) {
@@ -110,11 +110,6 @@ export function App() {
     return <CashInOut address={address} network={network} onBack={() => setCashOpen(false)} />;
   }
 
-  // Full-screen Activity (transaction history) overlay — opened from the app bar.
-  if (activityOpen) {
-    return <Activity address={address} network={network} onBack={() => setActivityOpen(false)} />;
-  }
-
   // Full-screen Swap (SDEX path-payment) overlay.
   if (swapOpen) {
     return <Swap address={address} network={network} onBack={() => setSwapOpen(false)} />;
@@ -130,14 +125,7 @@ export function App() {
       <AppBar
         address={address}
         network={settings.network}
-        onToggleNetwork={toggleNetwork}
-        onLock={lock}
         onCopyAddress={copyAddress}
-        onOpenReceive={() => setReceiveOpen(true)}
-        onOpenScan={() => setScanOpen(true)}
-        onOpenGuardians={() => setGuardiansOpen(true)}
-        onOpenCashInOut={() => setCashOpen(true)}
-        onOpenActivity={() => setActivityOpen(true)}
         onExpand={isExpanded || isNativePlatform() ? undefined : openExpanded}
       />
 
@@ -150,7 +138,9 @@ export function App() {
               address={address}
               network={network}
               onSend={() => setTab('send')}
+              onReceive={() => setReceiveOpen(true)}
               onSwap={() => setSwapOpen(true)}
+              onEarn={() => setTab('earn')}
             />
           )}
           {tab === 'earn' && <Earn address={address} network={network} embedded />}
@@ -158,17 +148,33 @@ export function App() {
             <Send
               address={address}
               network={network}
-              onDone={() => {
-                setTab('assets');
-                setActivityOpen(true);
-              }}
+              onDone={() => setTab('activity')}
             />
           )}
           {tab === 'apps' && <Apps address={address} network={settings.network} />}
+          {tab === 'activity' && <Activity address={address} network={network} embedded />}
+          {tab === 'settings' && (
+            <Settings
+              address={address}
+              settings={settings}
+              embedded
+              onCopyAddress={copyAddress}
+              onOpenReceive={() => setReceiveOpen(true)}
+              onOpenGuardians={() => setGuardiansOpen(true)}
+              onOpenScan={() => setScanOpen(true)}
+              onOpenCashInOut={() => setCashOpen(true)}
+              onLock={lock}
+              setNetwork={setNetwork}
+              setAutoLock={setAutoLock}
+              setHorizonOverrides={setHorizonOverrides}
+              setRpcOverrides={setRpcOverrides}
+            />
+          )}
         </div>
       </main>
 
-      <BottomNav active={tab} onChange={setTab} />
+      {/* Send/Earn are Home sub-views, so keep Home highlighted while they're open. */}
+      <BottomNav active={tab === 'send' || tab === 'earn' ? 'assets' : tab} onChange={setTab} />
     </div>
   );
 }

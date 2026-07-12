@@ -32,7 +32,11 @@ export interface PasskeyAccountRecord {
 export interface Settings {
   network: NetworkId;
   autoLockMinutes: number;
+  // Optional per-network endpoint overrides, edited behind the Settings hub's
+  // "Advanced" disclosure (#110). Empty/unset → the pinned public defaults in
+  // constants. Applied centrally by resolveNetworkConfig (shared/network.ts).
   horizonOverrides?: { testnet?: string; public?: string };
+  rpcOverrides?: { testnet?: string; public?: string };
   // Mini-app directory "favorites" / installs (#93): a list of MiniApp ids the
   // user pinned to their "My apps" section. Plain, non-secret metadata — a
   // bookmark, NOT elevated permissions. Lives in Settings so it live-updates

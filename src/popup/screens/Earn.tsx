@@ -495,6 +495,12 @@ export function Earn({ address, network, onBack, embedded }: Props) {
                       </div>
                       <span className="truncate text-title-sm text-on-surface">{pool.name}</span>
                       {pool.verified && <Icon name="verified" size={16} className="shrink-0 text-primary-container" />}
+                      {pool.lantern && (
+                        <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full border border-primary-container/40 bg-primary-container/15 px-2 py-0.5 text-label-sm font-semibold text-primary-container">
+                          <Icon name="lightbulb" filled size={12} />
+                          Lantern
+                        </span>
+                      )}
                     </div>
                     <ul className="space-y-2">
                       {pool.reserves.map((r) => {
