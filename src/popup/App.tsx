@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { useWallet } from './hooks/useWallet';
 import { useSettings } from './hooks/useSettings';
 import { resolveNetworkConfig } from '@shared/network';
@@ -47,8 +47,12 @@ export function App() {
   const [swapOpen, setSwapOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const showToast = useToast();
+  // Memoized so the NetworkConfig only rebuilds when settings change, instead of
+  // on every render. Computed at the top (before any early return) to respect the
+  // Rules of Hooks; `settings` may be null on first paint, so guard for it. (#127)
+  const network = useMemo(() => (settings ? resolveNetworkConfig(settings) : null), [settings]);
 
-  if (!status || !settings) return <Splash />;
+  if (!status || !settings || !network) return <Splash />;
 
   // Passkey smart account (#53) — a parallel, seed-phrase-free account mode.
   // It takes over the whole surface (no vault, no unlock — the passkey is the
@@ -63,8 +67,6 @@ export function App() {
       );
     }
   }
-
-  const network = resolveNetworkConfig(settings);
 
   // Onboarding — no wallet yet.
   if (!status.initialized) {
