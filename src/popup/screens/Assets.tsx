@@ -157,7 +157,7 @@ function QuickAction({ icon, label, onClick }: { icon: string; label: string; on
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center gap-1.5 rounded-2xl bg-surface-container px-2 py-3 text-on-surface transition-colors hover:bg-surface-variant active:scale-95"
+      className="flex flex-col items-center gap-1.5 rounded-2xl bg-surface-container px-2 py-3 text-on-surface transition-colors hover:bg-surface-variant active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-container"
     >
       <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary-container/20 text-primary-container">
         <Icon name={icon} size={22} />
