@@ -10,7 +10,7 @@
 // Pure XDR surgery + the injectable `CredentialsApi` — no network.
 
 import { Address, hash, xdr } from '@stellar/stellar-sdk';
-import { challengeMatches } from './assertion';
+import { assertionMatches } from './assertion';
 import { normalizeLowS } from './secp256r1';
 import { signWithPasskey, type CredentialsApi, type PasskeyAssertion } from './webauthn';
 
@@ -68,6 +68,14 @@ export interface SignAuthEntriesParams {
   credentialId: Uint8Array;
   /** Ledger sequence the signatures stay valid until (part of the signed payload). */
   signatureExpirationLedger: number;
+  /**
+   * WebAuthn origins the assertion's `clientDataJSON.origin` must match (audit
+   * finding #5 / #127). Exact, case-sensitive per WebAuthn semantics. Defaults to
+   * `['https://' + rpId]` — the origin a browser produces for this relying party —
+   * so the check binds to the configured `rpId` unless a caller overrides it for a
+   * platform/extension origin (e.g. `chrome-extension://…`).
+   */
+  allowedOrigins?: string[];
   credentials?: CredentialsApi;
 }
 
@@ -85,6 +93,9 @@ export async function signAuthEntriesWithPasskey(
   if (envelope.switch().name !== 'envelopeTypeTx') {
     throw new Error('Expected a plain (non-fee-bump) transaction envelope.');
   }
+  // The origins we accept on the assertion's clientDataJSON. Default binds to the
+  // configured rpId (the origin a browser produces for it); callers may override.
+  const allowedOrigins = params.allowedOrigins ?? [`https://${params.rpId}`];
   const operations = envelope.v1().tx().operations();
   const invokeOp = operations.find((op) => op.body().switch().name === 'invokeHostFunction');
   if (!invokeOp) throw new Error('Transaction has no invokeHostFunction operation.');
@@ -103,10 +114,14 @@ export async function signAuthEntriesWithPasskey(
       challenge: payload,
       ...(params.credentials ? { credentials: params.credentials } : {}),
     });
-    // Never attach an assertion over the wrong payload — the contract would
-    // reject it anyway, but failing here gives a clear local error instead.
-    if (!challengeMatches(assertion.clientDataJSON, payload)) {
-      throw new Error('The authenticator signed a different challenge than requested.');
+    // Never attach an assertion over the wrong payload OR from an unexpected
+    // origin — the contract would reject the wrong challenge anyway, but binding
+    // the origin here (audit finding #5 / #127) stops a malicious frame's replayed
+    // assertion at the local pre-trust check, and gives a clear error either way.
+    if (!assertionMatches(assertion.clientDataJSON, { expectedChallenge: payload, allowedOrigins })) {
+      throw new Error(
+        'The authenticator signed a different challenge or origin than requested.',
+      );
     }
     creds.signature(passkeySignatureScVal(assertion));
     signed += 1;

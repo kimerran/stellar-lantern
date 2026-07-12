@@ -29,6 +29,11 @@ jobs:
 
       - name: Build web assets
         run: npm run build:mobile
+        env:
+          # The debug APK is the testnet testing artifact, so enable the
+          # experimental passkey smart accounts (#53) here for on-device testnet
+          # testing. The shipped release build (release.yml) keeps it OFF.
+          VITE_FEATURE_PASSKEY: 'true'
 
       - name: Setup JDK 21
         uses: actions/setup-java@v4

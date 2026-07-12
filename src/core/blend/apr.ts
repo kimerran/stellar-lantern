@@ -26,8 +26,7 @@
 // the figure is a small over-estimate unless a caller passes the real rate. Both are
 // why the label is honest about being approximate.
 
-import { Address } from '@stellar/stellar-sdk';
-import { simulateView, type ReserveRef, type RpcOpts } from './positions';
+import { readReserves, type ReserveRef, type RpcOpts } from './positions';
 
 // Blend SCALAR_7 fixed-point unit (1e7 = 100% / 1.0) for the rate parameters.
 export const SCALAR_7 = 10_000_000;
@@ -174,28 +173,42 @@ export function supplyApyFromReserve(
 }
 
 /**
+ * Assemble the est.-APY-per-code map from an already-decoded `readReserves` result.
+ * Pure — the same shared `get_reserve` reads that drive the supplied-position
+ * readout feed this too, so a reserve is fetched once per refresh, not twice.
+ * Fail-soft — a reserve that can't be read (or lacks rate fields) maps to `null`;
+ * if *no* reserve reads at all, returns `null` so the caller drops the readout.
+ */
+export function reserveApysFromReserves(
+  reserves: ReserveRef[],
+  decodedReserves: Array<unknown | null>,
+): Record<string, number | null> | null {
+  const out: Record<string, number | null> = {};
+  let anyRead = false;
+  reserves.forEach((r, i) => {
+    const reserve = decodedReserves[i] as RawReserve | null;
+    if (reserve) anyRead = true;
+    out[r.code] = supplyApyFromReserve(reserve);
+  });
+  return anyRead ? out : null;
+}
+
+/**
  * Read the estimated supply APY for each of `reserves` in a pool, keyed by asset
- * `code`. Read-only: simulates `get_reserve` per reserve (the same call `positions`
- * makes) and runs the pure estimate. Fail-soft — a reserve that can't be read (or
- * lacks rate fields) maps to `null`; if *no* reserve reads at all, returns `null`
- * so the caller can drop the whole readout.
+ * `code`. Read-only: simulates `get_reserve` per reserve (in parallel, the same
+ * call `positions` makes) and runs the pure estimate. Fail-soft — a reserve that
+ * can't be read (or lacks rate fields) maps to `null`; if *no* reserve reads at
+ * all, returns `null` so the caller can drop the whole readout.
+ *
+ * Kept for back-compat; callers that also need supplied positions should share a
+ * single `readReserves` result across both readouts (see Earn.tsx) so `get_reserve`
+ * is fetched once per reserve rather than twice per refresh.
  */
 export async function readReserveApys(
   poolId: string,
   reserves: ReserveRef[],
   opts: RpcOpts,
 ): Promise<Record<string, number | null> | null> {
-  const out: Record<string, number | null> = {};
-  let anyRead = false;
-  for (const r of reserves) {
-    const reserve = (await simulateView(
-      poolId,
-      'get_reserve',
-      new Address(r.assetId).toScVal(),
-      opts,
-    )) as RawReserve | null;
-    if (reserve) anyRead = true;
-    out[r.code] = supplyApyFromReserve(reserve);
-  }
-  return anyRead ? out : null;
+  const decodedReserves = await readReserves(poolId, reserves, opts);
+  return reserveApysFromReserves(reserves, decodedReserves);
 }
