@@ -25,6 +25,10 @@ export default defineConfig(({ mode }) => ({
   build: {
     outDir: 'dist-mobile',
     target: 'esnext',
-    sourcemap: true,
+    // Sourcemaps in dev only. `vite build` defaults mode to 'production', so a
+    // plain `npm run build:mobile` ships NO `.map` files. Developers who want
+    // maps can run `vite build --config vite.config.mobile.ts --mode development`.
+    // Keep in sync with vite.config.ts (no drift).
+    sourcemap: mode !== 'production',
   },
 }));
