@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { parseClientData, challengeMatches, webauthnSignedMessage } from '@core/passkey/assertion';
+import {
+  parseClientData,
+  challengeMatches,
+  originAllowed,
+  assertionMatches,
+  webauthnSignedMessage,
+} from '@core/passkey/assertion';
 
 const enc = new TextEncoder();
 
@@ -47,6 +53,65 @@ describe('challengeMatches', () => {
     const c = new Uint8Array(len);
     for (let i = 0; i < len; i++) c[i] = (i * 37 + 5) & 0xff;
     expect(challengeMatches(clientData('webauthn.get', c), c)).toBe(true);
+  });
+});
+
+describe('originAllowed', () => {
+  it('accepts an origin in the allowlist (exact, case-sensitive match)', () => {
+    expect(originAllowed(clientData('webauthn.get', challenge, 'https://lantern.app'), ['https://lantern.app'])).toBe(true);
+  });
+
+  it('rejects a cross / disallowed origin, an empty allowlist, or a case mismatch', () => {
+    expect(originAllowed(clientData('webauthn.get', challenge, 'https://evil.example'), ['https://lantern.app'])).toBe(false);
+    expect(originAllowed(clientData('webauthn.get', challenge, 'https://lantern.app'), [])).toBe(false);
+    expect(originAllowed(clientData('webauthn.get', challenge, 'https://Lantern.app'), ['https://lantern.app'])).toBe(false);
+    expect(originAllowed(enc.encode('garbage'), ['https://lantern.app'])).toBe(false);
+  });
+});
+
+describe('assertionMatches', () => {
+  const allowedOrigins = ['https://lantern.app'];
+
+  it('accepts a webauthn.get with a matching challenge and an allowed origin', () => {
+    expect(
+      assertionMatches(clientData('webauthn.get', challenge, 'https://lantern.app'), {
+        expectedChallenge: challenge,
+        allowedOrigins,
+      }),
+    ).toBe(true);
+  });
+
+  it('rejects a disallowed / cross origin', () => {
+    expect(
+      assertionMatches(clientData('webauthn.get', challenge, 'https://evil.example'), {
+        expectedChallenge: challenge,
+        allowedOrigins,
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects a mismatched challenge even from an allowed origin', () => {
+    expect(
+      assertionMatches(clientData('webauthn.get', challenge, 'https://lantern.app'), {
+        expectedChallenge: new Uint8Array([9, 9]),
+        allowedOrigins,
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects a wrong type (registration, not assertion)', () => {
+    expect(
+      assertionMatches(clientData('webauthn.create', challenge, 'https://lantern.app'), {
+        expectedChallenge: challenge,
+        allowedOrigins,
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects malformed clientDataJSON', () => {
+    expect(
+      assertionMatches(enc.encode('garbage'), { expectedChallenge: challenge, allowedOrigins }),
+    ).toBe(false);
   });
 });
 

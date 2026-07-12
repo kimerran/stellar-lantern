@@ -6,6 +6,13 @@
 // reconstruct the signed message and confirm the challenge, so the wallet can
 // (a) verify an assertion locally and (b) hand the contract the right payload.
 //
+// Origin binding (#127, audit finding #5): `clientDataJSON` also carries the
+// `origin` the assertion was produced for. Verifying the challenge alone lets a
+// malicious frame request/replay an assertion from an unexpected origin, so
+// `assertionMatches` / `originAllowed` additionally pin `origin` to a caller-
+// supplied allowlist (exact, case-sensitive string match per WebAuthn origin
+// semantics). Prefer `assertionMatches` for the full type+challenge+origin check.
+//
 // No `navigator.credentials` calls here (those are thin device-gated forwarders,
 // a later slice) — this is the offline-testable core.
 
@@ -71,6 +78,41 @@ export function challengeMatches(clientDataJSON: Uint8Array, expected: Uint8Arra
   } catch {
     return false;
   }
+}
+
+/**
+ * True when the assertion's `clientDataJSON` was produced for one of
+ * `allowedOrigins` — an exact, case-sensitive string match per WebAuthn origin
+ * semantics (e.g. `https://lantern.app`). Returns false on any parse failure, an
+ * empty allowlist, or an origin not in the list. This does NOT check the type or
+ * challenge; use `assertionMatches` for the full assertion check.
+ */
+export function originAllowed(clientDataJSON: Uint8Array, allowedOrigins: string[]): boolean {
+  let data: ClientData;
+  try {
+    data = parseClientData(clientDataJSON);
+  } catch {
+    return false;
+  }
+  return allowedOrigins.includes(data.origin);
+}
+
+/**
+ * The full pre-trust check for a passkey assertion: the `clientDataJSON` must be
+ * a `webauthn.get`, its challenge must equal `expectedChallenge` (the payload we
+ * asked to be signed, e.g. a tx hash), AND its `origin` must be exactly one of
+ * `allowedOrigins`. Composes `challengeMatches` (type + challenge) with an origin
+ * allowlist so a malicious frame cannot request/replay an assertion from an
+ * unexpected origin. Returns false on any parse failure or mismatch.
+ */
+export function assertionMatches(
+  clientDataJSON: Uint8Array,
+  opts: { expectedChallenge: Uint8Array; allowedOrigins: string[] },
+): boolean {
+  return (
+    challengeMatches(clientDataJSON, opts.expectedChallenge) &&
+    originAllowed(clientDataJSON, opts.allowedOrigins)
+  );
 }
 
 /**
