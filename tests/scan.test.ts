@@ -51,6 +51,27 @@ function invokeXdr(fn: string): string {
     .toXDR();
 }
 
+// accountMerge drains the whole XLM balance and closes the account; manageData
+// is an op type the scanner doesn't model. Both build via the SDK like the
+// setOptions helper above. (#127)
+function accountMergeXdr(destination: string): string {
+  const source = new Account(SOURCE, '1');
+  return new TransactionBuilder(source, { fee: '100', networkPassphrase: pp })
+    .addOperation(Operation.accountMerge({ destination }))
+    .setTimeout(180)
+    .build()
+    .toXDR();
+}
+
+function manageDataXdr(): string {
+  const source = new Account(SOURCE, '1');
+  return new TransactionBuilder(source, { fee: '100', networkPassphrase: pp })
+    .addOperation(Operation.manageData({ name: 'foo', value: 'bar' }))
+    .setTimeout(180)
+    .build()
+    .toXDR();
+}
+
 describe('decode + explain', () => {
   it('decodes a payment and explains it in one sentence', () => {
     const xdr = xdrFor({ dest: NORMAL_DEST, amount: '12', funded: true });
@@ -95,6 +116,13 @@ describe('decode + explain', () => {
     const decoded = decodeTransaction(xdr, pp);
     expect(decoded?.operations[0]?.masterWeight).toBe(0);
     expect(explainTransaction(decoded)).toMatch(/removes your own key.{0,3}s signing power/i);
+  });
+
+  it('surfaces the merge target of an accountMerge so it does not render blank', () => {
+    const decoded = decodeTransaction(accountMergeXdr(NORMAL_DEST), pp);
+    const op = decoded?.operations[0];
+    expect(op?.type).toBe('accountMerge');
+    expect(op?.destination).toBe(NORMAL_DEST);
   });
 
   it('decodes a Soroban invoke: contract id, function name, and names it in the explanation', () => {
@@ -215,6 +243,26 @@ describe('scan engine (mock)', () => {
     expect(v.tier).toBe(2); // uncertain contract call escalates to (mock) Tier 2
     const reason = v.reasons.find((r) => r.code === 'contract_call');
     expect(reason?.detail).toMatch(/supply/);
+  });
+
+  it('flags an accountMerge as high and names the merge target (not blank)', () => {
+    const xdr = accountMergeXdr(NORMAL_DEST);
+    const v = scan({ xdr, networkPassphrase: pp, context: { network: 'TESTNET', fromAddress: SOURCE } });
+    expect(v.risk).toBe('high');
+    expect(v.action).toBe('block_confirm');
+    const reason = v.reasons.find((r) => r.code === 'account_merge');
+    expect(reason).toBeDefined();
+    expect(reason?.severity).toBe('high');
+    expect(reason?.detail).toMatch(/GDVE.{0,3}ZA57/); // merge target surfaced, not blank
+  });
+
+  it('flags an unrecognized op type (manageData) rather than rendering it benign', () => {
+    const xdr = manageDataXdr();
+    const v = scan({ xdr, networkPassphrase: pp, context: { network: 'TESTNET', fromAddress: SOURCE } });
+    expect(v.risk).not.toBe('low');
+    const reason = v.reasons.find((r) => r.code === 'unrecognized_op');
+    expect(reason).toBeDefined();
+    expect(reason?.detail).toMatch(/manage data/i);
   });
 
   it('fails CLOSED on an undecodable/garbage XDR (high, not low)', () => {
