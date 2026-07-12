@@ -22,6 +22,7 @@ export function BottomNav({ active, onChange }: { active: Tab; onChange: (t: Tab
           <button
             key={tab}
             onClick={() => onChange(tab)}
+            aria-current={isActive ? 'page' : undefined}
             className={`flex flex-col items-center gap-0.5 rounded-xl px-4 py-1.5 transition-colors active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-container ${
               isActive
                 ? 'bg-primary-container text-on-primary-container shadow-nav-active'
