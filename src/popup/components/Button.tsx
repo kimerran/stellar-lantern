@@ -23,7 +23,7 @@ export function Button({
   ...rest
 }: ButtonProps) {
   const base =
-    'inline-flex items-center justify-center gap-2 rounded-lg text-title-md transition-colors active:scale-95 disabled:opacity-40 disabled:active:scale-100 disabled:cursor-not-allowed';
+    'inline-flex items-center justify-center gap-2 rounded-lg text-title-md transition-colors active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-container disabled:opacity-40 disabled:active:scale-100 disabled:cursor-not-allowed';
   const sizing = 'px-5 py-3.5';
   const variants: Record<Variant, string> = {
     primary:

@@ -554,7 +554,7 @@ function ActionButton({ label, icon, onClick }: { label: string; icon: string; o
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-outline-variant px-3 py-2 text-label-lg text-on-surface transition-colors hover:bg-surface-variant active:scale-95"
+      className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-outline-variant px-3 py-2 text-label-lg text-on-surface transition-colors hover:bg-surface-variant active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-container"
     >
       <Icon name={icon} size={16} className="text-primary-container" />
       {label}
