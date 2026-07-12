@@ -47,6 +47,23 @@ describe('resolveNetworkConfig', () => {
     }
   });
 
+  it('rejects a plaintext http:// override to a public host (falls back to default)', () => {
+    const cfg = resolveNetworkConfig(base({ horizonOverrides: { testnet: 'http://my-horizon.example' } }));
+    expect(cfg.horizonUrl).toBe(NETWORKS.TESTNET.horizonUrl);
+  });
+
+  it('applies an https:// override', () => {
+    const cfg = resolveNetworkConfig(base({ horizonOverrides: { testnet: 'https://secure-horizon.example' } }));
+    expect(cfg.horizonUrl).toBe('https://secure-horizon.example');
+  });
+
+  it('allows http://localhost (with port) for local dev quickstart nodes', () => {
+    const cfg = resolveNetworkConfig(base({ horizonOverrides: { testnet: 'http://localhost:8000' } }));
+    expect(cfg.horizonUrl).toBe('http://localhost:8000');
+    const loopback = resolveNetworkConfig(base({ horizonOverrides: { testnet: 'http://127.0.0.1:8000' } }));
+    expect(loopback.horizonUrl).toBe('http://127.0.0.1:8000');
+  });
+
   it('resolves the network named in settings by default', () => {
     expect(resolveNetworkConfig(base({ network: 'PUBLIC' })).id).toBe('PUBLIC');
     expect(resolveNetworkConfig(base({ network: 'TESTNET' })).id).toBe('TESTNET');

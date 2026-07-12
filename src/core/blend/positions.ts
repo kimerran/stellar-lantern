@@ -111,10 +111,93 @@ function supplyMap(positions: unknown): Record<number, bigint> {
 }
 
 /**
+ * Read a user's `get_positions` and return the reserve-index → bToken supply map,
+ * or `null` if positions can't be read at all (so the caller drops the readout).
+ * The supply map alone is cheap to share between the position + APY read paths.
+ */
+export async function readSupplyMap(
+  poolId: string,
+  user: string,
+  opts: RpcOpts,
+): Promise<Record<number, bigint> | null> {
+  const positions = await simulateView(poolId, 'get_positions', new Address(user).toScVal(), opts);
+  if (positions == null) return null;
+  return supplyMap(positions);
+}
+
+/**
+ * Fetch each reserve's `get_reserve` view ONCE, in parallel, returning the decoded
+ * results aligned to `reserves` order (each entry `null` on any RPC/decode error).
+ * This is the single shared read that both the supplied-position and the est.-APY
+ * readouts consume — fetch a reserve here once, then feed it to both pure helpers
+ * (`suppliedPositionFromReserve` here, `supplyApyFromReserve` in `apr.ts`) instead
+ * of hitting `get_reserve` twice per refresh.
+ */
+export async function readReserves(
+  poolId: string,
+  reserves: ReserveRef[],
+  opts: RpcOpts,
+): Promise<Array<unknown | null>> {
+  return Promise.all(
+    reserves.map((r) =>
+      simulateView(poolId, 'get_reserve', new Address(r.assetId).toScVal(), opts),
+    ),
+  );
+}
+
+// The `get_reserve` fields the supplied-position conversion needs.
+type PositionReserve =
+  | { config?: { index?: number; decimals?: number }; data?: { b_rate?: bigint | string } }
+  | null
+  | undefined;
+
+/**
+ * Compute one supplied position from an already-decoded `get_reserve` result and
+ * the user's supply map. Pure — separated from the RPC read so the same decoded
+ * reserve can drive both this and the APY estimate. Fail-soft: an unreadable
+ * reserve (missing index / `b_rate`) yields a zero position rather than dropping
+ * the row, exactly as before.
+ */
+export function suppliedPositionFromReserve(
+  ref: ReserveRef,
+  reserve: unknown,
+  supply: Record<number, bigint>,
+): SuppliedPosition {
+  const rv = reserve as PositionReserve;
+  const index = rv?.config?.index;
+  const decimals = rv?.config?.decimals ?? 7;
+  const bRate = rv?.data?.b_rate;
+  if (index == null || bRate == null) {
+    return { code: ref.code, suppliedBase: '0', decimals };
+  }
+  const bTokens = supply[index] ?? 0n;
+  return { code: ref.code, suppliedBase: bTokensToUnderlying(bTokens, bRate), decimals };
+}
+
+/**
+ * Assemble the per-reserve supplied positions from a shared `readReserves` result
+ * plus the user's supply map. Pure. Returns `null` when the supply map is `null`
+ * (positions unreadable), so the caller omits the readout entirely.
+ */
+export function suppliedPositionsFromReserves(
+  reserves: ReserveRef[],
+  decodedReserves: Array<unknown | null>,
+  supply: Record<number, bigint> | null,
+): SuppliedPosition[] | null {
+  if (supply == null) return null;
+  return reserves.map((r, i) => suppliedPositionFromReserve(r, decodedReserves[i], supply));
+}
+
+/**
  * Read the user's supplied balance for each of `reserves` in a pool. Returns one
  * entry per reserve (0 when nothing is supplied), or `null` if positions can't be
  * read at all. Each reserve's index + decimals + `b_rate` come from `get_reserve`;
  * the supplied bTokens come from `get_positions`, converted to the underlying.
+ *
+ * The `get_positions` read and the per-reserve `get_reserve` reads run in parallel.
+ * Kept for back-compat; callers that also need APYs should instead share a single
+ * `readReserves` result across both readouts (see `readReserves` / Earn.tsx) so
+ * `get_reserve` is fetched once per reserve rather than twice per refresh.
  */
 export async function readSuppliedPositions(
   poolId: string,
@@ -122,29 +205,9 @@ export async function readSuppliedPositions(
   reserves: ReserveRef[],
   opts: RpcOpts,
 ): Promise<SuppliedPosition[] | null> {
-  const positions = await simulateView(poolId, 'get_positions', new Address(user).toScVal(), opts);
-  if (positions == null) return null;
-  const supply = supplyMap(positions);
-
-  const out: SuppliedPosition[] = [];
-  for (const r of reserves) {
-    const reserve = (await simulateView(
-      poolId,
-      'get_reserve',
-      new Address(r.assetId).toScVal(),
-      opts,
-    )) as { config?: { index?: number; decimals?: number }; data?: { b_rate?: bigint | string } } | null;
-
-    const index = reserve?.config?.index;
-    const decimals = reserve?.config?.decimals ?? 7;
-    const bRate = reserve?.data?.b_rate;
-    if (index == null || bRate == null) {
-      // Reserve unreadable — report a zero position rather than dropping the row.
-      out.push({ code: r.code, suppliedBase: '0', decimals });
-      continue;
-    }
-    const bTokens = supply[index] ?? 0n;
-    out.push({ code: r.code, suppliedBase: bTokensToUnderlying(bTokens, bRate), decimals });
-  }
-  return out;
+  const [supply, decodedReserves] = await Promise.all([
+    readSupplyMap(poolId, user, opts),
+    readReserves(poolId, reserves, opts),
+  ]);
+  return suppliedPositionsFromReserves(reserves, decodedReserves, supply);
 }
