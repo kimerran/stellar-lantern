@@ -1,0 +1,13 @@
+# GitGuardian configuration.
+#
+# The unit-test suite uses throwaway, non-secret credentials to exercise the
+# vault / session / biometric flows — fake wallet unlock passwords (e.g. 'pw',
+# 'new-pw') and runtime-generated BIP-39 mnemonics. None of these are real
+# secrets; they never leave the test process. The generic-password detector's
+# hits under `tests/` are therefore false positives (real secrets must never
+# live in unit tests regardless), so we exclude the test tree from secret
+# detection rather than chasing individual literals.
+version: 2
+secret:
+  ignored-paths:
+    - "tests/**"
