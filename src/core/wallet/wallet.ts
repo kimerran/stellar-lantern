@@ -1,11 +1,12 @@
 import { Keypair, StrKey } from '@stellar/stellar-sdk';
-import { generateMnemonic as bip39Generate, mnemonicToSeedSync, validateMnemonic } from 'bip39';
+import { generateMnemonic as bip39Generate, mnemonicToSeedSync, validateMnemonic } from './mnemonic';
 import { deriveEd25519Seed } from './derivation';
 
-// SEP-0005 derivation for Stellar account 0 (path m/44'/148'/0'). We use bip39
-// (pure-JS @noble/hashes) for the mnemonic + seed and our own SLIP-0010 ed25519
-// derivation (see ./derivation.ts) so the worker bundle never pulls in the
-// fragile create-hmac/crypto-browserify chain.
+// SEP-0005 derivation for Stellar account 0 (path m/44'/148'/0'). We use our own
+// English-only BIP-39 (see ./mnemonic.ts, a faithful bip39@3.1.0 port over the
+// pure-JS @noble/hashes) plus our own SLIP-0010 ed25519 derivation (see
+// ./derivation.ts) so the worker bundle never pulls in the fragile
+// create-hmac/crypto-browserify chain — nor the 9 non-English bip39 wordlists.
 
 export type MnemonicStrength = 128 | 256; // 12 or 24 words
 const STELLAR_PATH = "m/44'/148'/0'";

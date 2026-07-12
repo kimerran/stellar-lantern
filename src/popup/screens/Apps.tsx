@@ -40,8 +40,8 @@ import { isNativePlatform } from '@shared/kv';
 // Bundled apps are self-contained static pages; the URL bar is best-effort (most
 // real sites refuse framing via X-Frame-Options). A read-only wallet bridge lets
 // an embedded app request the public key + network via postMessage (with user
-// approval) — see Browser below. Signing is not yet exposed; the "Checked by
-// Lantern" chip is still visual only.
+// approval) — see Browser below. The header trust chip reflects real state:
+// "Checked" only for bundled first-party pages, "Unverified" for remote sites.
 
 type Open =
   | { kind: 'app'; app: MiniApp; src: string; title: string; origin: string }
@@ -287,6 +287,12 @@ function Browser({
   const [submitting, setSubmitting] = useState(false);
   const [signErr, setSignErr] = useState<string | null>(null);
   const [confirmText, setConfirmText] = useState('');
+  // Modal plumbing for the sign & submit sheet (dialog semantics + focus trap):
+  // the sheet itself, the element focused before it opened (restored on close),
+  // and a submit-in-flight guard so Escape can't reject a tx mid-submission.
+  const signSheetRef = useRef<HTMLDivElement>(null);
+  const signTriggerRef = useRef<HTMLElement | null>(null);
+  const submittingRef = useRef(false);
 
   function postToApp(message: unknown) {
     frameRef.current?.contentWindow?.postMessage(message, '*');
@@ -403,6 +409,7 @@ function Browser({
 
   async function approveSign() {
     if (!signReq) return;
+    submittingRef.current = true;
     setSubmitting(true);
     setSignErr(null);
     const cfg = NETWORKS[network];
@@ -412,6 +419,7 @@ function Browser({
       networkPassphrase: cfg.passphrase,
       horizonUrl: cfg.horizonUrl,
     });
+    submittingRef.current = false;
     setSubmitting(false);
     if (res.ok) {
       postToApp({ type: 'lantern:txResult', hash: res.data.hash });
@@ -425,6 +433,63 @@ function Browser({
     setSignReq(null);
     setSignErr(null);
   }
+
+  // Make the sign & submit sheet a real modal dialog (#127): trap Tab focus,
+  // move focus into the sheet on open and restore it on close, and let Escape
+  // REJECT the request. Escape rejects rather than approves, so it can never
+  // bypass the high-risk type-CONFIRM / hold-to-sign gate. A submit-in-flight
+  // guard stops Escape from racing an approval that's already been sent.
+  useEffect(() => {
+    if (!signReq) return;
+    const sheet = signSheetRef.current;
+    if (!sheet) return;
+    signTriggerRef.current = document.activeElement as HTMLElement | null;
+    // Focus the container (tabindex -1), not a button — a confirmation dialog
+    // shouldn't pre-arm an action that a stray Enter could fire.
+    sheet.focus();
+
+    function focusable(): HTMLElement[] {
+      return Array.from(
+        sheet!.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => el.offsetParent !== null);
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        if (submittingRef.current) return; // don't reject a send already in flight
+        e.preventDefault();
+        rejectSign();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const items = focusable();
+      if (items.length === 0) {
+        e.preventDefault();
+        sheet!.focus();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (!first || !last) return;
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || active === sheet)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown, true);
+      signTriggerRef.current?.focus?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signReq]);
 
   // If a remote frame never reports a load within the window, the site blocked
   // it before navigation committed (common with frame-ancestors 'none').
@@ -492,10 +557,28 @@ function Browser({
             {open.origin}
           </span>
         </span>
-        <span className="flex shrink-0 items-center gap-1 rounded-full bg-surface-container-high px-2 py-1 text-label-sm text-on-surface-variant">
-          <Icon name="security" filled size={13} className="text-primary-container" />
-          Checked
-        </span>
+        {/* Trust chip — driven by what we actually know, not a hardcoded label.
+            Bundled apps are first-party pages shipped and reviewed inside the
+            extension, so "Checked" is honest. Remote URLs (URL bar + remote
+            directory apps) are arbitrary sites we only sandbox — we make no
+            safety claim about them, so they read "Unverified". */}
+        {isRemote ? (
+          <span
+            className="flex shrink-0 items-center gap-1 rounded-full bg-surface-container-high px-2 py-1 text-label-sm text-on-surface-variant"
+            title="External site — loaded in a sandbox and not verified by Lantern."
+          >
+            <Icon name="gpp_maybe" size={13} className="text-on-surface-variant" />
+            Unverified
+          </span>
+        ) : (
+          <span
+            className="flex shrink-0 items-center gap-1 rounded-full bg-surface-container-high px-2 py-1 text-label-sm text-on-surface-variant"
+            title="Bundled Lantern mini-app — a first-party page shipped with the wallet."
+          >
+            <Icon name="security" filled size={13} className="text-primary-container" />
+            Checked
+          </span>
+        )}
         <button
           onClick={reload}
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-variant hover:text-on-surface active:scale-95"
@@ -602,10 +685,17 @@ function Browser({
         const native = isNativePlatform();
         const acknowledged = !isHigh || native || confirmText.trim().toUpperCase() === 'CONFIRM';
         return (
-          <div className="absolute inset-x-0 bottom-0 z-20 max-h-[80%] space-y-3 overflow-y-auto rounded-t-2xl border-t border-outline-variant/40 bg-surface-container p-4 shadow-layer-1">
+          <div
+            ref={signSheetRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sign-sheet-title"
+            tabIndex={-1}
+            className="absolute inset-x-0 bottom-0 z-20 max-h-[80%] space-y-3 overflow-y-auto rounded-t-2xl border-t border-outline-variant/40 bg-surface-container p-4 shadow-layer-1 focus:outline-none"
+          >
             <div className="flex items-center gap-2">
               <Icon name="draw" size={18} className="text-primary-container" />
-              <span className="text-title-sm text-on-surface">
+              <span id="sign-sheet-title" className="text-title-sm text-on-surface">
                 <span className="font-semibold">{open.title}</span> wants to send
               </span>
             </div>
