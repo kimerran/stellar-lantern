@@ -27,6 +27,20 @@ const SCAM_MEMO_RE = /\b(seed|secret|recovery|phrase|password|verify|claim|airdr
 const HIGH_BALANCE_SHARE = 0.9; // sending ≥90% of spendable balance
 const MEDIUM_BALANCE_SHARE = 0.5;
 
+// Op types the scanner explicitly models (decode surfaces their fields and the
+// engine has tailored reasons for the risky ones). accountMerge is modeled too —
+// it gets its own high-severity reason above. Anything NOT in this set is
+// unrecognized and gets the catch-all "unrecognized operation" warning. (#127)
+const MODELED_OP_TYPES = new Set<string>([
+  'payment',
+  'createAccount',
+  'pathPaymentStrictSend',
+  'pathPaymentStrictReceive',
+  'setOptions',
+  'invokeHostFunction',
+  'accountMerge',
+]);
+
 export interface ScanInput {
   xdr: string;
   networkPassphrase: string;
@@ -43,6 +57,24 @@ export function scan({ xdr, networkPassphrase, context }: ScanInput): ScanVerdic
   // (#81) — the whole branch dead-code-eliminates when the flag is off.
   if (__FEATURE_DEMO_AFFORDANCES__ && context.forceScenario) {
     return forced(context.forceScenario, explanation);
+  }
+
+  // Fail CLOSED on an undecodable payload. If decoding returned null the XDR is
+  // malformed or uses something we don't support — none of the heuristics below
+  // can run, and skipping them would collapse the verdict to a benign "low"
+  // ("allow"), presenting a transaction we CANNOT understand as safe to sign
+  // (audit #127). Instead surface a high-severity reason and route it straight
+  // to the CONFIRM / press-and-hold gate. Return early, before any heuristic
+  // that assumes a decoded tx.
+  if (!decoded) {
+    reasons.push({
+      code: 'undecodable',
+      severity: 'high',
+      title: 'Couldn’t read this transaction',
+      detail:
+        'Lantern couldn’t decode this transaction and can’t verify it’s safe — do not sign unless you’re certain.',
+    });
+    return verdictFrom(reasons, explanation);
   }
 
   const dest = decoded?.primaryDestination;
@@ -130,6 +162,34 @@ export function scan({ xdr, networkPassphrase, context }: ScanInput): ScanVerdic
     });
   }
 
+  // accountMerge drains the account's ENTIRE XLM balance to the merge target and
+  // permanently closes the account — the single most destructive op, yet it
+  // decodes to a plain unvalued transfer. Surface it explicitly, naming the
+  // target, before any signing prompt. (#127)
+  const merge = decoded?.operations.find((o) => o.type === 'accountMerge');
+  if (merge) {
+    reasons.push({
+      code: 'account_merge',
+      severity: 'high',
+      title: 'Transfers everything & closes this account',
+      detail: `This transfers your entire XLM balance to ${truncateAddress(merge.destination ?? '', 4, 4)} and permanently closes this account. Only continue if you set this up yourself.`,
+    });
+  }
+
+  // Any op type the scanner doesn't explicitly model (clawback, setTrustLineFlags,
+  // manageData, or a genuinely unknown type) could move funds or change
+  // permissions in ways we can't describe. Rather than let it render as a benign
+  // unvalued op, raise a catch-all warning so the user reviews it. (#127)
+  const unrecognized = decoded?.operations.find((o) => !MODELED_OP_TYPES.has(o.type));
+  if (unrecognized) {
+    reasons.push({
+      code: 'unrecognized_op',
+      severity: 'medium',
+      title: 'Unrecognized operation',
+      detail: `This includes a “${humanizeOpType(unrecognized.type)}” operation Lantern can’t fully check. Review it carefully and only continue if you trust the source.`,
+    });
+  }
+
   // A swap normally routes its proceeds back to the sender (a self-swap). One
   // that sends the swapped output to a DIFFERENT account is a "swap and send" —
   // the funds leave the wallet, and a drainer could disguise a transfer as a
@@ -182,6 +242,11 @@ function highestSeverity(reasons: ScanReason[]): 'low' | 'medium' | 'high' {
   if (reasons.some((r) => r.severity === 'high')) return 'high';
   if (reasons.some((r) => r.severity === 'medium')) return 'medium';
   return 'low';
+}
+
+// "setTrustLineFlags" → "set trust line flags" for plain-language warnings.
+function humanizeOpType(type: string): string {
+  return type.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
 }
 
 function mockLatency(risk: 'low' | 'medium' | 'high'): number {
