@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lantern — UI screenshot harness</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=block"
+      rel="stylesheet"
+    />
+    <style>
+      /* The app's tailwind.css clamps body to the 360×600 popup box; override it
+         so the body shrink-wraps the composite and the backdrop stays uniform
+         (the capture script trims that uniform backdrop). !important beats the
+         non-important app rule regardless of stylesheet order. */
+      html, body {
+        width: auto !important; height: auto !important;
+        min-width: 0 !important; min-height: 0 !important;
+        margin: 0 !important; padding: 0 !important;
+        background: #070b14 !important;
+      }
+      body { display: inline-block !important; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

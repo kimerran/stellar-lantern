@@ -14,6 +14,7 @@
     "test:watch": "vitest",
     "icons": "node scripts/gen-icons.mjs",
     "icons:android": "node scripts/gen-android-icons.mjs",
+    "screenshots": "vite build --config scripts/screenshots/vite.config.ts && node scripts/screenshots/capture.mjs",
     "package": "npm run build && node scripts/package.mjs",
     "build:mobile": "tsc --noEmit && vite build --config vite.config.mobile.ts",
     "cap:sync": "npx cap sync android"
