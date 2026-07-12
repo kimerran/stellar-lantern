@@ -6,6 +6,29 @@ Self-custody has two silent killers: users approve transactions they can't read 
 
 ---
 
+## How Lantern compares (Stellar wallets, July 2026)
+
+A best-effort snapshot from public sources (official sites/docs, GitHub, and 2026 ecosystem write-ups) as of **July 2026** — wallet features move fast, so verify before relying on any cell. **✓** = yes · **~** = partial/limited · **—** = not offered or not publicly confirmed. Cells describe the *default in-wallet* experience, not what's merely reachable through an external dApp.
+
+| Capability | **Lantern** | Lobstr | Freighter | xBull | Rabet |
+|---|---|---|---|---|---|
+| Platforms | Extension + Android | iOS/Android/Web + ext | Extension + iOS/Android | Extension + mobile + web | Extension + desktop + mobile |
+| Scan **every** tx before signing | ✓ own on-device engine → plain-language + risk gate | ✓ Blockaid | ✓ Blockaid | — | — |
+| Guardian / social recovery (no seed) | ✓ native weighted-multisig guardians | ~ multisig Vault + email/code | — (seed phrase) | — | — |
+| Passkey smart accounts (seedless) | ✓ Soroban secp256r1 ¹ | ✓ passkey accounts | — | ~ announced (V2) | — |
+| Biometric unlock | ✓ (Android) | ✓ | ✓ | — | — |
+| In-wallet swaps | ✓ SDEX + Soroswap best-price aggregator ¹ | ✓ SDEX + cross-chain | ✓ SDEX | ✓ SDEX | ✓ SDEX |
+| Earn / lending (Blend) | ✓ native — our own Blend pool ¹ | — | — (via external dApp) | — (via external dApp) | — |
+| Fiat cash in/out (SEP-24 anchors) | ✓ in-app | ✓ card/bank/Apple·Google Pay | — | — | — |
+| dApp / mini-app browser | ✓ sandboxed, scan-gated bridge | ✓ WalletConnect v2 | ✓ dApp signer | ✓ dApp SDK | ✓ injected API |
+| Open source | ✓ | ~ (extension only) | ✓ | ✓ | ✓ |
+
+¹ **Testnet / opt-in today.** Lantern's Soroban features — passkey smart accounts (#53), the native Earn pool (#109), and the Soroswap best-price aggregator (#71) — currently run on Testnet and/or behind build flags. The wallet core, the scan gate, guardian recovery, SDEX swaps, SEP-24 anchors, and biometric unlock ship on both the extension and Android.
+
+**Where Lantern is different:** *every* signature — payment, trustline, `setOptions`, guardian recovery, or Soroban call — passes the same **scan → explain → confirm → sign** gate driven by an **auditable on-device risk engine** (rather than a single cloud provider), and it attacks the seed-phrase failure mode from both sides at once: **native-multisig guardian recovery** *and* **passkey smart accounts**. The mainstream incumbents (**Lobstr**, **Freighter**) pair excellent Blockaid scanning + biometrics but keep a recovery phrase; **xBull**/**Rabet** are lean open-source signers; passkey-native smart wallets (**Orbi**, SDF's **Meridian Pay**) and seedless consumer apps with guardianship + earn (**Beans**) each cover *parts* of Lantern's stack — but not the whole security-first surface in one open-source, extension-**and**-mobile package.
+
+*Not tabled above (different category):* remittance/payments apps (**Beans**, **Vesseo** — ex-Vibrant), passkey-native smart wallets (**Orbi**, **Meridian Pay**), the signer-only **Albedo**, and the now-dormant **Solar**.
+
 ## What's in the box (shipped today)
 
 | Area | What it does |
