@@ -10,6 +10,10 @@ app's actual compiled Tailwind CSS + design tokens and fonts (Inter + Material
 Symbols), captured with headless Chrome at the true 360×600 popup size. Data
 shown (balances, addresses, APYs) is representative placeholder content.
 
+**Regenerate** these images with `npm run screenshots` (the generator lives in
+[`scripts/screenshots/`](../../scripts/screenshots/README.md)). It renders the
+real screen components with the data layer stubbed, so the images track the UI.
+
 ## Primary surfaces
 
 ![Home, Settings, Activity, Earn](./overview.png)
