@@ -265,6 +265,16 @@ describe('scan engine (mock)', () => {
     expect(reason?.detail).toMatch(/manage data/i);
   });
 
+  it('fails CLOSED on an undecodable/garbage XDR (high, not low)', () => {
+    // Malformed payload the SDK can't parse — decodeTransaction returns null.
+    const v = scan({ xdr: 'not-valid-xdr!!', networkPassphrase: pp, context: { network: 'TESTNET', fromAddress: SOURCE } });
+    expect(v.risk).toBe('high');
+    expect(v.action).toBe('block_confirm');
+    expect(v.reasons.some((r) => r.code === 'undecodable')).toBe(true);
+    // A payload we can't understand must never render as benign.
+    expect(v.risk).not.toBe('low');
+  });
+
   it('honors the demo forceScenario override', () => {
     const xdr = xdrFor({ dest: NORMAL_DEST, amount: '1', funded: true });
     const v = scan({ xdr, networkPassphrase: pp, context: { network: 'TESTNET', fromAddress: SOURCE, forceScenario: 'high' } });
