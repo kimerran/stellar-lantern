@@ -70,6 +70,12 @@ function mapOp(op: Record<string, unknown>): DecodedOp {
         sendAmount: str(op.sendMax),
         destAssetCode: assetCode(op.destAsset),
       };
+    case 'accountMerge':
+      // accountMerge sends the ENTIRE remaining XLM balance to `destination` and
+      // deletes this account. There is no explicit amount field (it's always
+      // "everything"), so at least surface the merge target so it doesn't render
+      // blank; the engine flags it as high-impact. (#127)
+      return { type, destination: str(op.destination) };
     case 'setOptions':
       return { type, ...decodeSetOptions(op) };
     case 'invokeHostFunction':
