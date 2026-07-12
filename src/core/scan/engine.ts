@@ -45,6 +45,24 @@ export function scan({ xdr, networkPassphrase, context }: ScanInput): ScanVerdic
     return forced(context.forceScenario, explanation);
   }
 
+  // Fail CLOSED on an undecodable payload. If decoding returned null the XDR is
+  // malformed or uses something we don't support — none of the heuristics below
+  // can run, and skipping them would collapse the verdict to a benign "low"
+  // ("allow"), presenting a transaction we CANNOT understand as safe to sign
+  // (audit #127). Instead surface a high-severity reason and route it straight
+  // to the CONFIRM / press-and-hold gate. Return early, before any heuristic
+  // that assumes a decoded tx.
+  if (!decoded) {
+    reasons.push({
+      code: 'undecodable',
+      severity: 'high',
+      title: 'Couldn’t read this transaction',
+      detail:
+        'Lantern couldn’t decode this transaction and can’t verify it’s safe — do not sign unless you’re certain.',
+    });
+    return verdictFrom(reasons, explanation);
+  }
+
   const dest = decoded?.primaryDestination;
   const amount = Number(decoded?.primaryAmount ?? '0');
   const spendable = Number(context.spendableXlm ?? '0');
