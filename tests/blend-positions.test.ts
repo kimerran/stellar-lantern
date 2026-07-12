@@ -1,10 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { StrKey, nativeToScVal, xdr } from '@stellar/stellar-sdk';
+import { StrKey, TransactionBuilder, nativeToScVal, xdr } from '@stellar/stellar-sdk';
 import {
   bTokensToUnderlying,
   readSuppliedPositions,
+  readReserves,
+  readSupplyMap,
+  suppliedPositionsFromReserves,
   SCALAR_12,
 } from '@core/blend/positions';
+import { reserveApysFromReserves } from '@core/blend/apr';
 
 const USER = 'GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ';
 const POOL = StrKey.encodeContract(Buffer.alloc(32, 7));
@@ -115,5 +119,60 @@ describe('readSuppliedPositions', () => {
     const impl = rpcQueue(['http-fail']);
     const out = await readSuppliedPositions(POOL, USER, reserves, opts(impl));
     expect(out).toBeNull();
+  });
+});
+
+// The name of the invoked contract function, decoded from a simulate request's XDR.
+function invokedFn(txXdr: string): string {
+  const tx = TransactionBuilder.fromXDR(txXdr, 'Test SDF Network ; September 2015');
+  // The scan decoder isn't in scope here; reach into the SDK op union directly.
+  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+  const op = tx.operations[0] as any;
+  return op.func.invokeContract().functionName().toString();
+}
+
+// A fetch stub that answers by invoked function name and tallies each call, so we
+// can assert how many times `get_reserve` is actually hit per refresh.
+function countingRpc() {
+  const calls: Record<string, number> = { get_positions: 0, get_reserve: 0 };
+  const impl = ((_url: string, init: { body: string }) => {
+    const body = JSON.parse(init.body) as { params: { transaction: string } };
+    const fn = invokedFn(body.params.transaction);
+    calls[fn] = (calls[fn] ?? 0) + 1;
+    const val =
+      fn === 'get_positions' ? positionsScVal({ 3: 10000000n }) : reserveScVal(3, 7, B_RATE);
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({ jsonrpc: '2.0', id: 1, result: { results: [{ xdr: val.toXDR('base64') }] } }),
+    });
+  }) as unknown as typeof fetch;
+  return { impl, calls };
+}
+
+// Guards the de-dup fix (#127): deriving BOTH readouts from one shared reserve read
+// hits `get_reserve` once per reserve, not twice (the old positions+apr double read).
+describe('shared reserve read (de-dup)', () => {
+  it('fetches get_positions once and get_reserve once per reserve for both readouts', async () => {
+    const { impl, calls } = countingRpc();
+    const refs = reserves;
+
+    // Mirror Earn.tsx's per-pool refresh: one supply read + one shared reserve read.
+    const [supply, decoded] = await Promise.all([
+      readSupplyMap(POOL, USER, opts(impl)),
+      readReserves(POOL, refs, opts(impl)),
+    ]);
+    const supplied = suppliedPositionsFromReserves(refs, decoded, supply);
+    const apys = reserveApysFromReserves(refs, decoded);
+
+    // Both readouts were produced from the single shared fetch…
+    expect(supplied).not.toBeNull();
+    expect(supplied?.[0]).toEqual({ code: 'USDC', suppliedBase: '10558023', decimals: 7 });
+    expect(apys).not.toBeNull();
+
+    // …and get_reserve was hit exactly once per reserve (2), not twice (4).
+    expect(calls.get_positions).toBe(1);
+    expect(calls.get_reserve).toBe(refs.length);
   });
 });
