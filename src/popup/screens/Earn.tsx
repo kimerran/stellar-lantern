@@ -506,17 +506,19 @@ export function Earn({ address, network, onBack, embedded }: Props) {
                       {pool.reserves.map((r) => {
                         const supplied = suppliedDisplay(pool.id, r);
                         return (
-                          <li key={r.assetId} className="flex items-center gap-2">
-                            <div className="w-24 shrink-0">
-                              <div className="font-mono text-label-md text-on-surface">{r.code}</div>
-                              <div className="text-label-sm text-primary-container">
+                          <li key={r.assetId} className="space-y-2">
+                            <div className="flex items-baseline gap-2">
+                              <span className="font-mono text-label-md text-on-surface">{r.code}</span>
+                              <span className="text-label-sm text-primary-container">
                                 {formatApy(apyFor(pool.id, r.code))} est. APY
-                              </div>
+                              </span>
                               {supplied && (
-                                <div className="text-label-sm text-on-surface-variant">{supplied} earning</div>
+                                <span className="ml-auto truncate text-label-sm text-on-surface-variant">
+                                  {supplied} earning
+                                </span>
                               )}
                             </div>
-                            <div className="grid flex-1 grid-cols-2 gap-2">
+                            <div className="grid grid-cols-2 gap-2">
                               <ActionButton label="Supply" icon="south_west" onClick={() => choose(pool, r, 'supply')} />
                               <ActionButton label="Withdraw" icon="north_east" onClick={() => choose(pool, r, 'withdraw')} />
                             </div>
@@ -552,7 +554,7 @@ function ActionButton({ label, icon, onClick }: { label: string; icon: string; o
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center justify-center gap-1.5 rounded-lg border border-outline-variant px-3 py-2 text-label-lg text-on-surface transition-colors hover:bg-surface-variant active:scale-95"
+      className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-outline-variant px-3 py-2 text-label-lg text-on-surface transition-colors hover:bg-surface-variant active:scale-95"
     >
       <Icon name={icon} size={16} className="text-primary-container" />
       {label}
