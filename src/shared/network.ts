@@ -15,13 +15,19 @@ function overrideKey(id: NetworkId): keyof EndpointOverrides {
   return id === 'TESTNET' ? 'testnet' : 'public';
 }
 
-// A trimmed override only counts if it's a non-empty http(s) URL — a blank field
-// (or whitespace) means "use the default", and we never let a malformed value
-// silently replace a working endpoint.
+// A trimmed override only counts if it's a non-empty HTTPS URL — plaintext
+// `http://` is rejected so a MITM can't feed the wallet forged account /
+// simulation data, EXCEPT `http://localhost` and `http://127.0.0.1` (with an
+// optional port) which stay allowed for local dev quickstart nodes. A blank
+// field (or whitespace) means "use the default", and any other non-HTTPS value
+// falls back the same way — we never let a malformed or insecure value silently
+// replace a working endpoint.
 function cleanOverride(value: string | undefined): string | undefined {
   const v = value?.trim();
   if (!v) return undefined;
-  return /^https?:\/\//i.test(v) ? v : undefined;
+  if (/^https:\/\//i.test(v)) return v;
+  if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(v)) return v;
+  return undefined;
 }
 
 /**
