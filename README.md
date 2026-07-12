@@ -6,6 +6,29 @@ Self-custody has two silent killers: users approve transactions they can't read 
 
 ---
 
+## How Lantern compares (Stellar wallets, July 2026)
+
+A best-effort snapshot from public sources (official sites/docs, GitHub, and 2026 ecosystem write-ups) as of **July 2026** — wallet features move fast, so verify before relying on any cell. **✓** = yes · **~** = partial/limited · **—** = not offered or not publicly confirmed. Cells describe the *default in-wallet* experience, not what's merely reachable through an external dApp.
+
+| Capability | **Lantern** | Lobstr | Freighter | xBull | Rabet |
+|---|---|---|---|---|---|
+| Platforms | Extension + Android | iOS/Android/Web + ext | Extension + iOS/Android | Extension + mobile + web | Extension + desktop + mobile |
+| Scan **every** tx before signing | ✓ own on-device engine → plain-language + risk gate | ✓ Blockaid | ✓ Blockaid | — | — |
+| Guardian / social recovery (no seed) | ✓ native weighted-multisig guardians | ~ multisig Vault + email/code | — (seed phrase) | — | — |
+| Passkey smart accounts (seedless) | ✓ Soroban secp256r1 ¹ | ✓ passkey accounts | — | ~ announced (V2) | — |
+| Biometric unlock | ✓ (Android) | ✓ | ✓ | — | — |
+| In-wallet swaps | ✓ SDEX + Soroswap best-price aggregator ¹ | ✓ SDEX + cross-chain | ✓ SDEX | ✓ SDEX | ✓ SDEX |
+| Earn / lending (Blend) | ✓ native — our own Blend pool ¹ | — | — (via external dApp) | — (via external dApp) | — |
+| Fiat cash in/out (SEP-24 anchors) | ✓ in-app | ✓ card/bank/Apple·Google Pay | — | — | — |
+| dApp / mini-app browser | ✓ sandboxed, scan-gated bridge | ✓ WalletConnect v2 | ✓ dApp signer | ✓ dApp SDK | ✓ injected API |
+| Open source | ✓ | ~ (extension only) | ✓ | ✓ | ✓ |
+
+¹ **Testnet / opt-in today.** Lantern's Soroban features — passkey smart accounts (#53), the native Earn pool (#109), and the Soroswap best-price aggregator (#71) — currently run on Testnet and/or behind build flags. The wallet core, the scan gate, guardian recovery, SDEX swaps, SEP-24 anchors, and biometric unlock ship on both the extension and Android.
+
+**Where Lantern is different:** *every* signature — payment, trustline, `setOptions`, guardian recovery, or Soroban call — passes the same **scan → explain → confirm → sign** gate driven by an **auditable on-device risk engine** (rather than a single cloud provider), and it attacks the seed-phrase failure mode from both sides at once: **native-multisig guardian recovery** *and* **passkey smart accounts**. The mainstream incumbents (**Lobstr**, **Freighter**) pair excellent Blockaid scanning + biometrics but keep a recovery phrase; **xBull**/**Rabet** are lean open-source signers; passkey-native smart wallets (**Orbi**, SDF's **Meridian Pay**) and seedless consumer apps with guardianship + earn (**Beans**) each cover *parts* of Lantern's stack — but not the whole security-first surface in one open-source, extension-**and**-mobile package.
+
+*Not tabled above (different category):* remittance/payments apps (**Beans**, **Vesseo** — ex-Vibrant), passkey-native smart wallets (**Orbi**, **Meridian Pay**), the signer-only **Albedo**, and the now-dormant **Solar**.
+
 ## What's in the box (shipped today)
 
 | Area | What it does |
@@ -77,6 +100,40 @@ VITE_FEATURE_SWAP=false npm run build              # store build without swaps
 Both build targets (`build` → `dist/`, `build:mobile` → `dist-mobile/`) honor the
 same flags via a shared helper, and `npm run verify:flags` asserts an off flag's
 code is actually absent from the emitted bundle.
+
+## Testnet smart contracts
+
+All Soroban work runs on the **Stellar Testnet** (`Test SDF Network ; September 2015`,
+RPC `https://soroban-testnet.stellar.org`). Testnet is periodically reset, which
+wipes deployed state — re-deploy and update the pinned ids when that happens.
+Explore any id at `https://stellar.expert/explorer/testnet/contract/<id>`.
+
+### Deployed by Lantern
+
+| Contract | Address / hash | Purpose |
+| --- | --- | --- |
+| **Lantern Earn** (Blend v2 pool) | `CC4KSBTTPCKZUYBXB47SSZGXTKO6G23Y6LJOIR6YCOJVTGJZEYJCHBOH` | Our own lending pool, deployed via the Blend factory with curated USDC + XLM reserves (#109). Wired in `src/core/blend/directory.ts`; re-deploy with `scripts/deploy-lantern-pool.sh`. |
+| **Passkey smart account** (WASM) | wasm hash `8759fa9e49446cb8d332da8fee973c453b1178fb0525345892991f4997d8451b` | secp256r1 / WebAuthn custom-account contract (#53). The WASM is installed on testnet and vendored in `src/core/passkey/contractWasm.ts`; a fresh **instance** is deployed per passkey account during seed-phrase-free onboarding. |
+
+### Reserve / asset tokens (Stellar Asset Contracts)
+
+| Asset | SAC address | Used by |
+| --- | --- | --- |
+| **USDC** | `CAQCFVLOBK5GIULPNZRGATJJMIZL5BSP7X5YJVMGCPTUEPFM4AVSRCJU` | Earn (supply/withdraw), swaps |
+| **XLM** (native) | `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC` | Earn (supply/withdraw), swaps |
+
+### Blend v2 infrastructure we build on
+
+Third-party contracts from [blend-utils](https://github.com/blend-capital/blend-utils)
+(`testnet.contracts.json`) — not ours, but our pool + Earn stack depend on them.
+
+| Contract | Address | Role |
+| --- | --- | --- |
+| **poolFactoryV2** | `CDV6RX4CGPCOKGTBFS52V3LMWQGZN3LCQTXF5RVPOOCG4XVMHXQ4NTF6` | Deploys the Lantern Earn pool instance |
+| **oraclemock** | `CAZOKR2Y5E2OSWSIBRVZMJ47RUTQPIGVWSAQ2UISGAVC46XKPGDG5PKI` | Prices the USDC / XLM reserves |
+| **backstopV2** | `CBDVWXT433PRVTUNM56C3JREF3HIZHRBA64NB2C3B2UNCKIS65ZYCLZA` | Blend backstop module |
+| **Blend V2 Testnet Pool** | `CCEBVDYM32YNYCVNRXQKDFFPISJJCV557CDZEIRBEE4NCV4KHPQ44HGF` | Third-party pool also listed in the Earn directory (proves no ABI regression) |
+| **BLND token** | `CB22KRA3YZVCNCQI64JQ5WE7UY2VAV7WFLK6A2JN3HEX56T2EDAFO7QF` | Blend emissions token |
 
 ## Architecture
 
