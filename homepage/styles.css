@@ -246,6 +246,27 @@ section { padding: 76px 0; }
 .feature h3 { font-size: 1.15rem; margin-bottom: 8px; letter-spacing: -0.01em; }
 .feature p { color: var(--on-surface-variant); font-size: 0.95rem; }
 
+/* ───────── Screens gallery ───────── */
+.screens { border-top: 1px solid rgba(79, 70, 50, 0.4); }
+.gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+.shot {
+  background: var(--surface);
+  border: 1px solid rgba(79, 70, 50, 0.45);
+  border-radius: 20px;
+  padding: 14px 14px 18px;
+  transition: transform 0.25s var(--ease), border-color 0.25s, background 0.25s;
+}
+.shot:hover { transform: translateY(-5px); border-color: rgba(255, 193, 7, 0.35); background: var(--surface-high); }
+.shot img {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(79, 70, 50, 0.5);
+  box-shadow: 0 22px 55px rgba(0, 0, 0, 0.5);
+}
+.shot .cap { display: block; margin-top: 16px; padding: 0 4px; }
+.shot .cap b { display: block; font-size: 1rem; font-weight: 600; color: var(--amber-bright); letter-spacing: -0.01em; }
+.shot .cap span { display: block; margin-top: 3px; color: var(--on-surface-variant); font-size: 0.9rem; line-height: 1.5; }
+
 /* ───────── Install steps ───────── */
 .install { background: var(--surface-lowest); border-top: 1px solid rgba(79,70,50,0.4); border-bottom: 1px solid rgba(79,70,50,0.4); }
 .beta-tag {
@@ -363,6 +384,7 @@ footer { border-top: 1px solid rgba(79, 70, 50, 0.5); padding: 56px 0 40px; back
   .hero-grid { grid-template-columns: 1fr; gap: 40px; }
   .hero p.lede { max-width: none; }
   .features { grid-template-columns: 1fr 1fr; }
+  .gallery { grid-template-columns: 1fr 1fr; gap: 18px; }
   .steps { grid-template-columns: 1fr; }
   .showcase-grid { grid-template-columns: 1fr; gap: 32px; }
   .nav-links { display: none; }
@@ -377,6 +399,7 @@ footer { border-top: 1px solid rgba(79, 70, 50, 0.5); padding: 56px 0 40px; back
 }
 @media (max-width: 560px) {
   .features { grid-template-columns: 1fr; }
+  .gallery { grid-template-columns: 1fr; max-width: 380px; margin: 0 auto; }
   .cookie { left: 16px; right: 16px; bottom: 16px; max-width: none; }
   section { padding: 60px 0; }
 }
