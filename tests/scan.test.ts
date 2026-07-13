@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Account, Contract, nativeToScVal, Networks, Operation, TransactionBuilder } from '@stellar/stellar-sdk';
-import { scan, DEMO_FLAGGED_ADDRESSES, sampleVerdict } from '@core/scan/engine';
+import { scan, DEMO_FLAGGED_ADDRESSES, isReportedAddress, sampleVerdict } from '@core/scan/engine';
 import { buildTransferXdr } from '@core/stellar/tx';
 import { analyzeMessage } from '@core/scan/paste';
 import { decodeTransaction } from '@core/scan/decode';
@@ -311,5 +311,29 @@ describe('paste-to-check (mock)', () => {
     const v = analyzeMessage('Your account is locked, act immediately');
     expect(v.risk).toBe('medium');
     expect(v.tier).toBe(2);
+  });
+});
+
+describe('isReportedAddress — demo deny-list network/flag gating', () => {
+  const flagged = [...DEMO_FLAGGED_ADDRESSES][0]!;
+
+  it('flags a deny-listed address on TESTNET even with demo affordances OFF', () => {
+    expect(isReportedAddress(flagged, Networks.TESTNET, false)).toBe(true);
+  });
+
+  it('does NOT flag it on MAINNET when demo affordances are OFF', () => {
+    expect(isReportedAddress(flagged, Networks.PUBLIC, false)).toBe(false);
+  });
+
+  it('flags it on MAINNET only when demo affordances are ON', () => {
+    expect(isReportedAddress(flagged, Networks.PUBLIC, true)).toBe(true);
+  });
+
+  it('never flags a non-deny-listed address (testnet, flag off)', () => {
+    expect(isReportedAddress(NORMAL_DEST, Networks.TESTNET, false)).toBe(false);
+  });
+
+  it('returns false for an undefined destination', () => {
+    expect(isReportedAddress(undefined, Networks.TESTNET, false)).toBe(false);
   });
 });
