@@ -2,6 +2,7 @@ import { ACTION_FOR, type DecodedOp, type ScanContext, type ScanReason, type Sca
 import { decodeTransaction } from './decode';
 import { explainTransaction } from './explainer';
 import { truncateAddress } from '@shared/format';
+import { NETWORKS } from '@shared/constants';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MOCK scan engine.
@@ -20,6 +21,24 @@ import { truncateAddress } from '@shared/format';
 export const DEMO_FLAGGED_ADDRESSES = new Set<string>([
   'GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ',
 ]);
+
+// Whether `dest` should be surfaced as a reported/scam address. The demo
+// deny-list stands in for the real reputation feed (#22); until that lands it is
+// active on **TESTNET in every build** — so scam-flagging is demoable and
+// testable without a special demo build — and on other networks only when
+// DEMO_AFFORDANCES is on. A real mainnet build therefore never presents this
+// hardcoded verdict to users; #22 replaces this branch. Pure + explicitly
+// parameterised (network + flag) so the gating is unit-testable independent of
+// the build-time `__FEATURE_DEMO_AFFORDANCES__` define.
+export function isReportedAddress(
+  dest: string | undefined,
+  networkPassphrase: string,
+  demoAffordances: boolean,
+): boolean {
+  if (!dest) return false;
+  if (!demoAffordances && networkPassphrase !== NETWORKS.TESTNET.passphrase) return false;
+  return DEMO_FLAGGED_ADDRESSES.has(dest);
+}
 
 // Words seen in memos used by drainer / fake-airdrop scams.
 const SCAM_MEMO_RE = /\b(seed|secret|recovery|phrase|password|verify|claim|airdrop|unlock|validate)\b/i;
@@ -82,10 +101,11 @@ export function scan({ xdr, networkPassphrase, context }: ScanInput): ScanVerdic
   const spendable = Number(context.spendableXlm ?? '0');
 
   // ── Tier 0: rules + (mock) reputation ──
-  // The hardcoded demo deny-list stands in for the real risk backend (#22); gate
-  // it behind DEMO_AFFORDANCES so it (and its addresses) compile out of a store
-  // build (#81). The real reputation feed replaces this branch later.
-  if (__FEATURE_DEMO_AFFORDANCES__ && dest && DEMO_FLAGGED_ADDRESSES.has(dest)) {
+  // The hardcoded demo deny-list stands in for the real risk backend (#22).
+  // Active on testnet in every build (so scam-flagging is demoable/testable
+  // without a demo build) and elsewhere only under DEMO_AFFORDANCES — see
+  // isReportedAddress. The real reputation feed replaces this branch later.
+  if (isReportedAddress(dest, networkPassphrase, __FEATURE_DEMO_AFFORDANCES__)) {
     reasons.push({
       code: 'reported_address',
       severity: 'high',
