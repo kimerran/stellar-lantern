@@ -6,7 +6,7 @@
     <title>Lantern — Securely light your path to the decentralized web</title>
     <meta
       name="description"
-      content="Lantern is a non-custodial Stellar wallet for Chrome with an AI security layer that screens every transaction before you sign. Beta."
+      content="Lantern is a non-custodial Stellar wallet — Chrome extension and Android app — with an AI security layer that screens every transaction before you sign. Send, swap, earn, cash out, and recover with guardians. Beta."
     />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -32,6 +32,7 @@
         </a>
         <nav class="nav-links" id="nav-links">
           <a href="#features">Features</a>
+          <a href="#screens">Screens</a>
           <a href="#install">Install</a>
           <a href="Lantern_Pitch_Deck.pdf" target="_blank" rel="noopener">Pitch Deck</a>
           <a href="#contact">Contact</a>
@@ -54,12 +55,12 @@
               Securely light your path to the <span class="amber-text">decentralized web</span>.
             </h1>
             <p class="lede reveal-load d3">
-              Lantern is a Stellar wallet with an AI security layer that screens every transaction
-              before you sign — so scams never make it past the glow.
+              Lantern is a Stellar wallet — on Chrome and Android — with an AI security layer that
+              screens every transaction before you sign. So scams never make it past the glow.
             </p>
             <div class="hero-cta reveal-load d4">
               <a class="btn btn-primary" href="https://drive.google.com/drive/folders/1xNiN2ws0Uqfysv_fii0ZSfBd1116Woa4?usp=sharing" target="_blank" rel="noopener">
-                <span class="material-symbols-outlined">download</span> Download the Chrome Extension
+                <span class="material-symbols-outlined">download</span> Download
               </a>
               <a class="btn btn-ghost" href="#install">
                 <span class="material-symbols-outlined">menu_book</span> How to install
@@ -67,7 +68,7 @@
             </div>
             <p class="hero-note reveal-load d5">
               <span class="material-symbols-outlined">science</span>
-              Public Beta — installs in under a minute via Developer Mode.
+              Public Beta — Chrome extension &amp; Android APK, ready in about a minute.
             </p>
           </div>
 
@@ -84,39 +85,54 @@
           <div class="section-head reveal">
             <span class="eyebrow">Why Lantern</span>
             <h2>Your keys. Your coins. <span class="amber-text">An AI watching your back.</span></h2>
-            <p>Everything a Stellar wallet should do — plus a safety net between you and every signature.</p>
+            <p>Everything a Stellar wallet should do — send, swap, earn, and cash out — plus a safety net between you and every signature.</p>
           </div>
 
           <div class="features">
             <article class="feature reveal">
               <div class="chip"><span class="material-symbols-outlined">key</span></div>
               <h3>Non-custodial</h3>
-              <p>Your private keys are encrypted and never leave your device. No accounts, no middlemen.</p>
+              <p>Your private keys are encrypted on-device and never leave it. No accounts, no custodians — just you.</p>
             </article>
             <article class="feature reveal">
               <div class="chip"><span class="material-symbols-outlined">security</span></div>
-              <h3>AI scam shield</h3>
-              <p>Every transaction is screened before you sign, with clear risk warnings in plain language.</p>
+              <h3>Scan every signature</h3>
+              <p>Payments, trustlines, contract calls — each one is decoded, explained in plain language, and gated when it's high-risk.</p>
             </article>
             <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">content_paste_search</span></div>
-              <h3>Paste-to-check</h3>
-              <p>Drop in a suspicious message and Lantern flags scam patterns instantly, on-device.</p>
+              <div class="chip"><span class="material-symbols-outlined">shield_person</span></div>
+              <h3>Guardian recovery</h3>
+              <p>Lose your seed, keep your funds. Appoint guardians and recover onto a new device with Stellar-native multisig — no 12 words to lose.</p>
+            </article>
+            <article class="feature reveal">
+              <div class="chip"><span class="material-symbols-outlined">savings</span></div>
+              <h3>Earn yield</h3>
+              <p>Supply assets to Blend lending pools — including our own Lantern Earn pool — and earn yield. Withdraw anytime.</p>
+            </article>
+            <article class="feature reveal">
+              <div class="chip"><span class="material-symbols-outlined">account_balance</span></div>
+              <h3>Cash in &amp; out</h3>
+              <p>Move between crypto and your bank or card through regulated SEP-24 anchors, right inside the wallet.</p>
+            </article>
+            <article class="feature reveal">
+              <div class="chip"><span class="material-symbols-outlined">swap_horiz</span></div>
+              <h3>In-wallet swaps</h3>
+              <p>Swap XLM and assets at the best price across Stellar's decentralized exchange — without leaving Lantern.</p>
             </article>
             <article class="feature reveal">
               <div class="chip"><span class="material-symbols-outlined">grid_view</span></div>
               <h3>Mini-app browser</h3>
-              <p>Explore Stellar dApps inside a sandboxed frame — your keys stay out of reach.</p>
+              <p>Explore Stellar dApps in a sandboxed frame. Connecting shares only your public key — signing always needs a separate prompt.</p>
             </article>
             <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">send</span></div>
-              <h3>Send in seconds</h3>
-              <p>Move XLM and assets with live fees, balances, and a clean review step every time.</p>
+              <div class="chip"><span class="material-symbols-outlined">content_paste_search</span></div>
+              <h3>Paste-to-check</h3>
+              <p>Drop in a suspicious address or message and Lantern flags scam patterns instantly, on-device.</p>
             </article>
             <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">open_in_full</span></div>
-              <h3>Popup or full screen</h3>
-              <p>Use it as a quick popup, or expand the whole wallet into a full browser tab.</p>
+              <div class="chip"><span class="material-symbols-outlined">devices</span></div>
+              <h3>Android &amp; Chrome</h3>
+              <p>One wallet, two homes: a Chrome/Edge extension and an Android app, built from a single codebase.</p>
             </article>
           </div>
         </div>
@@ -144,16 +160,61 @@
         </div>
       </section>
 
+      <!-- ───────── Screens ───────── -->
+      <section id="screens" class="screens">
+        <div class="wrap">
+          <div class="section-head reveal">
+            <span class="eyebrow">A closer look</span>
+            <h2>The whole wallet, <span class="amber-text">in your pocket.</span></h2>
+            <p>Real screens from the Lantern Android app — balances, sandboxed dApps, live yield, and guardian-grade settings.</p>
+          </div>
+
+          <div class="gallery">
+            <figure class="shot reveal">
+              <img src="screenshots/1185.png" alt="Lantern home screen showing an XLM balance with Send, Receive, Swap and Earn actions" loading="lazy" />
+              <figcaption class="cap"><b>Home</b><span>Balance, send, receive, swap and earn — one clean home.</span></figcaption>
+            </figure>
+            <figure class="shot reveal">
+              <img src="screenshots/1186.png" alt="Lantern mini-app browser listing curated Stellar dApps" loading="lazy" />
+              <figcaption class="cap"><b>Discover apps</b><span>A sandboxed mini-app browser for Stellar dApps.</span></figcaption>
+            </figure>
+            <figure class="shot reveal">
+              <img src="screenshots/1187.png" alt="A dApp connection prompt showing that only the public key is shared" loading="lazy" />
+              <figcaption class="cap"><b>Connect, safely</b><span>dApps get only your public key — signing always needs a separate prompt.</span></figcaption>
+            </figure>
+            <figure class="shot reveal">
+              <img src="screenshots/1189.png" alt="Earn screen showing Blend lending pool positions and APYs" loading="lazy" />
+              <figcaption class="cap"><b>Earn yield</b><span>Supply to Blend pools and track every position.</span></figcaption>
+            </figure>
+            <figure class="shot reveal">
+              <img src="screenshots/1190.png" alt="A supply confirmation reading back the smart-contract call in plain language" loading="lazy" />
+              <figcaption class="cap"><b>Read before you sign</b><span>Even a smart-contract call is explained before you confirm.</span></figcaption>
+            </figure>
+            <figure class="shot reveal">
+              <img src="screenshots/1188.png" alt="Settings screen with guardians, scam checks, cash in/out and network toggle" loading="lazy" />
+              <figcaption class="cap"><b>Settings</b><span>Guardians, scam checks, anchors and network — all in one place.</span></figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
       <!-- ───────── Install (Beta) ───────── -->
       <section id="install" class="install">
         <div class="wrap">
           <div class="section-head reveal">
             <span class="beta-tag"><span class="material-symbols-outlined" style="font-size:14px">science</span> Beta install</span>
-            <h2 style="margin-top:16px">Install the Beta in 5 steps</h2>
-            <p>Lantern isn't on the Chrome Web Store yet. You can load it directly in Developer Mode — it takes about a minute.</p>
+            <h2 style="margin-top:16px">Install the Beta</h2>
+            <p>Lantern isn't in the app stores yet. On Android, it's a one-tap APK. On Chrome or Edge, load the extension in Developer Mode — about a minute either way. Both live in the same download folder.</p>
           </div>
 
           <div class="steps">
+            <div class="step reveal" style="border-color: rgba(132,213,255,0.3); background: rgba(132,213,255,0.05);">
+              <div class="num"><span class="material-symbols-outlined" style="font-size:18px">android</span></div>
+              <div>
+                <h4>On Android? Just the APK</h4>
+                <p>Download <strong>lantern.apk</strong> from the folder, open it, and allow installs from unknown sources. That's it — the steps below are only for the desktop extension.</p>
+              </div>
+            </div>
             <div class="step reveal">
               <div class="num">1</div>
               <div>
@@ -200,9 +261,9 @@
 
           <div class="install-cta reveal">
             <a class="btn btn-primary" href="https://drive.google.com/drive/folders/1xNiN2ws0Uqfysv_fii0ZSfBd1116Woa4?usp=sharing" target="_blank" rel="noopener">
-              <span class="material-symbols-outlined">download</span> Download the Chrome Extension
+              <span class="material-symbols-outlined">download</span> Download
             </a>
-            <span class="muted" style="font-size:0.9rem">Works on Chrome &amp; Edge (Chromium).</span>
+            <span class="muted" style="font-size:0.9rem">Android APK + extension for Chrome &amp; Edge (Chromium).</span>
           </div>
         </div>
       </section>
@@ -228,14 +289,15 @@
         <div class="footer-grid">
           <div class="footer-brand">
             <a class="brand" href="#top"><img src="logo.jpg" alt="Lantern logo" /> Lantern</a>
-            <p>A non-custodial Stellar wallet with an AI security layer. Built by Artisam Labs.</p>
+            <p>A non-custodial Stellar wallet with an AI security layer — on Chrome and Android. Built by Artisam Labs.</p>
           </div>
           <div class="footer-col">
             <h5>Product</h5>
             <a href="https://drive.google.com/drive/folders/1xNiN2ws0Uqfysv_fii0ZSfBd1116Woa4?usp=sharing" target="_blank" rel="noopener">
-              <span class="material-symbols-outlined">download</span> Download Chrome extension
+              <span class="material-symbols-outlined">download</span> Download
             </a>
             <a href="#features"><span class="material-symbols-outlined">bolt</span> Features</a>
+            <a href="#screens"><span class="material-symbols-outlined">photo_library</span> Screens</a>
             <a href="#install"><span class="material-symbols-outlined">menu_book</span> Install guide</a>
           </div>
           <div class="footer-col">
