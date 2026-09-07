@@ -1,6 +1,7 @@
 #![cfg(test)]
 
 use super::*;
+use soroban_sdk::testutils::storage::Persistent as _;
 use soroban_sdk::testutils::{Address as _, Events, Ledger};
 use soroban_sdk::token::{StellarAssetClient, TokenClient};
 use soroban_sdk::{Env, Symbol, TryFromVal, Val};
@@ -57,6 +58,11 @@ fn entry_of(env: &Env, contract_id: &Address, subject: &Address) -> Option<Entry
             .persistent()
             .get(&DataKey::Entry(subject.clone()))
     })
+}
+
+/// Ledgers left before a persistent key expires, read from inside the contract.
+fn ttl_of(env: &Env, contract_id: &Address, key: &DataKey) -> u32 {
+    env.as_contract(contract_id, || env.storage().persistent().get_ttl(key))
 }
 
 fn count_of(env: &Env, contract_id: &Address) -> u32 {
@@ -148,6 +154,7 @@ fn report_creates_entry() {
             updated_at: 1_700_000_000,
             status: Status::Active,
             reports: 1,
+            index: 0,
         }
     );
     assert_eq!(count_of(&env, &f.contract_id), 1);
@@ -413,4 +420,64 @@ fn report_emits_event() {
     let data_val = Val::try_from_val(&env, &body.data).unwrap();
     let data: (Address, Reason, Status, u32) = TryFromVal::try_from_val(&env, &data_val).unwrap();
     assert_eq!(data, (reporter, Reason::Drainer, Status::Active, 1u32));
+}
+
+// --- #32: index TTL ---------------------------------------------------------
+
+/// `Index(i) -> subject` is a separate ledger entry from `Entry(subject)`, and
+/// a freshly written one starts at the network minimum TTL. If only the entry
+/// were bumped, the index would expire first and `Count`/`Entry` would keep
+/// claiming a subject that `list()` (#34) could no longer reach.
+#[test]
+fn report_extends_the_index_key_with_the_entry() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    let reporter = Address::generate(&env);
+    let subject = Address::generate(&env);
+    f.sac_admin.mint(&reporter, &(FEE * 10));
+
+    c.report(&reporter, &subject, &Reason::Scam, &no_evidence(&env));
+
+    let entry_ttl = ttl_of(&env, &f.contract_id, &DataKey::Entry(subject.clone()));
+    let index_ttl = ttl_of(&env, &f.contract_id, &DataKey::Index(0));
+    assert_eq!(index_ttl, entry_ttl);
+    assert!(index_ttl >= BUMP_THRESHOLD);
+}
+
+/// The same invariant on the repeat-report path: a later report has to find the
+/// subject's ordinal again (it is carried on the entry) and refresh that key,
+/// otherwise the gap reopens on every subsequent write.
+#[test]
+fn repeat_report_refreshes_the_index_key() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    let reporter = Address::generate(&env);
+    let other = Address::generate(&env);
+    let first = Address::generate(&env);
+    let second = Address::generate(&env);
+    f.sac_admin.mint(&reporter, &(FEE * 10));
+    f.sac_admin.mint(&other, &(FEE * 10));
+
+    c.report(&reporter, &first, &Reason::Scam, &no_evidence(&env));
+    c.report(&reporter, &second, &Reason::Scam, &no_evidence(&env));
+
+    // Let time pass, then report the first subject again.
+    env.ledger().with_mut(|li| li.sequence_number += 10_000);
+    c.report(&other, &first, &Reason::Phishing, &no_evidence(&env));
+
+    let entry = entry_of(&env, &f.contract_id, &first).unwrap();
+    assert_eq!(entry.index, 0);
+    assert_eq!(
+        ttl_of(&env, &f.contract_id, &DataKey::Index(0)),
+        ttl_of(&env, &f.contract_id, &DataKey::Entry(first.clone())),
+    );
+    // The other subject keeps its own slot: index keys are per-subject.
+    let second_entry = entry_of(&env, &f.contract_id, &second).unwrap();
+    assert_eq!(second_entry.index, 1);
 }

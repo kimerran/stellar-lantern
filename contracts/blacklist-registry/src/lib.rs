@@ -70,6 +70,7 @@ pub struct Entry {
     pub updated_at: u64,      // ledger timestamp of the last write
     pub status: Status,
     pub reports: u32, // how many times this subject has been reported
+    pub index: u32,   // insertion position; the entry's DataKey::Index(index) key
 }
 
 #[contracttype]
@@ -103,12 +104,25 @@ fn bump_instance(env: &Env) {
         .extend_ttl(BUMP_THRESHOLD, BUMP_AMOUNT);
 }
 
-fn bump_entry(env: &Env, subject: &Address) {
+/// Extend an entry AND its insertion-index key together.
+///
+/// `Index(i) -> subject` is a separate persistent ledger entry from
+/// `Entry(subject)`, and a newly written one starts at the network's *minimum*
+/// persistent TTL (4,095 ledgers in the test env) rather than the entry's
+/// ~60 days. Bumping only the entry would let the index expire underneath a
+/// live subject: `Count` and `Entry(subject)` would still say the subject is
+/// flagged while `list()` (#34) could no longer enumerate it. Anything that
+/// keeps an entry alive keeps its index slot alive, which is why `Entry` carries
+/// its own `index` — the ordinal has to be recoverable from the entry alone.
+fn bump_entry(env: &Env, subject: &Address, index: u32) {
     env.storage().persistent().extend_ttl(
         &DataKey::Entry(subject.clone()),
         BUMP_THRESHOLD,
         BUMP_AMOUNT,
     );
+    env.storage()
+        .persistent()
+        .extend_ttl(&DataKey::Index(index), BUMP_THRESHOLD, BUMP_AMOUNT);
 }
 
 #[contract]
@@ -199,6 +213,7 @@ impl BlacklistRegistry {
                     updated_at: now,
                     status: Status::Active,
                     reports: 1,
+                    index: count,
                 }
             }
             Some(prev) if prev.status == Status::Revoked => {
@@ -229,7 +244,7 @@ impl BlacklistRegistry {
         };
 
         env.storage().persistent().set(&key, &entry);
-        bump_entry(&env, &subject);
+        bump_entry(&env, &subject, entry.index);
         bump_instance(&env);
 
         // An indexer must be able to reconstruct the whole registry from events
