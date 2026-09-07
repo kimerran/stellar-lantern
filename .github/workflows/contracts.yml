@@ -1,0 +1,149 @@
+name: Soroban contracts
+
+# The per-PR gate for the Rust/Soroban crates, mirroring what android.yml does
+# for the app: nothing else in CI compiles the contracts, so before this lane a
+# contracts-only PR ran no checks at all (#35).
+#
+# Each crate under contracts/ is standalone (not a cargo workspace), so the
+# checks run per crate rather than as one workspace-wide pass. The crate list is
+# discovered from the checkout rather than hardcoded, so a PR that *introduces*
+# a crate is gated by this lane on its very first run — no matrix edit, and no
+# ordering problem between the crate's PR and this one.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'contracts/**'
+      - 'scripts/build-passkey-contract.sh'
+      - 'scripts/build-blacklist-registry.sh'
+      - '.github/workflows/contracts.yml'
+  push:
+    branches: [develop, main]
+    paths:
+      - 'contracts/**'
+      - 'scripts/build-passkey-contract.sh'
+      - 'scripts/build-blacklist-registry.sh'
+      - '.github/workflows/contracts.yml'
+
+# A newer push to the PR supersedes an in-flight run.
+concurrency:
+  group: contracts-${{ github.ref }}
+  cancel-in-progress: true
+
+# Read-only: this lane only builds and uploads artifacts, and `cargo`/`stellar
+# contract build` run PR-controlled code (build scripts, proc macros).
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      crates: ${{ steps.find.outputs.crates }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - id: find
+        name: Find contract crates
+        run: |
+          set -euo pipefail
+          crates=$(find contracts -mindepth 2 -maxdepth 2 -name Cargo.toml \
+            | xargs -r -n1 dirname | xargs -r -n1 basename | sort | jq -R . | jq -sc .)
+          echo "Found: $crates"
+          echo "crates=$crates" >> "$GITHUB_OUTPUT"
+
+  check:
+    needs: discover
+    if: needs.discover.outputs.crates != '[]'
+    name: ${{ matrix.crate }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        crate: ${{ fromJSON(needs.discover.outputs.crates) }}
+    defaults:
+      run:
+        working-directory: contracts/${{ matrix.crate }}
+    steps:
+      # `cargo` runs PR-controlled code (build scripts, proc macros) right after
+      # this step, so the checkout token must not be left in .git/config for it
+      # to read.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # No floating `stable`: the toolchain is pinned by
+      # contracts/rust-toolchain.toml, which rustup picks up from the crate's
+      # parent directory. That is what keeps the wasm hash printed below stable
+      # across runs — a compiler bump can move the bytecode, and it should move
+      # it as a visible change to that file. soroban-sdk 27 builds contracts for
+      # wasm32v1-none; the file requests that target plus rustfmt and clippy.
+      - name: Setup Rust
+        run: |
+          set -euo pipefail
+          rustup show active-toolchain
+          rustc --version
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contracts/${{ matrix.crate }}
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test
+
+      # The published bytecode is what `stellar contract build` emits, NOT what
+      # plain `cargo build --release --target wasm32v1-none` emits — the CLI
+      # post-processes the artifact (locally: 3,264 bytes vs 5,185 for the
+      # passkey account, different sha). Since the whole point of the hash below
+      # is that it can be checked against the README's deployed-contract table
+      # (#36), the lane has to build the same way the build scripts do. The
+      # prebuilt release binary keeps that to a few seconds, unlike
+      # `cargo install stellar-cli`. Pinned deliberately: a CLI upgrade can move
+      # the bytes, and that should be a visible change, not a silent one.
+      - name: Install stellar CLI
+        run: |
+          set -euo pipefail
+          VERSION=26.0.0
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL "https://github.com/stellar/stellar-cli/releases/download/v${VERSION}/stellar-cli-${VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+            | tar -xz -C "$HOME/.local/bin" stellar
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/stellar" version
+
+      - name: Build wasm
+        run: stellar contract build
+
+      # The sha256 is the published bytecode hash, so printing it here makes the
+      # README's deployed-contract claim checkable from any run.
+      - name: Report wasm size + hash
+        id: wasm
+        run: |
+          set -euo pipefail
+          WASM=$(find target/wasm32v1-none/release -maxdepth 1 -name '*.wasm' | head -1)
+          if [ -z "$WASM" ]; then
+            echo "::error::no .wasm produced for ${{ matrix.crate }}"
+            exit 1
+          fi
+          echo "path=contracts/${{ matrix.crate }}/$WASM" >> "$GITHUB_OUTPUT"
+          {
+            echo "### ${{ matrix.crate }}"
+            echo "- \`$(basename "$WASM")\` — $(wc -c < "$WASM") bytes"
+            echo "- sha256 \`$(sha256sum "$WASM" | cut -d' ' -f1)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload wasm
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.crate }}-wasm
+          path: ${{ steps.wasm.outputs.path }}
+          if-no-files-found: error
