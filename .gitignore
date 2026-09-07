@@ -24,3 +24,6 @@ android/capacitor-cordova-android-plugins/
 
 # Internal client work
 instawards/
+
+# Soroban contract build output
+contracts/blacklist-registry/target/
