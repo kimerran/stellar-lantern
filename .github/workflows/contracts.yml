@@ -31,6 +31,11 @@ concurrency:
   group: contracts-${{ github.ref }}
   cancel-in-progress: true
 
+# Read-only: this lane only builds and uploads artifacts, and `cargo`/`stellar
+# contract build` run PR-controlled code (build scripts, proc macros).
+permissions:
+  contents: read
+
 jobs:
   discover:
     runs-on: ubuntu-latest
@@ -38,6 +43,8 @@ jobs:
       crates: ${{ steps.find.outputs.crates }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - id: find
         name: Find contract crates
@@ -61,14 +68,24 @@ jobs:
       run:
         working-directory: contracts/${{ matrix.crate }}
     steps:
+      # `cargo` runs PR-controlled code (build scripts, proc macros) right after
+      # this step, so the checkout token must not be left in .git/config for it
+      # to read.
       - uses: actions/checkout@v4
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
-          # soroban-sdk 27 builds contracts for wasm32v1-none.
-          targets: wasm32v1-none
+          persist-credentials: false
+
+      # No floating `stable`: the toolchain is pinned by
+      # contracts/rust-toolchain.toml, which rustup picks up from the crate's
+      # parent directory. That is what keeps the wasm hash printed below stable
+      # across runs — a compiler bump can move the bytecode, and it should move
+      # it as a visible change to that file. soroban-sdk 27 builds contracts for
+      # wasm32v1-none; the file requests that target plus rustfmt and clippy.
+      - name: Setup Rust
+        run: |
+          set -euo pipefail
+          rustup show active-toolchain
+          rustc --version
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
