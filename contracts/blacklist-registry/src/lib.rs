@@ -253,10 +253,21 @@ impl BlacklistRegistry {
         // `#[contractevent]` macro, which derives its own topic layout; moving
         // to it would change the wire format downstream indexers key off, so
         // that is a deliberate follow-up rather than a drive-by here.
+        //
+        // The payload is the *persisted* attribution (`entry.reporter`,
+        // `entry.reason`), not this call's arguments: on a repeat report of an
+        // already-Active/Disputed subject the entry deliberately keeps the FIRST
+        // reporter and reason, so publishing the caller's would make an indexer
+        // that folds these events into state diverge from storage.
         #[allow(deprecated)]
         env.events().publish(
             (symbol_short!("report"), subject.clone()),
-            (reporter, reason, entry.status, entry.reports),
+            (
+                entry.reporter.clone(),
+                entry.reason,
+                entry.status,
+                entry.reports,
+            ),
         );
 
         entry.reports

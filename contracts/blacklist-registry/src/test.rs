@@ -481,3 +481,35 @@ fn repeat_report_refreshes_the_index_key() {
     let second_entry = entry_of(&env, &f.contract_id, &second).unwrap();
     assert_eq!(second_entry.index, 1);
 }
+
+/// A repeat report keeps the FIRST reporter and reason in storage, so the event
+/// has to carry those too — an indexer folding `report` events into state must
+/// not drift from what `Entry` says.
+#[test]
+fn repeat_report_event_carries_persisted_attribution() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    let first = Address::generate(&env);
+    let second = Address::generate(&env);
+    let subject = Address::generate(&env);
+    f.sac_admin.mint(&first, &(FEE * 10));
+    f.sac_admin.mint(&second, &(FEE * 10));
+
+    c.report(&first, &subject, &Reason::Drainer, &some_evidence(&env));
+    c.report(&second, &subject, &Reason::Mixer, &no_evidence(&env));
+
+    let all = env.events().all();
+    let mine = all.filter_by_contract(&f.contract_id);
+    let events = mine.events();
+    let soroban_sdk::xdr::ContractEventBody::V0(body) = &events[events.len() - 1].body;
+    let data_val = Val::try_from_val(&env, &body.data).unwrap();
+    let data: (Address, Reason, Status, u32) = TryFromVal::try_from_val(&env, &data_val).unwrap();
+
+    let entry = entry_of(&env, &f.contract_id, &subject).unwrap();
+    assert_eq!(entry.reporter, first);
+    assert_eq!(entry.reason, Reason::Drainer);
+    assert_eq!(data, (first, Reason::Drainer, Status::Active, 2u32));
+}
