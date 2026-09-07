@@ -247,12 +247,16 @@ impl BlacklistRegistry {
         bump_entry(&env, &subject, entry.index);
         bump_instance(&env);
 
-        // An indexer must be able to reconstruct the whole registry from events
-        // alone — that is part of the evidence package, so the topic/data shape
-        // is fixed by the spec. SDK 27 deprecates `publish` in favour of the
-        // `#[contractevent]` macro, which derives its own topic layout; moving
-        // to it would change the wire format downstream indexers key off, so
-        // that is a deliberate follow-up rather than a drive-by here.
+        // The event is the registry's public audit trail: replaying it gives an
+        // indexer the flagged set and, per subject, the current attribution,
+        // reason, status and report count. It is deliberately NOT the whole
+        // entry — `evidence`, `reported_at` and `updated_at` are not in the
+        // payload, so an indexer that needs those reads contract storage (the
+        // views land in #34). The topic/data shape is fixed by the spec, and
+        // SDK 27 deprecates `publish` in favour of the `#[contractevent]`
+        // macro, which derives its own topic layout; moving to it would change
+        // the wire format downstream indexers key off, so that is a deliberate
+        // follow-up rather than a drive-by here.
         //
         // The payload is the *persisted* attribution (`entry.reporter`,
         // `entry.reason`), not this call's arguments: on a repeat report of an
