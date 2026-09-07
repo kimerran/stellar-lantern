@@ -21,7 +21,8 @@
 
 #![no_std]
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, panic_with_error, Address, BytesN, Env,
+    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short,
+    token::TokenClient, Address, BytesN, Env,
 };
 
 #[contracterror]
@@ -69,6 +70,7 @@ pub struct Entry {
     pub updated_at: u64,      // ledger timestamp of the last write
     pub status: Status,
     pub reports: u32, // how many times this subject has been reported
+    pub index: u32,   // insertion position; the entry's DataKey::Index(index) key
 }
 
 #[contracttype]
@@ -102,15 +104,25 @@ fn bump_instance(env: &Env) {
         .extend_ttl(BUMP_THRESHOLD, BUMP_AMOUNT);
 }
 
-// Used by every entry read/write from #32 onward; the constructor writes no
-// entries, so it is unreferenced in this slice.
-#[allow(dead_code)]
-fn bump_entry(env: &Env, subject: &Address) {
+/// Extend an entry AND its insertion-index key together.
+///
+/// `Index(i) -> subject` is a separate persistent ledger entry from
+/// `Entry(subject)`, and a newly written one starts at the network's *minimum*
+/// persistent TTL (4,095 ledgers in the test env) rather than the entry's
+/// ~60 days. Bumping only the entry would let the index expire underneath a
+/// live subject: `Count` and `Entry(subject)` would still say the subject is
+/// flagged while `list()` (#34) could no longer enumerate it. Anything that
+/// keeps an entry alive keeps its index slot alive, which is why `Entry` carries
+/// its own `index` — the ordinal has to be recoverable from the entry alone.
+fn bump_entry(env: &Env, subject: &Address, index: u32) {
     env.storage().persistent().extend_ttl(
         &DataKey::Entry(subject.clone()),
         BUMP_THRESHOLD,
         BUMP_AMOUNT,
     );
+    env.storage()
+        .persistent()
+        .extend_ttl(&DataKey::Index(index), BUMP_THRESHOLD, BUMP_AMOUNT);
 }
 
 #[contract]
@@ -141,6 +153,128 @@ impl BlacklistRegistry {
         env.storage().instance().set(&DataKey::Config, &config);
         env.storage().instance().set(&DataKey::Count, &0u32);
         bump_instance(&env);
+    }
+
+    /// Report `subject` as malicious. Charges `config.fee` of `config.fee_token`
+    /// from `reporter` to `config.treasury` — the fee is what makes spamming the
+    /// registry expensive, and it funds the scanner's inference costs.
+    /// Returns the subject's new total report count.
+    pub fn report(
+        env: Env,
+        reporter: Address,
+        subject: Address,
+        reason: Reason,
+        evidence: BytesN<32>,
+    ) -> u32 {
+        // Auth first, before any storage read or transfer: nothing about this
+        // call should be observable to an unauthorized caller.
+        reporter.require_auth();
+
+        if reporter == subject {
+            panic_with_error!(&env, Error::SelfReport);
+        }
+
+        let config: Config = env
+            .storage()
+            .instance()
+            .get(&DataKey::Config)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::NotFound));
+
+        // Charged on EVERY accepted report, including repeat reports of an
+        // already-flagged subject — that is the anti-spam property. A zero-fee
+        // config skips the transfer entirely (free writes are legal).
+        if config.fee > 0 {
+            TokenClient::new(&env, &config.fee_token).transfer(
+                &reporter,
+                &config.treasury,
+                &config.fee,
+            );
+        }
+
+        let now = env.ledger().timestamp();
+        let key = DataKey::Entry(subject.clone());
+        let existing: Option<Entry> = env.storage().persistent().get(&key);
+
+        let entry = match existing {
+            None => {
+                // First report for this subject: append it to the insertion-ordered
+                // index so #34's `list()` can page over subjects.
+                let count: u32 = env.storage().instance().get(&DataKey::Count).unwrap_or(0);
+                env.storage()
+                    .persistent()
+                    .set(&DataKey::Index(count), &subject);
+                env.storage().instance().set(&DataKey::Count, &(count + 1));
+                Entry {
+                    subject: subject.clone(),
+                    reporter: reporter.clone(),
+                    reason,
+                    evidence,
+                    reported_at: now,
+                    updated_at: now,
+                    status: Status::Active,
+                    reports: 1,
+                    index: count,
+                }
+            }
+            Some(prev) if prev.status == Status::Revoked => {
+                // Revoked means the admin cleared it; a fresh report resurrects the
+                // entry under the NEW reporter's attribution, but keeps the original
+                // `reported_at` so the audit trail stays intact.
+                Entry {
+                    reporter: reporter.clone(),
+                    reason,
+                    evidence,
+                    updated_at: now,
+                    status: Status::Active,
+                    reports: prev.reports + 1,
+                    ..prev
+                }
+            }
+            Some(prev) => {
+                // Active or Disputed: count the report, but keep the FIRST reporter's
+                // attribution — a later reporter can't rewrite the audit trail. A
+                // disputed entry stays disputed; only the admin resolves it (#33).
+                // Count and the index are untouched: the subject is already indexed.
+                Entry {
+                    reports: prev.reports + 1,
+                    updated_at: now,
+                    ..prev
+                }
+            }
+        };
+
+        env.storage().persistent().set(&key, &entry);
+        bump_entry(&env, &subject, entry.index);
+        bump_instance(&env);
+
+        // The event is the registry's public audit trail: replaying it gives an
+        // indexer the flagged set and, per subject, the current attribution,
+        // reason, status and report count. It is deliberately NOT the whole
+        // entry — `evidence`, `reported_at` and `updated_at` are not in the
+        // payload, so an indexer that needs those reads contract storage (the
+        // views land in #34). The topic/data shape is fixed by the spec, and
+        // SDK 27 deprecates `publish` in favour of the `#[contractevent]`
+        // macro, which derives its own topic layout; moving to it would change
+        // the wire format downstream indexers key off, so that is a deliberate
+        // follow-up rather than a drive-by here.
+        //
+        // The payload is the *persisted* attribution (`entry.reporter`,
+        // `entry.reason`), not this call's arguments: on a repeat report of an
+        // already-Active/Disputed subject the entry deliberately keeps the FIRST
+        // reporter and reason, so publishing the caller's would make an indexer
+        // that folds these events into state diverge from storage.
+        #[allow(deprecated)]
+        env.events().publish(
+            (symbol_short!("report"), subject.clone()),
+            (
+                entry.reporter.clone(),
+                entry.reason,
+                entry.status,
+                entry.reports,
+            ),
+        );
+
+        entry.reports
     }
 }
 
