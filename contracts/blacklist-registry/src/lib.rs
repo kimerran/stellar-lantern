@@ -290,6 +290,16 @@ impl BlacklistRegistry {
     /// a matrix can strand an entry in a state the admin cannot leave, and the
     /// only thing the registry actually needs to guarantee is that every change
     /// is authorized and auditable.
+    ///
+    /// **`Revoked` is not durable.** It clears the *current* evidence, it does
+    /// not immunize the subject: the next `report()` resurrects the entry to
+    /// `Active` under the new reporter's attribution (see `report`'s Revoked
+    /// arm). So the admin's strongest action is the one any fee-payer can
+    /// undo, while the weaker `Disputed` survives any number of reports. That
+    /// is intended — a permanent admin allow-list would make one key able to
+    /// silence a subject forever, which is exactly the centralization the fee
+    /// model exists to avoid. `set_fee` is the lever if re-flagging a revoked
+    /// subject needs to cost more.
     pub fn set_status(env: Env, subject: Address, status: Status) {
         Self::require_admin(&env);
 
@@ -319,17 +329,27 @@ impl BlacklistRegistry {
 
     /// Admin-only: hand control to `new_admin`.
     ///
-    /// The transfer is atomic — the moment this returns, the old admin has no
-    /// rights left, so a compromised admin key is rotated in a single call
-    /// (SOW §3.9 risk table).
+    /// **Both** admins authorize: the outgoing one to approve the hand-off, the
+    /// incoming one to prove the address exists and is controlled. There is no
+    /// upgrade entry point and no recovery path, so a hand-off to a mistyped or
+    /// uncontrolled address is terminal — the registry would keep serving
+    /// reporters and readers with its entire admin surface gone for good. The
+    /// second signature is what makes that unreachable, and it costs nothing:
+    /// both authorizations ride in the same transaction, so a compromised key
+    /// is still rotated in a single call (SOW §3.9 risk table).
     pub fn set_admin(env: Env, new_admin: Address) {
         let mut config = Self::require_admin(&env);
+        new_admin.require_auth();
+
+        let old_admin = config.admin.clone();
         config.admin = new_admin.clone();
         Self::save_config(&env, &config);
 
         #[allow(deprecated)]
-        env.events()
-            .publish((symbol_short!("config"), symbol_short!("admin")), new_admin);
+        env.events().publish(
+            (symbol_short!("config"), symbol_short!("admin")),
+            (old_admin, new_admin),
+        );
     }
 
     /// Admin-only: redirect future report fees to `treasury`.
@@ -338,13 +358,36 @@ impl BlacklistRegistry {
     /// sent, since the contract never custodies them.
     pub fn set_treasury(env: Env, treasury: Address) {
         let mut config = Self::require_admin(&env);
+        let old_treasury = config.treasury.clone();
         config.treasury = treasury.clone();
         Self::save_config(&env, &config);
 
         #[allow(deprecated)]
         env.events().publish(
             (symbol_short!("config"), symbol_short!("treasury")),
-            treasury,
+            (old_treasury, treasury),
+        );
+    }
+
+    /// Admin-only: switch the token reports are paid in.
+    ///
+    /// Present for symmetry with the other three `Config` fields: with no
+    /// upgrade path, leaving it out would freeze the fee asset for the
+    /// contract's lifetime, so a de-pegged or frozen SAC could only be escaped
+    /// by redeploying the registry and abandoning its entries. Changing it
+    /// reprices nothing on its own — `fee` is denominated in the new token's
+    /// units from the next report on, so the two are normally set together in
+    /// one transaction.
+    pub fn set_fee_token(env: Env, fee_token: Address) {
+        let mut config = Self::require_admin(&env);
+        let old_token = config.fee_token.clone();
+        config.fee_token = fee_token.clone();
+        Self::save_config(&env, &config);
+
+        #[allow(deprecated)]
+        env.events().publish(
+            (symbol_short!("config"), symbol_short!("fee_token")),
+            (old_token, fee_token),
         );
     }
 
@@ -355,12 +398,15 @@ impl BlacklistRegistry {
         if fee < 0 {
             panic_with_error!(&env, Error::InvalidFee);
         }
+        let old_fee = config.fee;
         config.fee = fee;
         Self::save_config(&env, &config);
 
         #[allow(deprecated)]
-        env.events()
-            .publish((symbol_short!("config"), symbol_short!("fee")), fee);
+        env.events().publish(
+            (symbol_short!("config"), symbol_short!("fee")),
+            (old_fee, fee),
+        );
     }
 }
 

@@ -141,6 +141,31 @@ jobs:
             echo "- sha256 \`$(sha256sum "$WASM" | cut -d' ' -f1)\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # The lane built the bytecode but, until now, never compared it against
+      # the copy committed next to the crate. That copy is what #36 publishes a
+      # deployed hash from and what reviewers read the interface out of, so a PR
+      # that changes the contract but forgets `scripts/build-<crate>.sh` stayed
+      # green with a vendored artifact that did not contain the change (#43).
+      # Both crates reproduce byte-for-byte here — same pinned rustc, same
+      # pinned CLI — so any difference is a stale commit, not build noise.
+      - name: Vendored wasm is up to date
+        run: |
+          set -euo pipefail
+          BUILT=$(find target/wasm32v1-none/release -maxdepth 1 -name '*.wasm' | head -1)
+          COMMITTED=$(basename "$BUILT")
+          if [ ! -f "$COMMITTED" ]; then
+            echo "No vendored $COMMITTED next to the crate — nothing to compare."
+            exit 0
+          fi
+          if ! cmp -s "$BUILT" "$COMMITTED"; then
+            echo "::error::contracts/${{ matrix.crate }}/$COMMITTED is stale."
+            echo "  committed: $(sha256sum "$COMMITTED" | cut -d' ' -f1) ($(wc -c < "$COMMITTED") bytes)"
+            echo "  built:     $(sha256sum "$BUILT" | cut -d' ' -f1) ($(wc -c < "$BUILT") bytes)"
+            echo "  fix: run this crate's scripts/build-*.sh and commit the result."
+            exit 1
+          fi
+          echo "$COMMITTED matches the build."
+
       - name: Upload wasm
         uses: actions/upload-artifact@v4
         with:

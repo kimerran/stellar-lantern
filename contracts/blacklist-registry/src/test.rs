@@ -551,6 +551,35 @@ fn set_status_as(env: &Env, f: &Fixture, who: &Address, subject: &Address, statu
         .is_ok()
 }
 
+/// Did `set_admin(new_admin)` succeed with exactly `signers` authorizing it?
+/// `set_admin` needs both the outgoing and the incoming admin, so this is the
+/// only way to show each signature is load-bearing.
+fn set_admin_signed_by(env: &Env, f: &Fixture, signers: &[&Address], new_admin: &Address) -> bool {
+    let invoke = soroban_sdk::testutils::MockAuthInvoke {
+        contract: &f.contract_id,
+        fn_name: "set_admin",
+        args: (new_admin.clone(),).into_val(env),
+        sub_invokes: &[],
+    };
+    // The crate is no_std, so the auth list is a fixed array sliced to length
+    // rather than a Vec. Only 1 or 2 signers are ever needed here.
+    assert!(signers.len() == 1 || signers.len() == 2);
+    let all = [
+        soroban_sdk::testutils::MockAuth {
+            address: signers[0],
+            invoke: &invoke,
+        },
+        soroban_sdk::testutils::MockAuth {
+            address: signers[signers.len() - 1],
+            invoke: &invoke,
+        },
+    ];
+    BlacklistRegistryClient::new(env, &f.contract_id)
+        .mock_auths(&all[..signers.len()])
+        .try_set_admin(new_admin)
+        .is_ok()
+}
+
 fn config_of(env: &Env, contract_id: &Address) -> Config {
     instance_get(env, contract_id, &DataKey::Config).unwrap()
 }
@@ -810,6 +839,7 @@ fn config_ops_require_admin_auth() {
 
     assert!(c.try_set_fee(&0).is_err());
     assert!(c.try_set_treasury(&Address::generate(&env)).is_err());
+    assert!(c.try_set_fee_token(&Address::generate(&env)).is_err());
     assert!(c.try_set_admin(&Address::generate(&env)).is_err());
 
     assert_eq!(
@@ -821,6 +851,67 @@ fn config_ops_require_admin_auth() {
             fee: FEE,
         }
     );
+}
+
+/// The hand-off is unrecoverable — there is no upgrade path — so it takes both
+/// signatures: the outgoing admin to approve it, the incoming one to prove the
+/// address exists and is controlled. Either alone must fail.
+#[test]
+fn set_admin_requires_both_admins() {
+    let env = Env::default();
+    let f = setup(&env, FEE);
+    let new_admin = Address::generate(&env);
+
+    assert!(!set_admin_signed_by(&env, &f, &[&f.admin], &new_admin));
+    assert!(!set_admin_signed_by(&env, &f, &[&new_admin], &new_admin));
+    assert_eq!(config_of(&env, &f.contract_id).admin, f.admin);
+
+    // Both authorizations ride in the same transaction, so the rotation is
+    // still a single call.
+    assert!(set_admin_signed_by(
+        &env,
+        &f,
+        &[&f.admin, &new_admin],
+        &new_admin
+    ));
+    assert_eq!(config_of(&env, &f.contract_id).admin, new_admin);
+}
+
+#[test]
+fn set_fee_token_switches_the_charged_asset() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    let issuer = Address::generate(&env);
+    let sac = env.register_stellar_asset_contract_v2(issuer);
+    let new_token = sac.address();
+    let new_token_admin = StellarAssetClient::new(&env, &new_token);
+
+    let reporter = Address::generate(&env);
+    let subject = Address::generate(&env);
+    f.sac_admin.mint(&reporter, &(FEE * 10));
+    new_token_admin.mint(&reporter, &(FEE * 10));
+
+    c.report(&reporter, &subject, &Reason::Scam, &no_evidence(&env));
+    c.set_fee_token(&new_token);
+    c.report(&reporter, &subject, &Reason::Scam, &no_evidence(&env));
+
+    assert_eq!(config_of(&env, &f.contract_id).fee_token, new_token);
+    // One fee in each asset: the switch applies from the next report on.
+    assert_eq!(balance(&env, &f.fee_token, &f.treasury), FEE);
+    assert_eq!(balance(&env, &new_token, &f.treasury), FEE);
+}
+
+#[test]
+fn set_fee_token_requires_admin_auth() {
+    let env = Env::default();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    assert!(c.try_set_fee_token(&Address::generate(&env)).is_err());
+    assert_eq!(config_of(&env, &f.contract_id).fee_token, f.fee_token);
 }
 
 /// Every admin change is auditable from events alone — that is what makes the
@@ -870,24 +961,30 @@ fn admin_ops_emit_events() {
         assert_eq!(Symbol::try_from_val(&env, &topics[1]).unwrap(), field);
     };
 
+    // Every config event carries BOTH sides, like the status event: an indexer
+    // following admin history should not have to carry state across events to
+    // know what was replaced.
     c.set_treasury(&new_treasury);
     let (topics, data) = last_event();
     assert_config_topic(&topics, symbol_short!("treasury"));
-    assert_eq!(
-        Address::try_from_val(&env, &data).unwrap(),
-        new_treasury.clone()
-    );
+    let treasuries: (Address, Address) = TryFromVal::try_from_val(&env, &data).unwrap();
+    assert_eq!(treasuries, (f.treasury.clone(), new_treasury.clone()));
 
     c.set_fee(&(FEE * 2));
     let (topics, data) = last_event();
     assert_config_topic(&topics, symbol_short!("fee"));
-    assert_eq!(i128::try_from_val(&env, &data).unwrap(), FEE * 2);
+    let fees: (i128, i128) = TryFromVal::try_from_val(&env, &data).unwrap();
+    assert_eq!(fees, (FEE, FEE * 2));
+
+    c.set_fee_token(&new_treasury);
+    let (topics, data) = last_event();
+    assert_config_topic(&topics, symbol_short!("fee_token"));
+    let tokens: (Address, Address) = TryFromVal::try_from_val(&env, &data).unwrap();
+    assert_eq!(tokens, (f.fee_token.clone(), new_treasury.clone()));
 
     c.set_admin(&new_admin);
     let (topics, data) = last_event();
     assert_config_topic(&topics, symbol_short!("admin"));
-    assert_eq!(
-        Address::try_from_val(&env, &data).unwrap(),
-        new_admin.clone()
-    );
+    let admins: (Address, Address) = TryFromVal::try_from_val(&env, &data).unwrap();
+    assert_eq!(admins, (f.admin.clone(), new_admin.clone()));
 }
