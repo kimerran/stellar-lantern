@@ -1208,6 +1208,12 @@ fn list_rejects_bad_limit() {
 fn list_skips_a_missing_entry() {
     // One index slot pointing at an entry that is gone must not brick paging
     // over everything after it.
+    //
+    // The entry is removed explicitly here. That is a state the contract cannot
+    // reach on its own — it never calls remove(), and an archived persistent
+    // entry does not read back as None, it fails the invocation until a
+    // RestoreFootprint brings it back. This is defence in depth against a slot
+    // with nothing behind it, not coverage of archival.
     let env = Env::default();
     env.mock_all_auths();
     let f = setup(&env, FEE);
@@ -1227,6 +1233,36 @@ fn list_skips_a_missing_entry() {
     let page = c.list(&0, &10);
     assert_eq!(page.len(), 1);
     assert_eq!(page.get(0).unwrap().subject, b);
+}
+
+#[test]
+fn list_does_not_refresh_entry_ttl() {
+    // Paging is a sweep, not a demand signal: an indexer walking the registry
+    // should not rewrite the TTL of every entry it passes. The refresh belongs
+    // to is_flagged/get, which are asked about one subject someone cares about.
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    let subject = Address::generate(&env);
+    report_once(&env, &f, &c, &subject, Reason::Scam);
+
+    // Inside the bump threshold, where a refreshing read would visibly move it.
+    env.ledger()
+        .with_mut(|li| li.sequence_number += BUMP_AMOUNT - BUMP_THRESHOLD + 1_000);
+    let before = ttl_of(&env, &f.contract_id, &DataKey::Entry(subject.clone()));
+    assert!(before < BUMP_THRESHOLD);
+
+    assert_eq!(c.list(&0, &10).len(), 1);
+    assert_eq!(
+        ttl_of(&env, &f.contract_id, &DataKey::Entry(subject.clone())),
+        before
+    );
+
+    // ...while a per-subject read still does refresh it.
+    assert!(c.is_flagged(&subject));
+    assert!(ttl_of(&env, &f.contract_id, &DataKey::Entry(subject)) > before);
 }
 
 #[test]

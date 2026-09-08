@@ -462,18 +462,33 @@ impl BlacklistRegistry {
     ///
     /// `limit` must be `1..=MAX_PAGE`. A `start` past the end returns an empty
     /// `Vec` rather than erroring, so a caller can page to exhaustion without
-    /// special-casing the last page. Index slots whose `Entry` has gone missing
-    /// are skipped rather than panicked on: one expired or malformed slot must
-    /// not brick paging over the whole registry.
+    /// special-casing the last page.
+    ///
+    /// **Advance `start` by `limit`, never by the returned page's length.** A
+    /// page can come back short from the middle of the registry — a skipped
+    /// slot shortens it — so a short page is not an end-of-registry signal;
+    /// `count()` is. A caller that does `start += page.len()` re-reads the same
+    /// window forever.
+    ///
+    /// An index slot with no entry behind it is skipped rather than panicked
+    /// on, so one such slot cannot brick paging over the whole registry.
+    ///
+    /// Unlike `is_flagged` and `get`, this does **not** refresh entry TTL. It
+    /// reads each `Entry` directly, so a bulk indexer sweep does not rewrite the
+    /// TTL of the entire registry, and the refresh stays with the per-subject
+    /// reads that are the real demand signal for keeping an entry alive. That
+    /// also keeps a full page to one write rather than one per row, which is
+    /// what makes the `MAX_PAGE` cap comfortable rather than load-bearing.
     pub fn list(env: Env, start: u32, limit: u32) -> Vec<Entry> {
         if limit == 0 || limit > MAX_PAGE {
             panic_with_error!(&env, Error::InvalidLimit);
         }
 
+        bump_instance(&env);
+
         let total: u32 = env.storage().instance().get(&DataKey::Count).unwrap_or(0);
         let mut out = Vec::new(&env);
         if start >= total {
-            bump_instance(&env);
             return out;
         }
 
@@ -481,11 +496,11 @@ impl BlacklistRegistry {
         for i in start..end {
             let subject: Option<Address> = env.storage().persistent().get(&DataKey::Index(i));
             let Some(subject) = subject else { continue };
-            if let Some(entry) = Self::load(&env, &subject) {
+            let entry: Option<Entry> = env.storage().persistent().get(&DataKey::Entry(subject));
+            if let Some(entry) = entry {
                 out.push_back(entry);
             }
         }
-        bump_instance(&env);
         out
     }
 
