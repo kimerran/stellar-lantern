@@ -77,14 +77,33 @@ node scripts/hot-read-blacklist-registry.mjs --key-only \
 `getLedgerEntries(ledgerKey)` returns at most one entry. Nothing back means the
 subject was never reported — the common case, and not an error.
 
-An **archived** entry does not come back empty, so it cannot be mistaken for
-this case. A persistent entry that ages out is archived rather than deleted:
-`getLedgerEntries` still returns it, with a `liveUntilLedgerSeq` behind the
-response's `latestLedger`. That is a third outcome and the helper reports it as
-one (`status: "unknown"`, `reason: "archived"`), because answering "not flagged"
-for a subject whose entry is merely asleep is the one direction a screening call
-must not fail in. The caller's move is to fall back to the contract views
-(#46) — a simulated invocation restores the entry as part of the call.
+### Archived is a third answer, and empty is not a promise
+
+A persistent entry that ages out is **archived**, not deleted. While it is still
+returned, `getLedgerEntries` hands it back with a `liveUntilLedgerSeq` that is
+behind the response's `latestLedger` — or zero. The RPC reference defines the
+field as *"The ledger sequence number of the ledger that the entry will be live
+until. May be zero if the entry is no longer live."*
+([getLedgerEntries](https://developers.stellar.org/docs/data/apis/rpc/api-reference/methods/getLedgerEntries)).
+The helper keys off exactly that and reports a **third outcome** —
+`status: "unknown"`, `reason: "archived"`, and `flagged: null` rather than
+`false` — because answering "not flagged" for a subject whose entry is merely
+asleep is the one direction a screening call must not fail in.
+
+Expiry and eviction are separate events, though, and that matters for the empty
+case. An entry whose TTL has lapsed stays in the live state until an eviction
+scan removes it; only during that window is it returned with a stale
+`liveUntilLedgerSeq`. Once evicted it is gone from the live state, and the
+`getLedgerEntries` reference does not say whether the RPC then serves it from
+the archive — so **an empty result means "no live entry at this key", not
+"never reported"**. In practice it is almost always never-reported, and the
+helper keeps that path cheap and non-fatal (`status: "not-flagged"`), but its
+`reason` says what the read actually established rather than claiming more.
+
+If you need certainty for one subject — before gating a signature on a clean
+answer, say — ask the contract views (#46). They see through archival, at the
+cost of a simulation. Do not add an archive lookup to the hot path: it would
+spend a round-trip on every clean address, which is nearly all of them.
 
 The value decodes to the contract's `Entry` struct. The current shape is **nine**
 fields, not the eight in the original schema: `index: u32` was added in #32 so an

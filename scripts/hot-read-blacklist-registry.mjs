@@ -146,8 +146,18 @@ async function main() {
   const found = res.entries?.[0];
 
   if (!found) {
-    // Never reported is the common case, not an error. An archived entry does
-    // NOT arrive here — see the archived branch below.
+    // An empty read means there is no LIVE entry at this key. That is almost
+    // always "never reported", and the common case has to stay this cheap — but
+    // it is not a certainty. Expiry and eviction are separate events: an expired
+    // entry is still returned (with liveUntilLedgerSeq behind latestLedger, or
+    // zero) and the archived branch below catches it, while an entry the network
+    // has since evicted is not in the live state at all. Whether the RPC then
+    // serves it from the Hot Archive is not something the getLedgerEntries
+    // reference states, so this branch does not claim to have ruled it out. A
+    // caller that needs certainty for a specific subject asks the contract views
+    // (#46), which see through archival; adding an archive lookup here would
+    // cost the hot path a round-trip on every clean address, which is most of
+    // them.
     const out = {
       contract,
       subject,
@@ -156,10 +166,15 @@ async function main() {
       status: 'not-flagged',
       flagged: false,
       entry: null,
-      reason: 'no entry',
+      reason:
+        'no live entry — expected for a never-reported address, but not distinguishable from an evicted one without an archive lookup',
     };
     console.log(
-      json ? JSON.stringify(out, null, 2) : `not flagged — no entry for ${subject} (${endpoint})`,
+      json
+        ? JSON.stringify(out, null, 2)
+        : `not flagged — no live entry for ${subject} (${endpoint})\n` +
+            `  Expected for an address nobody has reported. Not distinguishable from an evicted\n` +
+            `  entry without an archive lookup — use the contract views if you need certainty.`,
     );
     return;
   }
@@ -167,16 +182,22 @@ async function main() {
   const entry = decodeEntry(found.val.contractData().val());
 
   // Archival is the one failure this screening call must not answer through.
-  // A persistent entry that ages out is archived, not deleted, and its
-  // liveUntilLedgerSeq falls behind the network's latest ledger. Reporting that
-  // as "not flagged" would turn a still-flagged subject into a clean verdict —
-  // exactly the wrong direction to fail in. It is a third outcome, and the
-  // caller's move is to fall back to the contract views (#46), which restore
-  // the entry as part of the invocation.
+  // A persistent entry that ages out is archived rather than deleted, and the
+  // getLedgerEntries reference defines liveUntilLedgerSeq as "the ledger
+  // sequence number of the ledger that the entry will be live until. May be
+  // zero if the entry is no longer live." — so an entry that comes back with a
+  // sequence behind latestLedger, or with the zero placeholder, is present but
+  // not live. Reporting that as "not flagged" would turn a still-flagged
+  // subject into a clean verdict, exactly the wrong direction to fail in. It is
+  // a third outcome, and the caller's move is to fall back to the contract
+  // views (#46), which see through archival.
   const liveUntil = found.liveUntilLedgerSeq ?? null;
-  const archived = liveUntil !== null && res.latestLedger > liveUntil;
+  const archived = liveUntil !== null && (liveUntil === 0 || res.latestLedger > liveUntil);
 
-  const flagged = !archived && entry.status === 'Active';
+  // `flagged` is null, not false, when the answer is unknown: a boolean here
+  // would let a caller doing `if (!out.flagged)` treat an archived entry as
+  // clean, which is the whole failure this branch exists to prevent.
+  const flagged = archived ? null : entry.status === 'Active';
   const out = {
     contract,
     subject,

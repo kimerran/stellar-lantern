@@ -16,14 +16,14 @@
 //      weighted rather than treated as an auto-block.
 //
 // The skeleton (types, storage schema, TTL helpers, constructor) is #31, the
-// write path is #32 and the admin surface — status transitions plus config
-// changes — is #33. The public read API (`is_flagged`, `get`, `count`, `list`)
-// is #34.
+// write path is #32, the admin surface — status transitions plus config
+// changes — is #33, and the public read API (`is_flagged`, `get`, `count`,
+// `list`, `config`) is #34.
 
 #![no_std]
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short,
-    token::TokenClient, Address, BytesN, Env,
+    token::TokenClient, Address, BytesN, Env, Vec,
 };
 
 #[contracterror]
@@ -95,6 +95,11 @@ pub enum DataKey {
 // silently forgets its entries is worse than no registry, so every read and
 // write extends the entry it touched (and the instance) by ~60 days whenever
 // it has less than ~30 days left.
+/// Cap on `list()`'s page size. A caller that wants everything pages; a caller
+/// that asks for the world in one call gets `InvalidLimit` rather than an
+/// invocation that runs out of budget somewhere in the middle.
+const MAX_PAGE: u32 = 50;
+
 const LEDGERS_PER_DAY: u32 = 17_280; // ~5s ledgers
 const BUMP_THRESHOLD: u32 = LEDGERS_PER_DAY * 30;
 const BUMP_AMOUNT: u32 = LEDGERS_PER_DAY * 60;
@@ -408,9 +413,125 @@ impl BlacklistRegistry {
             (old_fee, fee),
         );
     }
+
+    // ── public read API (#34) ────────────────────────────────────────────────
+    //
+    // All five are read-only. None takes `require_auth`: the registry is a
+    // public good and screening a counterparty must not require an identity,
+    // let alone a signature. The only writes are TTL extensions, which are
+    // wanted — an entry that wallets are actively querying is exactly the one
+    // that should not expire.
+    //
+    // These are the *simulation-based* surface: a caller reaches them through
+    // `simulateTransaction`, conventionally with a source account. The cheaper
+    // path for the per-signature hot path is to read `DataKey::Entry(subject)`
+    // straight out of the ledger with `getLedgerEntries` — no simulation, no
+    // source account, no fee (#44).
+
+    /// The one-call question every wallet asks before a user signs: is this
+    /// counterparty currently flagged?
+    ///
+    /// True only for `Status::Active`. A disputed entry is one whose evidence
+    /// is contested and a revoked one has been cleared by the admin; neither
+    /// should raise a warning, because the whole point of the status machine is
+    /// that a challenged report stops gating users immediately. An address that
+    /// was never reported is simply `false` — never a panic, since this runs on
+    /// every counterparty of every transaction.
+    pub fn is_flagged(env: Env, subject: Address) -> bool {
+        match Self::load(&env, &subject) {
+            Some(entry) => entry.status == Status::Active,
+            None => false,
+        }
+    }
+
+    /// The full record behind a flag, for wallets that want to show the reason,
+    /// who reported it and the evidence hash. `None` when the subject was never
+    /// reported — an unknown address is not an error, it is the common case.
+    pub fn get(env: Env, subject: Address) -> Option<Entry> {
+        Self::load(&env, &subject)
+    }
+
+    /// Number of distinct reported subjects. Repeat reports of the same subject
+    /// do not move it — `Count` tracks subjects, not reports.
+    pub fn count(env: Env) -> u32 {
+        bump_instance(&env);
+        env.storage().instance().get(&DataKey::Count).unwrap_or(0)
+    }
+
+    /// Insertion-ordered page of entries, for indexers and the demo playground.
+    ///
+    /// `limit` must be `1..=MAX_PAGE`. A `start` past the end returns an empty
+    /// `Vec` rather than erroring, so a caller can page to exhaustion without
+    /// special-casing the last page.
+    ///
+    /// **Advance `start` by `limit`, never by the returned page's length.** A
+    /// page can come back short from the middle of the registry — a skipped
+    /// slot shortens it — so a short page is not an end-of-registry signal;
+    /// `count()` is. A caller that does `start += page.len()` re-reads the same
+    /// window forever.
+    ///
+    /// An index slot with no entry behind it is skipped rather than panicked
+    /// on, so one such slot cannot brick paging over the whole registry.
+    ///
+    /// Unlike `is_flagged` and `get`, this does **not** refresh entry TTL. It
+    /// reads each `Entry` directly, so a bulk indexer sweep does not rewrite the
+    /// TTL of the entire registry, and the refresh stays with the per-subject
+    /// reads that are the real demand signal for keeping an entry alive. That
+    /// also keeps a full page to one write rather than one per row, which is
+    /// what makes the `MAX_PAGE` cap comfortable rather than load-bearing.
+    pub fn list(env: Env, start: u32, limit: u32) -> Vec<Entry> {
+        if limit == 0 || limit > MAX_PAGE {
+            panic_with_error!(&env, Error::InvalidLimit);
+        }
+
+        bump_instance(&env);
+
+        let total: u32 = env.storage().instance().get(&DataKey::Count).unwrap_or(0);
+        let mut out = Vec::new(&env);
+        if start >= total {
+            return out;
+        }
+
+        let end = start.saturating_add(limit).min(total);
+        for i in start..end {
+            let subject: Option<Address> = env.storage().persistent().get(&DataKey::Index(i));
+            let Some(subject) = subject else { continue };
+            let entry: Option<Entry> = env.storage().persistent().get(&DataKey::Entry(subject));
+            if let Some(entry) = entry {
+                out.push_back(entry);
+            }
+        }
+        out
+    }
+
+    /// Current admin, treasury, fee token and fee — so a wallet can quote the
+    /// report fee before asking a user to pay it, rather than discovering the
+    /// price by having the transfer fail.
+    pub fn config(env: Env) -> Config {
+        bump_instance(&env);
+        env.storage()
+            .instance()
+            .get(&DataKey::Config)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::NotFound))
+    }
 }
 
 impl BlacklistRegistry {
+    /// Read an entry and, if it is there, keep it (and its index slot) alive.
+    ///
+    /// Refreshing on read is deliberate: a registry that forgets the addresses
+    /// wallets keep asking about is worse than no registry, and the read path is
+    /// the best signal we have about which entries still matter.
+    fn load(env: &Env, subject: &Address) -> Option<Entry> {
+        let entry: Entry = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Entry(subject.clone()))?;
+        bump_entry(env, subject, entry.index);
+        bump_instance(env);
+        Some(entry)
+    }
+
     /// Load `Config` and assert the caller is the *current* admin.
     ///
     /// Every admin entry point calls this first, before touching any other
