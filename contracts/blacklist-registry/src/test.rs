@@ -988,3 +988,339 @@ fn admin_ops_emit_events() {
     let admins: (Address, Address) = TryFromVal::try_from_val(&env, &data).unwrap();
     assert_eq!(admins, (f.admin.clone(), new_admin.clone()));
 }
+
+// --- #34: public read API ---------------------------------------------------
+
+/// Report `subject` once from a freshly funded reporter.
+fn report_once(
+    env: &Env,
+    f: &Fixture,
+    c: &BlacklistRegistryClient,
+    subject: &Address,
+    reason: Reason,
+) {
+    let reporter = Address::generate(env);
+    f.sac_admin.mint(&reporter, &(FEE * 100));
+    c.report(&reporter, subject, &reason, &some_evidence(env));
+}
+
+#[test]
+fn is_flagged_false_for_unknown() {
+    // The hot path runs this on every counterparty of every transaction, so an
+    // address nobody has ever reported has to be a plain `false`, not a panic.
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    assert!(!c.is_flagged(&Address::generate(&env)));
+}
+
+#[test]
+fn is_flagged_true_for_active() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    let subject = Address::generate(&env);
+    report_once(&env, &f, &c, &subject, Reason::Drainer);
+
+    assert!(c.is_flagged(&subject));
+}
+
+#[test]
+fn is_flagged_false_when_disputed_or_revoked() {
+    // A challenged report stops gating users immediately — that is the whole
+    // reason the status machine exists, and this is where it becomes visible.
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    let subject = Address::generate(&env);
+    report_once(&env, &f, &c, &subject, Reason::Scam);
+
+    c.set_status(&subject, &Status::Disputed);
+    assert!(!c.is_flagged(&subject));
+
+    c.set_status(&subject, &Status::Revoked);
+    assert!(!c.is_flagged(&subject));
+
+    // ...and back: revocation is not durable, so the flag returns with a report.
+    c.set_status(&subject, &Status::Active);
+    assert!(c.is_flagged(&subject));
+}
+
+#[test]
+fn get_returns_none_for_unknown() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    assert_eq!(c.get(&Address::generate(&env)), None);
+}
+
+#[test]
+fn get_returns_full_entry() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().with_mut(|li| li.timestamp = 1_700_000_000);
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    let reporter = Address::generate(&env);
+    let subject = Address::generate(&env);
+    f.sac_admin.mint(&reporter, &(FEE * 10));
+    c.report(
+        &reporter,
+        &subject,
+        &Reason::Poisoning,
+        &some_evidence(&env),
+    );
+
+    // The view must return exactly what storage holds — a wallet renders the
+    // warning from this, so a lossy view would be a lying warning.
+    assert_eq!(
+        c.get(&subject),
+        Some(Entry {
+            subject: subject.clone(),
+            reporter,
+            reason: Reason::Poisoning,
+            evidence: some_evidence(&env),
+            reported_at: 1_700_000_000,
+            updated_at: 1_700_000_000,
+            status: Status::Active,
+            reports: 1,
+            index: 0,
+        })
+    );
+    assert_eq!(c.get(&subject), entry_of(&env, &f.contract_id, &subject));
+}
+
+#[test]
+fn count_tracks_distinct_subjects() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    let a = Address::generate(&env);
+    let b = Address::generate(&env);
+    assert_eq!(c.count(), 0);
+
+    report_once(&env, &f, &c, &a, Reason::Scam);
+    report_once(&env, &f, &c, &a, Reason::Scam); // repeat: same subject
+    report_once(&env, &f, &c, &b, Reason::Mixer);
+
+    // Count is subjects, not reports.
+    assert_eq!(c.count(), 2);
+    assert_eq!(c.get(&a).unwrap().reports, 2);
+}
+
+#[test]
+fn list_returns_insertion_order() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    let a = Address::generate(&env);
+    let b = Address::generate(&env);
+    let d = Address::generate(&env);
+    for s in [&a, &b, &d] {
+        report_once(&env, &f, &c, s, Reason::Scam);
+    }
+
+    let page = c.list(&0, &10);
+    assert_eq!(page.len(), 3);
+    assert_eq!(
+        [
+            page.get(0).unwrap().subject,
+            page.get(1).unwrap().subject,
+            page.get(2).unwrap().subject
+        ],
+        [a, b, d]
+    );
+}
+
+#[test]
+fn list_paginates() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    // no_std: a fixed array rather than a Vec.
+    let subjects = [
+        Address::generate(&env),
+        Address::generate(&env),
+        Address::generate(&env),
+    ];
+    for s in &subjects {
+        report_once(&env, &f, &c, s, Reason::Scam);
+    }
+
+    let first = c.list(&0, &2);
+    let second = c.list(&2, &2);
+    assert_eq!(first.len(), 2);
+    assert_eq!(second.len(), 1); // last page is short, not an error
+    assert_eq!(first.get(0).unwrap().subject, subjects[0]);
+    assert_eq!(first.get(1).unwrap().subject, subjects[1]);
+    assert_eq!(second.get(0).unwrap().subject, subjects[2]);
+}
+
+#[test]
+fn list_start_past_end_is_empty() {
+    // Paging to exhaustion must not need a special case for the last page.
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    report_once(&env, &f, &c, &Address::generate(&env), Reason::Scam);
+
+    assert_eq!(c.list(&99, &10).len(), 0);
+    assert_eq!(c.list(&1, &10).len(), 0);
+    // Empty registry, too.
+    let g = setup(&env, FEE);
+    assert_eq!(client(&env, &g).list(&0, &10).len(), 0);
+}
+
+#[test]
+fn list_rejects_bad_limit() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    assert_eq!(c.try_list(&0, &0), Err(contract_err(Error::InvalidLimit)));
+    assert_eq!(
+        c.try_list(&0, &(MAX_PAGE + 1)),
+        Err(contract_err(Error::InvalidLimit))
+    );
+    // The boundary itself is legal.
+    assert!(c.try_list(&0, &MAX_PAGE).is_ok());
+}
+
+#[test]
+fn list_skips_a_missing_entry() {
+    // One index slot pointing at an entry that is gone must not brick paging
+    // over everything after it.
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    let a = Address::generate(&env);
+    let b = Address::generate(&env);
+    for s in [&a, &b] {
+        report_once(&env, &f, &c, s, Reason::Scam);
+    }
+    env.as_contract(&f.contract_id, || {
+        env.storage()
+            .persistent()
+            .remove(&DataKey::Entry(a.clone()));
+    });
+
+    let page = c.list(&0, &10);
+    assert_eq!(page.len(), 1);
+    assert_eq!(page.get(0).unwrap().subject, b);
+}
+
+#[test]
+fn config_returns_current_values() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    assert_eq!(
+        c.config(),
+        Config {
+            admin: f.admin.clone(),
+            treasury: f.treasury.clone(),
+            fee_token: f.fee_token.clone(),
+            fee: FEE,
+        }
+    );
+
+    // A wallet quotes the fee from this, so it has to track #33's setters.
+    c.set_fee(&(FEE * 3));
+    assert_eq!(c.config().fee, FEE * 3);
+}
+
+#[test]
+fn reads_need_no_auth() {
+    // No mock_all_auths(): screening a counterparty must not require an
+    // identity, let alone a signature. Seed the entry through storage so the
+    // write path's own auth requirement doesn't get in the way.
+    let env = Env::default();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+    let subject = Address::generate(&env);
+
+    env.as_contract(&f.contract_id, || {
+        let entry = Entry {
+            subject: subject.clone(),
+            reporter: Address::generate(&env),
+            reason: Reason::Scam,
+            evidence: no_evidence(&env),
+            reported_at: 10,
+            updated_at: 10,
+            status: Status::Active,
+            reports: 1,
+            index: 0,
+        };
+        env.storage()
+            .persistent()
+            .set(&DataKey::Entry(subject.clone()), &entry);
+        env.storage().persistent().set(&DataKey::Index(0), &subject);
+        env.storage().instance().set(&DataKey::Count, &1u32);
+    });
+
+    assert!(c.is_flagged(&subject));
+    assert_eq!(c.count(), 1);
+    assert_eq!(c.list(&0, &10).len(), 1);
+    assert!(c.get(&subject).is_some());
+    assert_eq!(c.config().fee, FEE);
+}
+
+#[test]
+fn reading_extends_the_entry_ttl() {
+    // Refreshing on read is deliberate: the entries wallets keep asking about
+    // are exactly the ones that must not expire.
+    //
+    // `extend_ttl` only acts once the remaining TTL drops below BUMP_THRESHOLD,
+    // so the ledger has to advance past that point before a read has anything
+    // to do — a read on a freshly written entry is correctly a no-op, and this
+    // asserts both halves of that.
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    let subject = Address::generate(&env);
+    report_once(&env, &f, &c, &subject, Reason::Scam);
+
+    // Still far from expiry: nothing to extend.
+    let fresh = ttl_of(&env, &f.contract_id, &DataKey::Entry(subject.clone()));
+    assert!(c.is_flagged(&subject));
+    assert_eq!(
+        ttl_of(&env, &f.contract_id, &DataKey::Entry(subject.clone())),
+        fresh
+    );
+
+    // Now inside the threshold, where a read is what keeps the entry alive.
+    env.ledger()
+        .with_mut(|li| li.sequence_number += BUMP_AMOUNT - BUMP_THRESHOLD + 1_000);
+    let before = ttl_of(&env, &f.contract_id, &DataKey::Entry(subject.clone()));
+    assert!(before < BUMP_THRESHOLD);
+    assert!(c.is_flagged(&subject));
+    let after = ttl_of(&env, &f.contract_id, &DataKey::Entry(subject.clone()));
+
+    assert!(after > before);
+    // The index slot rides along, same invariant the write path holds.
+    assert_eq!(ttl_of(&env, &f.contract_id, &DataKey::Index(0)), after);
+}
