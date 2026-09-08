@@ -4,7 +4,7 @@ use super::*;
 use soroban_sdk::testutils::storage::Persistent as _;
 use soroban_sdk::testutils::{Address as _, Events, Ledger};
 use soroban_sdk::token::{StellarAssetClient, TokenClient};
-use soroban_sdk::{Env, Symbol, TryFromVal, Val};
+use soroban_sdk::{Env, IntoVal, Symbol, TryFromVal, Val};
 
 const FEE: i128 = 1_000_000; // 0.1 XLM in stroops
 
@@ -512,4 +512,479 @@ fn repeat_report_event_carries_persisted_attribution() {
     assert_eq!(entry.reporter, first);
     assert_eq!(entry.reason, Reason::Drainer);
     assert_eq!(data, (first, Reason::Drainer, Status::Active, 2u32));
+}
+
+// --- #33: admin status transitions + config ---------------------------------
+
+/// Fund a fresh reporter and file one report, returning the subject.
+fn seed_entry(env: &Env, f: &Fixture, c: &BlacklistRegistryClient) -> Address {
+    let reporter = Address::generate(env);
+    let subject = Address::generate(env);
+    f.sac_admin.mint(&reporter, &(FEE * 100));
+    c.report(&reporter, &subject, &Reason::Scam, &some_evidence(env));
+    subject
+}
+
+/// The generated client surfaces a panicking contract call as a raw
+/// `soroban_sdk::Error` (these entry points return `()`, not `Result`), so
+/// assertions spell the expected error out the same way `report`'s do.
+fn contract_err(e: Error) -> Result<soroban_sdk::Error, soroban_sdk::InvokeError> {
+    Ok(soroban_sdk::Error::from_contract_error(e as u32))
+}
+
+/// Did `set_status` succeed when authorized by exactly one address — the only way to test
+/// the admin gate, since `mock_all_auths` would satisfy it for anyone.
+fn set_status_as(env: &Env, f: &Fixture, who: &Address, subject: &Address, status: Status) -> bool {
+    let invoke = soroban_sdk::testutils::MockAuthInvoke {
+        contract: &f.contract_id,
+        fn_name: "set_status",
+        args: (subject.clone(), status).into_val(env),
+        sub_invokes: &[],
+    };
+    let auths = [soroban_sdk::testutils::MockAuth {
+        address: who,
+        invoke: &invoke,
+    }];
+    BlacklistRegistryClient::new(env, &f.contract_id)
+        .mock_auths(&auths)
+        .try_set_status(subject, &status)
+        .is_ok()
+}
+
+/// Did `set_admin(new_admin)` succeed with exactly `signers` authorizing it?
+/// `set_admin` needs both the outgoing and the incoming admin, so this is the
+/// only way to show each signature is load-bearing.
+fn set_admin_signed_by(env: &Env, f: &Fixture, signers: &[&Address], new_admin: &Address) -> bool {
+    let invoke = soroban_sdk::testutils::MockAuthInvoke {
+        contract: &f.contract_id,
+        fn_name: "set_admin",
+        args: (new_admin.clone(),).into_val(env),
+        sub_invokes: &[],
+    };
+    // The crate is no_std, so the auth list is a fixed array sliced to length
+    // rather than a Vec. Only 1 or 2 signers are ever needed here.
+    assert!(signers.len() == 1 || signers.len() == 2);
+    let all = [
+        soroban_sdk::testutils::MockAuth {
+            address: signers[0],
+            invoke: &invoke,
+        },
+        soroban_sdk::testutils::MockAuth {
+            address: signers[signers.len() - 1],
+            invoke: &invoke,
+        },
+    ];
+    BlacklistRegistryClient::new(env, &f.contract_id)
+        .mock_auths(&all[..signers.len()])
+        .try_set_admin(new_admin)
+        .is_ok()
+}
+
+fn config_of(env: &Env, contract_id: &Address) -> Config {
+    instance_get(env, contract_id, &DataKey::Config).unwrap()
+}
+
+#[test]
+fn set_status_requires_admin_auth() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+    let subject = seed_entry(&env, &f, &c);
+
+    // Only the intruder's own auth is mocked, so the admin's require_auth fails.
+    let intruder = Address::generate(&env);
+    assert!(!set_status_as(
+        &env,
+        &f,
+        &intruder,
+        &subject,
+        Status::Revoked
+    ));
+
+    // Unchanged: the failed call must not have moved the entry.
+    assert_eq!(
+        entry_of(&env, &f.contract_id, &subject).unwrap().status,
+        Status::Active
+    );
+}
+
+#[test]
+fn set_status_unknown_subject_not_found() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    let stranger = Address::generate(&env);
+    assert_eq!(
+        c.try_set_status(&stranger, &Status::Revoked),
+        Err(contract_err(Error::NotFound))
+    );
+    // NotFound rather than an implicit create: the admin cannot flag an address
+    // without a fee-paying report behind it.
+    assert_eq!(entry_of(&env, &f.contract_id, &stranger), None);
+    assert_eq!(count_of(&env, &f.contract_id), 0);
+}
+
+#[test]
+fn set_status_cycles_all_states() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().with_mut(|li| li.timestamp = 1_000);
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+    let subject = seed_entry(&env, &f, &c);
+
+    // Any transition is legal, including back to Active and a same-status
+    // no-op — a transition matrix could strand an entry in a dead end.
+    let mut clock = 1_000u64;
+    for status in [
+        Status::Disputed,
+        Status::Revoked,
+        Status::Active,
+        Status::Active,
+    ] {
+        clock += 500;
+        env.ledger().with_mut(|li| li.timestamp = clock);
+        c.set_status(&subject, &status);
+
+        let entry = entry_of(&env, &f.contract_id, &subject).unwrap();
+        assert_eq!(entry.status, status);
+        assert_eq!(entry.updated_at, clock);
+    }
+}
+
+#[test]
+fn set_status_preserves_entry() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().with_mut(|li| li.timestamp = 1_000);
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    let reporter = Address::generate(&env);
+    let subject = Address::generate(&env);
+    f.sac_admin.mint(&reporter, &(FEE * 10));
+    c.report(&reporter, &subject, &Reason::Phishing, &some_evidence(&env));
+    c.report(&reporter, &subject, &Reason::Phishing, &some_evidence(&env));
+    let before = entry_of(&env, &f.contract_id, &subject).unwrap();
+
+    env.ledger().with_mut(|li| li.timestamp = 9_000);
+    c.set_status(&subject, &Status::Disputed);
+
+    // The audit trail is the point: a status change resolves a report, it does
+    // not rewrite who reported what, when, or how many times.
+    let after = entry_of(&env, &f.contract_id, &subject).unwrap();
+    assert_eq!(
+        after,
+        Entry {
+            status: Status::Disputed,
+            updated_at: 9_000,
+            ..before
+        }
+    );
+}
+
+#[test]
+fn set_status_extends_the_index_key_with_the_entry() {
+    // Same invariant report() holds: whatever keeps an entry alive keeps its
+    // insertion-index slot alive, or list() (#34) loses a live subject.
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+    let subject = seed_entry(&env, &f, &c);
+
+    env.ledger().with_mut(|li| li.sequence_number += 10_000);
+    c.set_status(&subject, &Status::Disputed);
+
+    let entry_ttl = ttl_of(&env, &f.contract_id, &DataKey::Entry(subject.clone()));
+    let index_ttl = ttl_of(&env, &f.contract_id, &DataKey::Index(0));
+    assert_eq!(index_ttl, entry_ttl);
+    assert!(index_ttl >= BUMP_THRESHOLD);
+}
+
+#[test]
+fn set_status_revoked_then_report_reactivates() {
+    // The end-to-end dispute path #32 could only fake by poking storage.
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+    let subject = seed_entry(&env, &f, &c);
+
+    c.set_status(&subject, &Status::Revoked);
+    let second = Address::generate(&env);
+    f.sac_admin.mint(&second, &(FEE * 10));
+    c.report(&second, &subject, &Reason::Poisoning, &no_evidence(&env));
+
+    let entry = entry_of(&env, &f.contract_id, &subject).unwrap();
+    assert_eq!(entry.status, Status::Active);
+    assert_eq!(entry.reporter, second);
+    assert_eq!(entry.reports, 2);
+}
+
+#[test]
+fn set_fee_rejects_negative() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    assert_eq!(c.try_set_fee(&-1), Err(contract_err(Error::InvalidFee)));
+    assert_eq!(config_of(&env, &f.contract_id).fee, FEE);
+}
+
+#[test]
+fn set_fee_applies_to_next_report() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    let reporter = Address::generate(&env);
+    let subject = Address::generate(&env);
+    f.sac_admin.mint(&reporter, &(FEE * 100));
+
+    c.report(&reporter, &subject, &Reason::Scam, &no_evidence(&env));
+    c.set_fee(&(FEE * 5));
+    c.report(&reporter, &subject, &Reason::Scam, &no_evidence(&env));
+
+    assert_eq!(config_of(&env, &f.contract_id).fee, FEE * 5);
+    assert_eq!(balance(&env, &f.fee_token, &f.treasury), FEE + FEE * 5);
+}
+
+#[test]
+fn set_fee_accepts_zero() {
+    // Zero is legal and makes writes free — how the registry runs on testnet
+    // before a treasury is funded.
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    c.set_fee(&0);
+    let reporter = Address::generate(&env); // deliberately unfunded
+    let subject = Address::generate(&env);
+    c.report(&reporter, &subject, &Reason::Scam, &no_evidence(&env));
+
+    assert_eq!(balance(&env, &f.fee_token, &f.treasury), 0);
+}
+
+#[test]
+fn set_treasury_reroutes_fee() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    let reporter = Address::generate(&env);
+    let subject = Address::generate(&env);
+    f.sac_admin.mint(&reporter, &(FEE * 100));
+    c.report(&reporter, &subject, &Reason::Scam, &no_evidence(&env));
+
+    let new_treasury = Address::generate(&env);
+    c.set_treasury(&new_treasury);
+    c.report(&reporter, &subject, &Reason::Scam, &no_evidence(&env));
+
+    assert_eq!(config_of(&env, &f.contract_id).treasury, new_treasury);
+    assert_eq!(balance(&env, &f.fee_token, &new_treasury), FEE);
+    // Already-collected fees are not custodied by the contract, so the old
+    // treasury keeps exactly what it was sent.
+    assert_eq!(balance(&env, &f.fee_token, &f.treasury), FEE);
+}
+
+#[test]
+fn set_admin_transfers_control() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+    let subject = seed_entry(&env, &f, &c);
+
+    let new_admin = Address::generate(&env);
+    c.set_admin(&new_admin);
+    assert_eq!(config_of(&env, &f.contract_id).admin, new_admin);
+
+    // The old admin is rejected the instant the transfer lands...
+    assert!(!set_status_as(
+        &env,
+        &f,
+        &f.admin,
+        &subject,
+        Status::Revoked
+    ));
+
+    // ...and the new one is accepted.
+    assert!(set_status_as(
+        &env,
+        &f,
+        &new_admin,
+        &subject,
+        Status::Revoked
+    ));
+    assert_eq!(
+        entry_of(&env, &f.contract_id, &subject).unwrap().status,
+        Status::Revoked
+    );
+}
+
+#[test]
+fn config_ops_require_admin_auth() {
+    // No mock_all_auths(): none of the three config setters may run unauthorized.
+    let env = Env::default();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    assert!(c.try_set_fee(&0).is_err());
+    assert!(c.try_set_treasury(&Address::generate(&env)).is_err());
+    assert!(c.try_set_fee_token(&Address::generate(&env)).is_err());
+    assert!(c.try_set_admin(&Address::generate(&env)).is_err());
+
+    assert_eq!(
+        config_of(&env, &f.contract_id),
+        Config {
+            admin: f.admin.clone(),
+            treasury: f.treasury.clone(),
+            fee_token: f.fee_token.clone(),
+            fee: FEE,
+        }
+    );
+}
+
+/// The hand-off is unrecoverable — there is no upgrade path — so it takes both
+/// signatures: the outgoing admin to approve it, the incoming one to prove the
+/// address exists and is controlled. Either alone must fail.
+#[test]
+fn set_admin_requires_both_admins() {
+    let env = Env::default();
+    let f = setup(&env, FEE);
+    let new_admin = Address::generate(&env);
+
+    assert!(!set_admin_signed_by(&env, &f, &[&f.admin], &new_admin));
+    assert!(!set_admin_signed_by(&env, &f, &[&new_admin], &new_admin));
+    assert_eq!(config_of(&env, &f.contract_id).admin, f.admin);
+
+    // Both authorizations ride in the same transaction, so the rotation is
+    // still a single call.
+    assert!(set_admin_signed_by(
+        &env,
+        &f,
+        &[&f.admin, &new_admin],
+        &new_admin
+    ));
+    assert_eq!(config_of(&env, &f.contract_id).admin, new_admin);
+}
+
+#[test]
+fn set_fee_token_switches_the_charged_asset() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    let issuer = Address::generate(&env);
+    let sac = env.register_stellar_asset_contract_v2(issuer);
+    let new_token = sac.address();
+    let new_token_admin = StellarAssetClient::new(&env, &new_token);
+
+    let reporter = Address::generate(&env);
+    let subject = Address::generate(&env);
+    f.sac_admin.mint(&reporter, &(FEE * 10));
+    new_token_admin.mint(&reporter, &(FEE * 10));
+
+    c.report(&reporter, &subject, &Reason::Scam, &no_evidence(&env));
+    c.set_fee_token(&new_token);
+    c.report(&reporter, &subject, &Reason::Scam, &no_evidence(&env));
+
+    assert_eq!(config_of(&env, &f.contract_id).fee_token, new_token);
+    // One fee in each asset: the switch applies from the next report on.
+    assert_eq!(balance(&env, &f.fee_token, &f.treasury), FEE);
+    assert_eq!(balance(&env, &new_token, &f.treasury), FEE);
+}
+
+#[test]
+fn set_fee_token_requires_admin_auth() {
+    let env = Env::default();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+
+    assert!(c.try_set_fee_token(&Address::generate(&env)).is_err());
+    assert_eq!(config_of(&env, &f.contract_id).fee_token, f.fee_token);
+}
+
+/// Every admin change is auditable from events alone — that is what makes the
+/// "weighted signal, never an auto-block" promise checkable off-chain.
+#[test]
+fn admin_ops_emit_events() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let f = setup(&env, FEE);
+    let c = client(&env, &f);
+    let subject = seed_entry(&env, &f, &c);
+
+    let new_admin = Address::generate(&env);
+    let new_treasury = Address::generate(&env);
+
+    // `events().all()` only carries the most recent invocation's events, so each
+    // call is inspected right after it rather than in one pass at the end.
+    let last_event = || {
+        let all = env.events().all();
+        let mine = all.filter_by_contract(&f.contract_id);
+        let events = mine.events();
+        let soroban_sdk::xdr::ContractEventBody::V0(body) = &events[events.len() - 1].body;
+        (
+            body.topics.clone(),
+            Val::try_from_val(&env, &body.data).unwrap(),
+        )
+    };
+
+    // set_status: topic (status, subject), data (old, new) — the old status is
+    // in the payload so an indexer can audit the transition, not just the result.
+    c.set_status(&subject, &Status::Disputed);
+    let (topics, data) = last_event();
+    assert_eq!(
+        Symbol::try_from_val(&env, &topics[0]).unwrap(),
+        symbol_short!("status")
+    );
+    assert_eq!(Address::try_from_val(&env, &topics[1]).unwrap(), subject);
+    let statuses: (Status, Status) = TryFromVal::try_from_val(&env, &data).unwrap();
+    assert_eq!(statuses, (Status::Active, Status::Disputed));
+
+    // Config changes: one topic per field, so an indexer can subscribe per key.
+    let assert_config_topic = |topics: &[soroban_sdk::xdr::ScVal], field: Symbol| {
+        assert_eq!(
+            Symbol::try_from_val(&env, &topics[0]).unwrap(),
+            symbol_short!("config")
+        );
+        assert_eq!(Symbol::try_from_val(&env, &topics[1]).unwrap(), field);
+    };
+
+    // Every config event carries BOTH sides, like the status event: an indexer
+    // following admin history should not have to carry state across events to
+    // know what was replaced.
+    c.set_treasury(&new_treasury);
+    let (topics, data) = last_event();
+    assert_config_topic(&topics, symbol_short!("treasury"));
+    let treasuries: (Address, Address) = TryFromVal::try_from_val(&env, &data).unwrap();
+    assert_eq!(treasuries, (f.treasury.clone(), new_treasury.clone()));
+
+    c.set_fee(&(FEE * 2));
+    let (topics, data) = last_event();
+    assert_config_topic(&topics, symbol_short!("fee"));
+    let fees: (i128, i128) = TryFromVal::try_from_val(&env, &data).unwrap();
+    assert_eq!(fees, (FEE, FEE * 2));
+
+    c.set_fee_token(&new_treasury);
+    let (topics, data) = last_event();
+    assert_config_topic(&topics, symbol_short!("fee_token"));
+    let tokens: (Address, Address) = TryFromVal::try_from_val(&env, &data).unwrap();
+    assert_eq!(tokens, (f.fee_token.clone(), new_treasury.clone()));
+
+    c.set_admin(&new_admin);
+    let (topics, data) = last_event();
+    assert_config_topic(&topics, symbol_short!("admin"));
+    let admins: (Address, Address) = TryFromVal::try_from_val(&env, &data).unwrap();
+    assert_eq!(admins, (f.admin.clone(), new_admin.clone()));
 }
