@@ -15,9 +15,10 @@
 //      itself. The reporter is recorded for attribution, so the signal can be
 //      weighted rather than treated as an auto-block.
 //
-// This slice is the skeleton only: types, storage schema, TTL helpers and the
-// constructor. The write path is #32, admin status transitions are #33, and the
-// public read API (`is_flagged`, `get`, `count`, `list`) is #34.
+// The skeleton (types, storage schema, TTL helpers, constructor) is #31, the
+// write path is #32 and the admin surface — status transitions plus config
+// changes — is #33. The public read API (`is_flagged`, `get`, `count`, `list`)
+// is #34.
 
 #![no_std]
 use soroban_sdk::{
@@ -275,6 +276,113 @@ impl BlacklistRegistry {
         );
 
         entry.reports
+    }
+
+    /// Admin-only: move an entry between Active / Disputed / Revoked.
+    ///
+    /// The entry is never deleted — a revoked report stays readable, so the
+    /// record of who reported what and how it was resolved survives. Disputes
+    /// are how a wrongly-flagged address stops producing a warning without
+    /// erasing the audit trail.
+    ///
+    /// Any transition between the three states is allowed, including a
+    /// same-status no-op write. There is deliberately no transition matrix:
+    /// a matrix can strand an entry in a state the admin cannot leave, and the
+    /// only thing the registry actually needs to guarantee is that every change
+    /// is authorized and auditable.
+    pub fn set_status(env: Env, subject: Address, status: Status) {
+        Self::require_admin(&env);
+
+        let key = DataKey::Entry(subject.clone());
+        let mut entry: Entry = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::NotFound));
+
+        // Never creates an entry: an unknown subject is NotFound above, so the
+        // admin cannot flag an address without a (fee-paying) report first.
+        let old_status = entry.status;
+        entry.status = status;
+        entry.updated_at = env.ledger().timestamp();
+
+        env.storage().persistent().set(&key, &entry);
+        bump_entry(&env, &subject, entry.index);
+        bump_instance(&env);
+
+        #[allow(deprecated)]
+        env.events().publish(
+            (symbol_short!("status"), subject.clone()),
+            (old_status, status),
+        );
+    }
+
+    /// Admin-only: hand control to `new_admin`.
+    ///
+    /// The transfer is atomic — the moment this returns, the old admin has no
+    /// rights left, so a compromised admin key is rotated in a single call
+    /// (SOW §3.9 risk table).
+    pub fn set_admin(env: Env, new_admin: Address) {
+        let mut config = Self::require_admin(&env);
+        config.admin = new_admin.clone();
+        Self::save_config(&env, &config);
+
+        #[allow(deprecated)]
+        env.events()
+            .publish((symbol_short!("config"), symbol_short!("admin")), new_admin);
+    }
+
+    /// Admin-only: redirect future report fees to `treasury`.
+    ///
+    /// Only *future* reports move — fees already collected stay where they were
+    /// sent, since the contract never custodies them.
+    pub fn set_treasury(env: Env, treasury: Address) {
+        let mut config = Self::require_admin(&env);
+        config.treasury = treasury.clone();
+        Self::save_config(&env, &config);
+
+        #[allow(deprecated)]
+        env.events().publish(
+            (symbol_short!("config"), symbol_short!("treasury")),
+            treasury,
+        );
+    }
+
+    /// Admin-only: reprice a report. `0` is legal (free writes); negative is
+    /// `Error::InvalidFee`, same rule the constructor enforces.
+    pub fn set_fee(env: Env, fee: i128) {
+        let mut config = Self::require_admin(&env);
+        if fee < 0 {
+            panic_with_error!(&env, Error::InvalidFee);
+        }
+        config.fee = fee;
+        Self::save_config(&env, &config);
+
+        #[allow(deprecated)]
+        env.events()
+            .publish((symbol_short!("config"), symbol_short!("fee")), fee);
+    }
+}
+
+impl BlacklistRegistry {
+    /// Load `Config` and assert the caller is the *current* admin.
+    ///
+    /// Every admin entry point calls this first, before touching any other
+    /// storage: nothing about the registry's state should be observable to an
+    /// unauthorized caller, and `set_admin` means "current" is not a constant.
+    fn require_admin(env: &Env) -> Config {
+        let config: Config = env
+            .storage()
+            .instance()
+            .get(&DataKey::Config)
+            .unwrap_or_else(|| panic_with_error!(env, Error::NotFound));
+        config.admin.require_auth();
+        config
+    }
+
+    fn save_config(env: &Env, config: &Config) {
+        env.storage().instance().set(&DataKey::Config, config);
+        bump_instance(env);
     }
 }
 
