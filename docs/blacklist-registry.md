@@ -77,6 +77,15 @@ node scripts/hot-read-blacklist-registry.mjs --key-only \
 `getLedgerEntries(ledgerKey)` returns at most one entry. Nothing back means the
 subject was never reported — the common case, and not an error.
 
+An **archived** entry does not come back empty, so it cannot be mistaken for
+this case. A persistent entry that ages out is archived rather than deleted:
+`getLedgerEntries` still returns it, with a `liveUntilLedgerSeq` behind the
+response's `latestLedger`. That is a third outcome and the helper reports it as
+one (`status: "unknown"`, `reason: "archived"`), because answering "not flagged"
+for a subject whose entry is merely asleep is the one direction a screening call
+must not fail in. The caller's move is to fall back to the contract views
+(#46) — a simulated invocation restores the entry as part of the call.
+
 The value decodes to the contract's `Entry` struct. The current shape is **nine**
 fields, not the eight in the original schema: `index: u32` was added in #32 so an
 entry's insertion ordinal is recoverable from the entry alone (the index slot's
