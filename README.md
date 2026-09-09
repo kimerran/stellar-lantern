@@ -121,6 +121,7 @@ Explore any id at `https://stellar.expert/explorer/testnet/contract/<id>`.
 | Contract | Address / hash | Purpose |
 | --- | --- | --- |
 | **Lantern Earn** (Blend v2 pool) | [`CC4KSBTTPCKZUYBXB47SSZGXTKO6G23Y6LJOIR6YCOJVTGJZEYJCHBOH`](https://stellar.expert/explorer/testnet/contract/CC4KSBTTPCKZUYBXB47SSZGXTKO6G23Y6LJOIR6YCOJVTGJZEYJCHBOH) | Our own lending pool, deployed via the Blend factory with curated USDC + XLM reserves (#109). Wired in `src/core/blend/directory.ts`; re-deploy with `scripts/deploy-lantern-pool.sh`. |
+| **Blacklist Registry** | [`CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F`](https://stellar.expert/explorer/testnet/contract/CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F) | On-chain scam-address registry — fee-gated reports routed to the treasury, admin status transitions, public `is_flagged`/`get`/`count`/`list`, plus a fee-free `getLedgerEntries` hot read (D1). WASM hash `40fd37718c3fbc7f849c4d414364cdd86c01b4db9ab86be9099007ba5be23783`. Documented in `docs/blacklist-registry.md`; re-deploy with `scripts/deploy-blacklist-registry.sh`. |
 | **Passkey smart account** (WASM) | wasm hash `8759fa9e49446cb8d332da8fee973c453b1178fb0525345892991f4997d8451b` | secp256r1 / WebAuthn custom-account contract (#53). The WASM is installed on testnet and vendored in `src/core/passkey/contractWasm.ts`; a fresh **instance** is deployed per passkey account during seed-phrase-free onboarding. |
 
 ### Reserve / asset tokens (Stellar Asset Contracts)

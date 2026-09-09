@@ -7,14 +7,14 @@ import { decodeEntry, entryLedgerKey } from '../scripts/hot-read-blacklist-regis
 // there is no excuse for them to be untested — and a silent change to either
 // would break every caller's screening path with no network error to notice.
 
-const CONTRACT = 'CDZSDRDWHL3LRK5PRQ6EJR74OYSQ4FE7OOZH37KIXN7GQ3HZ3N4MSAFK';
+const CONTRACT = 'CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F';
 const SUBJECT = 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7';
 
 // Published verbatim in docs/blacklist-registry.md and verified against a live
 // testnet read. If this assertion ever fails, the derivation regressed — the
 // expected value is not the thing to update.
 const PUBLISHED_KEY =
-  'AAAABgAAAAHzIcR2Ova4q6+MPETH/HYlDhSfc7J9/Ui7fmhs+dt4yQAAABAAAAABAAAAAgAAAA8A' +
+  'AAAABgAAAAFTYfpAhtxljUyEXStVJrepr4CSWlFIzYV62i5SB+n0bwAAABAAAAABAAAAAgAAAA8A' +
   'AAAFRW50cnkAAAAAAAASAAAAAAAAAAABlHJijueOuScU0i0DkJY8JNkn6gCZmUhuiR+sLaqcIQAA' +
   'AAE=';
 
