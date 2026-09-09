@@ -1,4 +1,4 @@
-# Blacklist registry — read paths
+# Blacklist registry — read paths and testnet deployment
 
 The registry answers one question for wallets: **has this counterparty been
 reported?** There are two ways to ask, and they are not interchangeable.
@@ -55,11 +55,11 @@ const ledgerKey = xdr.LedgerKey.contractData(
 
 ### Worked example
 
-Contract `CDZSDRDWHL3LRK5PRQ6EJR74OYSQ4FE7OOZH37KIXN7GQ3HZ3N4MSAFK`,
+Contract `CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F`,
 subject `GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7`:
 
 ```
-AAAABgAAAAHzIcR2Ova4q6+MPETH/HYlDhSfc7J9/Ui7fmhs+dt4yQAAABAAAAABAAAAAgAAAA8A
+AAAABgAAAAFTYfpAhtxljUyEXStVJrepr4CSWlFIzYV62i5SB+n0bwAAABAAAAABAAAAAgAAAA8A
 AAAFRW50cnkAAAAAAAASAAAAAAAAAAABlHJijueOuScU0i0DkJY8JNkn6gCZmUhuiR+sLaqcIQAA
 AAE=
 ```
@@ -68,7 +68,7 @@ Reproduce it offline — the derivation touches no network:
 
 ```bash
 node scripts/hot-read-blacklist-registry.mjs --key-only \
-  --contract CDZSDRDWHL3LRK5PRQ6EJR74OYSQ4FE7OOZH37KIXN7GQ3HZ3N4MSAFK \
+  --contract CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F \
   --subject  GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7
 ```
 
@@ -141,22 +141,92 @@ node scripts/hot-read-blacklist-registry.mjs \
   --contract C... --subject G... [--rpc https://soroban-testnet.stellar.org] [--json]
 ```
 
+## Deployment (testnet)
+
+| | |
+|---|---|
+| Contract id | [`CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F`](https://stellar.expert/explorer/testnet/contract/CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F) |
+| WASM hash | `40fd37718c3fbc7f849c4d414364cdd86c01b4db9ab86be9099007ba5be23783` |
+| Admin | `GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK` |
+| Treasury | `GA4A2EPXERUUVMBMH3D5OV4ONZ7QXIYKHBSI2ZWZ5HQAIFUMYCQZRSNR` |
+| Fee | `10000000` stroops (1 XLM) of the native XLM SAC `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC` |
+
+The WASM hash is the sha256 of the built artifact — `scripts/build-blacklist-registry.sh`
+prints it, `stellar contract upload` returns it, and the deploy script refuses to
+continue if the two disagree, so a hash published here cannot have drifted from
+the bytes on chain.
+
+Admin and treasury above are local `stellar keys` identities on the deploying
+machine. **No secret ever enters the repo**; a real deployment's admin and
+treasury secrets live in environment secrets (SOW §3.9).
+
+### Smoke report — the fee-routing evidence
+
+`scripts/smoke-blacklist-registry.sh <contract-id>` reports Lantern's demo
+flagged address and asserts the money moved:
+
+| | |
+|---|---|
+| Report tx | [`81fa64a67eb583f8fb499b2d425e88754b701480f1c8aff2e3ad8a6725fb8ed8`](https://stellar.expert/explorer/testnet/tx/81fa64a67eb583f8fb499b2d425e88754b701480f1c8aff2e3ad8a6725fb8ed8) |
+| Subject | `GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ` (`DEMO_FLAGGED_ADDRESSES`) |
+| Reason | `Scam`, evidence `7f107062713d6b640e0491e374f26314e3d12a1c4e3687959269ae5d32e411d8` |
+| Treasury balance | `100000000000` → `100010000000` stroops — **exactly +1 XLM** |
+| After | `is_flagged(GA7QY…) == true` |
+
+The script asserts the delta rather than printing two balances, so a fee that
+silently stopped routing fails the run instead of reading as success. The
+subject is the address the scanner already shows as flagged in the demo, so the
+on-chain entry and the demo agree.
+
+### Re-deploying after a testnet reset
+
+Testnet is periodically reset, which wipes the contract *and* every entry.
+
+```bash
+scripts/deploy-blacklist-registry.sh                 # prints new id + wasm hash
+scripts/smoke-blacklist-registry.sh <new-contract-id>  # re-seeds the demo entry
+```
+
+Then update, in this order:
+
+1. the README "Testnet smart contracts" row (contract id **and** WASM hash),
+2. the deployment table above, plus the smoke tx hash, and
+3. the worked example in this document (contract id **and** the base64 key).
+
+There is deliberately **no fourth step in the test suite**.
+`tests/blacklist-hot-read.test.ts` reads the worked example out of this file and
+re-derives the key from it, so this document is the fixture rather than a copy of
+one: a stale example fails `npm test` instead of sitting green next to a passing
+duplicate. Run the suite after step 3.
+
+Get the new key from `--key-only`, which needs no network:
+
+```bash
+node scripts/hot-read-blacklist-registry.mjs --key-only \
+  --contract <new-contract-id> --subject GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7
+```
+
 ## Verified against a live contract
 
-Run on testnet against a throwaway instance deployed for this purpose
-(`CDZSDRDWHL3LRK5PRQ6EJR74OYSQ4FE7OOZH37KIXN7GQ3HZ3N4MSAFK`, zero fee — **not**
-the registry's real deployment, which is #36):
+Against the deployment above, over `getLedgerEntries` with no source account, no
+transaction and no signature:
 
 | Case | Result |
 |---|---|
 | Reported subject, `Active` | `FLAGGED`, reason `Scam`, reporter and `reports: 1` decoded, `index: 0` |
-| Same subject after `set_status Disputed` | `flagged: false`, entry still readable with `status: "Disputed"` |
-| Address never reported | `not flagged — no entry`, clean exit, no error |
+| Address never reported | `not flagged — no live entry`, clean exit, no error |
 
-Every one of those went over `getLedgerEntries` with no source account, no
-transaction and no signature.
+The `Disputed` case — `flagged: false` with the entry still readable and
+`status: "Disputed"` — was verified in #44 against a throwaway zero-fee instance,
+because proving it here would mean disputing the demo entry this deployment
+exists to seed.
 
 ## What this does not do
 
 Wiring the hot read into the scanner or the wallet is D2 (Screen stage) and D3.
-This is the primitive, the proof and the recipe.
+**The wallet does not read this registry yet** — today's scanner still screens
+against the hardcoded `DEMO_FLAGGED_ADDRESSES` in `src/core/scan/engine.ts`, not
+against the deployed contract. This is the primitive, the proof and the recipe.
+
+The ABI, data model, status semantics, event schema and error codes are #45's
+job, not this document's.
