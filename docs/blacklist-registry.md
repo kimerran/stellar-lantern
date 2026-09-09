@@ -187,15 +187,17 @@ scripts/deploy-blacklist-registry.sh                 # prints new id + wasm hash
 scripts/smoke-blacklist-registry.sh <new-contract-id>  # re-seeds the demo entry
 ```
 
-Then update, in this order — the last one is the one that is easy to forget and
-the only one CI catches:
+Then update, in this order:
 
 1. the README "Testnet smart contracts" row (contract id **and** WASM hash),
-2. the deployment table above, plus the smoke tx hash,
-3. the worked example in this document (contract id **and** the base64 key), and
-4. `CONTRACT` / `PUBLISHED_KEY` in `tests/blacklist-hot-read.test.ts` — that test
-   asserts the derived key equals the one published here, so the doc and the test
-   cannot drift apart, and `npm test` fails until both are updated.
+2. the deployment table above, plus the smoke tx hash, and
+3. the worked example in this document (contract id **and** the base64 key).
+
+There is deliberately **no fourth step in the test suite**.
+`tests/blacklist-hot-read.test.ts` reads the worked example out of this file and
+re-derives the key from it, so this document is the fixture rather than a copy of
+one: a stale example fails `npm test` instead of sitting green next to a passing
+duplicate. Run the suite after step 3.
 
 Get the new key from `--key-only`, which needs no network:
 

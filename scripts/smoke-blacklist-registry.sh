@@ -53,6 +53,18 @@ echo "    treasury : $TREASURY"
 echo "    fee      : $FEE stroops of $FEE_TOKEN"
 echo "    evidence : $EVIDENCE"
 
+# The reporter also paying the transaction's base fee out of the account we are
+# measuring makes the delta land just under the configured fee, and the run then
+# fails as "delta != fee" — which reads as broken fee routing rather than a smoke
+# run pointed at a deployment whose treasury is the deployer.
+if [ "$REPORTER" = "$TREASURY" ]; then
+  echo "❌ reporter == treasury ($REPORTER)." >&2
+  echo "   The base fee would come out of the balance this script measures, so the" >&2
+  echo "   delta could not equal the report fee even with fee routing working." >&2
+  echo "   Re-deploy with a separate TREASURY, or pass another identity." >&2
+  exit 1
+fi
+
 BEFORE="$(sim "$FEE_TOKEN" balance --id "$TREASURY" | strip)"
 echo "==> treasury balance before: $BEFORE"
 
@@ -63,11 +75,25 @@ OUT="$(send "$CONTRACT_ID" report --reporter "$REPORTER" --subject "$SUBJECT" \
         --reason Scam --evidence "$EVIDENCE" 2>&1)"
 echo "$OUT" | sed 's/^/    /'
 TX="$(echo "$OUT" | sed -n 's/.*Signing transaction: \([0-9a-f]\{64\}\).*/\1/p' | tail -1)"
+# The hash is scraped out of a CLI log line, so it can vanish under a CLI update
+# while every assertion below still passes. The block this script prints exists
+# to be pasted into the docs as Deliverable 1's evidence — an empty TX would put
+# a stellar.expert URL ending in a bare slash in there, so stop instead.
+if [ -z "$TX" ]; then
+  echo "❌ could not read the report tx hash from the CLI output." >&2
+  echo "   Expected a line matching 'Signing transaction: <64 hex>' — the stellar" >&2
+  echo "   CLI's output format likely changed. The report itself succeeded; only" >&2
+  echo "   the evidence link is missing. Fix the scrape above before publishing." >&2
+  exit 1
+fi
 
 AFTER="$(sim "$FEE_TOKEN" balance --id "$TREASURY" | strip)"
 echo "==> treasury balance after: $AFTER"
 
-DELTA=$(( AFTER - BEFORE ))
+# Balances and fees are i128 on chain; bash arithmetic is 64-bit signed. Subtract
+# in BigInt so a fee token with large-denomination balances can't overflow the
+# check into a false pass. node is already a prerequisite (the hot read below).
+DELTA="$(node -e 'process.stdout.write((BigInt(process.argv[1]) - BigInt(process.argv[2])).toString())' "$AFTER" "$BEFORE")"
 if [ "$DELTA" != "$FEE" ]; then
   echo "❌ treasury delta $DELTA != fee $FEE" >&2; exit 1
 fi

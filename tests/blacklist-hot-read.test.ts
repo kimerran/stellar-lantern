@@ -1,22 +1,41 @@
 import { describe, expect, it } from 'vitest';
 import { Address, xdr } from '@stellar/stellar-sdk';
 import { decodeEntry, entryLedgerKey } from '../scripts/hot-read-blacklist-registry.mjs';
+// The doc itself, as text. `?raw` rather than `node:fs` because the node
+// polyfills this suite runs under stub the filesystem module out.
+import doc from '../docs/blacklist-registry.md?raw';
 
 // The derivation IS the claim this tool makes: that a client can compute where a
 // verdict lives without asking anyone. Both functions are pure and offline, so
 // there is no excuse for them to be untested — and a silent change to either
 // would break every caller's screening path with no network error to notice.
 
-const CONTRACT = 'CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F';
 const SUBJECT = 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7';
 
-// Published verbatim in docs/blacklist-registry.md and verified against a live
-// testnet read. If this assertion ever fails, the derivation regressed — the
-// expected value is not the thing to update.
-const PUBLISHED_KEY =
-  'AAAABgAAAAFTYfpAhtxljUyEXStVJrepr4CSWlFIzYV62i5SB+n0bwAAABAAAAABAAAAAgAAAA8A' +
-  'AAAFRW50cnkAAAAAAAASAAAAAAAAAAABlHJijueOuScU0i0DkJY8JNkn6gCZmUhuiR+sLaqcIQAA' +
-  'AAE=';
+/**
+ * The worked example as the documentation actually publishes it.
+ *
+ * Copying those values into a constant here would only pin this file against
+ * itself: the doc could go stale after a re-deploy and the suite would stay
+ * green, which is the one failure the doc's own runbook warns about. So the
+ * expected values are *read out of the markdown* — the doc is the fixture, and
+ * a doc that no longer matches the derivation fails the build.
+ */
+function publishedWorkedExample(): { contract: string; subject: string; key: string } {
+  const section = doc.split('### Worked example')[1]?.split('\n## ')[0];
+  if (!section) throw new Error('docs/blacklist-registry.md: no "### Worked example" section');
+
+  const contract = /Contract `(C[A-Z2-7]{55})`/.exec(section)?.[1];
+  const subject = /subject `(G[A-Z2-7]{55})`/.exec(section)?.[1];
+  // The first fenced block in the section is the base64 key, wrapped for width.
+  const key = /```\n([A-Za-z0-9+/=\n]+?)\n```/.exec(section)?.[1]?.replace(/\n/g, '');
+  if (!contract || !subject || !key) {
+    throw new Error('docs/blacklist-registry.md: worked example is not in the expected shape');
+  }
+  return { contract, subject, key };
+}
+
+const { contract: CONTRACT, subject: DOC_SUBJECT, key: PUBLISHED_KEY } = publishedWorkedExample();
 
 const REPORTER = 'GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK';
 
@@ -43,6 +62,9 @@ function entryScVal(): xdr.ScVal {
 
 describe('entryLedgerKey', () => {
   it('matches the key published in the docs', () => {
+    // Both sides come from docs/blacklist-registry.md, so this fails when the
+    // published example goes stale — not only when the derivation regresses.
+    expect(DOC_SUBJECT).toBe(SUBJECT);
     expect(entryLedgerKey(CONTRACT, SUBJECT).toXDR('base64')).toBe(PUBLISHED_KEY);
   });
 
