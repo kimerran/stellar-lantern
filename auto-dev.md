@@ -6,6 +6,23 @@ Before starting, make sure to read these files to get more context:
 - docs/features.md — running log of shipped features (append an entry here per change)
 - docs/migrations.md — DB timestamp/migration conventions (read before any schema change)
 
+## Remotes
+
+This checkout has **two** remotes, and they are not interchangeable:
+
+- `origin` → `kimerran/internal-lantern` — **where issues, branches and PRs live.** Everything below targets this remote.
+- `public` → `kimerran/stellar-lantern` — the public mirror. Release-only; **never** push a work branch or open a PR here.
+
+`gh` is pinned to `origin` (`gh repo set-default kimerran/internal-lantern`), so bare `gh issue`/`gh pr` commands resolve to the internal repo. Still pass `-R "$REPO"` explicitly on every `gh pr create`, since the head branch has to be pushed to `origin` first:
+
+```
+REPO=$(git config --get remote.origin.url | sed 's|.*github.com[:/]||' | sed 's/.git$//')
+git push -u origin <branch>
+gh pr create -R "$REPO" --base develop --head <branch> ...
+```
+
+Because PRs merge into `develop` rather than the default branch `main`, GitHub never auto-closes an issue on merge — that stays a human judgement call.
+
 ## Workflow
 
 1. **Fetch open issues assigned to you (or with a specific label):**
@@ -28,15 +45,15 @@ Before starting, make sure to read these files to get more context:
    - Create a branch from `develop` (not `main`): `gh issue develop {number} --base develop --checkout`
    - Make sure to rebase onto the develop branch
    - Make the code changes
-   - Commit and push
-   - Open a PR: `gh pr create --base develop --title "Fix #{number}: {title}" --body "Closes #{number}\n\n{summary of changes}"`
+   - Commit and push **to `origin`**: `git push -u origin {number}-{slug}`
+   - Open a PR **on `origin`**: `gh pr create -R "$REPO" --base develop --title "Fix #{number}: {title}" --body "Closes #{number}\n\n{summary of changes}"`
    - Make modifications to the docs/features.md for the changes
 
    **Epic (multiple acceptance criteria under one issue):**
    - List out the distinct, independently-describable items in the issue body first (e.g. numbered sections or checkboxes). For each item, decide: does it need code/state that a *different, not-yet-merged* item in this same epic produces?
    - Process items in dependency order. For each item:
-     - **No dependency on another unmerged item in this epic** → branch from `develop` (`git worktree add <path> -b {number}-{slug} develop`), same as a simple issue. Open the PR with `--base develop`.
-     - **Depends on another item in this epic that hasn't been merged yet** → branch from *that item's branch*, not from `develop` (`git worktree add <path> -b {number}-{slug}-b {number}-{slug}-a`). Open the PR with `--base {number}-{slug}-a` (the prior item's branch), not `develop`. This is a **stacked PR**: it only needs the earlier item's code to exist on its branch, not merged — so the whole dependency chain can be built and opened in one run without waiting on a human to merge anything in between. GitHub will auto-retarget it to `develop` once the branch below it merges.
+     - **No dependency on another unmerged item in this epic** → branch from `develop` (`git worktree add <path> -b {number}-{slug} develop`), same as a simple issue. Open the PR with `-R "$REPO" --base develop`.
+     - **Depends on another item in this epic that hasn't been merged yet** → branch from *that item's branch*, not from `develop` (`git worktree add <path> -b {number}-{slug}-b {number}-{slug}-a`). Open the PR with `-R "$REPO" --base {number}-{slug}-a` (the prior item's branch), not `develop`. Push both branches to `origin` first. This is a **stacked PR**: it only needs the earlier item's code to exist on its branch, not merged — so the whole dependency chain can be built and opened in one run without waiting on a human to merge anything in between. GitHub will auto-retarget it to `develop` once the branch below it merges.
      - Each item still gets its own atomic commit/branch/PR — stacking removes the *merge* dependency, it doesn't collapse multiple items into one PR.
      - PR body: use `"Part of #{number} (item: {item title}). Does not close #{number}."` for every item except the one that finishes the last remaining acceptance criterion, which uses `"Closes #{number}\n\n{summary}"`.
      - Update docs/features.md once per item (not once for the whole epic).
@@ -56,9 +73,7 @@ Before starting, make sure to read these files to get more context:
 5. **After processing all issues, stop and summarize what you did.**
 
 ## Rules
-- **Commit identity:** before committing, set the team identity so commits are not attributed to you or an individual:
-  `git config user.name "Artisan Team" && git config user.email "team@artisan.xyz"`
-  Do NOT add a `Co-Authored-By: Claude` trailer.
+- **Push branches and open PRs on `origin` (`kimerran/internal-lantern`) only** — never on the `public` mirror. See the Remotes section above.
 - Use git worktrees to work on each issue
 - Do not auto-merge PRs - this will be decided by the human!!!
 - Never ask the human operator for input. Decide and act.
