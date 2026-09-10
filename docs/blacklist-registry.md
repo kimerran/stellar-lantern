@@ -40,6 +40,7 @@ reported?** There are two ways to ask, and they are not interchangeable.
 | Source account | **none** | conventionally required |
 | Signing / fee | **none** | none, but a simulation round-trip |
 | Answers | one subject | one subject, or paging, or config |
+| Archived entry | `flagged: null` — unknown, not clean | a `restorePreamble`, not a result — also unknown until you restore |
 | Use it for | the per-signature screening path (D2 Screen) | UIs, indexers, anything wanting the whole set |
 
 The hot read is what the scanner's Screen stage runs per counterparty on every
@@ -326,10 +327,23 @@ the archive — so **an empty result means "no live entry at this key", not
 helper keeps that path cheap and non-fatal (`status: "not-flagged"`), but its
 `reason` says what the read actually established rather than claiming more.
 
-If you need certainty for one subject — before gating a signature on a clean
-answer, say — ask the contract views above. They see through archival, at the
-cost of a simulation. Do not add an archive lookup to the hot path: it would
-spend a round-trip on every clean address, which is nearly all of them.
+The contract views are **not** the way out of this. Simulating `is_flagged`
+against an archived entry does not return an authoritative `false`: it returns a
+`restorePreamble` instead of a result, saying the footprint contains archived
+state. Acting on that means building a `RestoreFootprint` transaction from the
+preamble, **submitting** it — a real fee on a real transaction, not a simulation
+— and re-simulating before the answer means anything. So the fallback has the
+same gap as the hot read, just one step further along, and until restoration
+succeeds the verdict is unknown rather than clean. That is the same posture the
+helper already takes with `flagged: null`.
+
+What the views do give you is a *named* uncertainty: a `restorePreamble` says
+"archived, restorable" where an empty `getLedgerEntries` result cannot
+distinguish that from never-reported. If you need certainty for one subject —
+before gating a signature on a clean answer, say — that is the signal to act on,
+and restoring is the only thing that resolves it. Do not put any of this on the
+hot path: it would spend a round-trip on every clean address, which is nearly
+all of them.
 
 The value decodes to the contract's `Entry` struct. The current shape is **nine**
 fields, not the eight in the original schema: `index: u32` was added in #32 so an
