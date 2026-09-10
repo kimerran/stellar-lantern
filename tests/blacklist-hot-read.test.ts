@@ -16,10 +16,9 @@ const SUBJECT = 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7';
  * The worked example as the documentation actually publishes it.
  *
  * Copying those values into a constant here would only pin this file against
- * itself: the doc could go stale after a re-deploy and the suite would stay
- * green, which is the one failure the doc's own runbook warns about. So the
- * expected values are *read out of the markdown* — the doc is the fixture, and
- * a doc that no longer matches the derivation fails the build.
+ * itself. Reading them out of the markdown makes the doc the fixture, so a
+ * worked example whose key no longer follows from its contract id fails the
+ * build rather than sitting green beside a passing duplicate.
  */
 function publishedWorkedExample(): { contract: string; subject: string; key: string } {
   const section = doc.split('### Worked example')[1]?.split('\n## ')[0];
@@ -35,7 +34,27 @@ function publishedWorkedExample(): { contract: string; subject: string; key: str
   return { contract, subject, key };
 }
 
+/**
+ * The contract id the deployment table publishes.
+ *
+ * The re-deploy runbook updates the README and this table before it reaches the
+ * worked example, so those two ids disagreeing is what a half-finished re-deploy
+ * actually looks like. Parsing both is what lets the runbook promise that
+ * skipping its last step fails `npm test`.
+ */
+function deployedContractId(): string {
+  const section = doc.split('## Deployment (testnet)')[1]?.split('\n## ')[0];
+  if (!section) throw new Error('docs/blacklist-registry.md: no "## Deployment (testnet)" section');
+
+  const contract = /\| Contract id \| \[`(C[A-Z2-7]{55})`\]/.exec(section)?.[1];
+  if (!contract) {
+    throw new Error('docs/blacklist-registry.md: deployment table has no contract id row');
+  }
+  return contract;
+}
+
 const { contract: CONTRACT, subject: DOC_SUBJECT, key: PUBLISHED_KEY } = publishedWorkedExample();
+const DEPLOYED = deployedContractId();
 
 const REPORTER = 'GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK';
 
@@ -66,6 +85,13 @@ describe('entryLedgerKey', () => {
     // published example goes stale — not only when the derivation regresses.
     expect(DOC_SUBJECT).toBe(SUBJECT);
     expect(entryLedgerKey(CONTRACT, SUBJECT).toXDR('base64')).toBe(PUBLISHED_KEY);
+  });
+
+  it('is published against the contract the deployment table names', () => {
+    // A re-deploy updates the README and the deployment table first and reaches
+    // the worked example last. Without this, stopping in the middle leaves a
+    // doc that points at two different contracts and a suite that never notices.
+    expect(CONTRACT).toBe(DEPLOYED);
   });
 
   it('is deterministic and offline', () => {

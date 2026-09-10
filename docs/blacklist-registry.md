@@ -121,7 +121,7 @@ under the threshold, so a read on a fresh entry costs nothing.
 |---|---|---|
 | 1 | `InvalidFee` | `__constructor`, `set_fee` — a negative fee |
 | 2 | `SelfReport` | `report` — `reporter == subject` |
-| 3 | `NotFound` | `set_status` — no entry for that subject |
+| 3 | `NotFound` | `set_status` — no entry for that subject. Also the error for a missing `Config` in `report`, `config` and `require_admin` (so every admin entry point can surface it), though that is unreachable once `__constructor` has run |
 | 4 | `InvalidLimit` | `list` — `limit == 0` or `limit > 50` |
 
 Entry points that return `()` or `u32` surface these as a raw
@@ -420,10 +420,17 @@ Then update, in this order:
 3. the worked example in this document (contract id **and** the base64 key).
 
 There is deliberately **no fourth step in the test suite**.
-`tests/blacklist-hot-read.test.ts` reads the worked example out of this file and
-re-derives the key from it, so this document is the fixture rather than a copy of
-one: a stale example fails `npm test` instead of sitting green next to a passing
-duplicate. Run the suite after step 3.
+`tests/blacklist-hot-read.test.ts` reads this file instead: it re-derives the
+ledger key from the worked example, and it asserts the worked example's contract
+id equals the one in the deployment table above. This document is the fixture
+rather than a copy of one, so **stopping after step 2 fails `npm test`** — the
+realistic version of forgetting, since the runbook reaches the worked example
+last.
+
+What it cannot see is a re-deploy where nobody touched this file at all: the doc
+stays internally consistent while pointing at a contract testnet has since wiped.
+So run the suite after step 3, and open the explorer link to confirm the id is
+live.
 
 Get the new key from `--key-only`, which needs no network:
 
