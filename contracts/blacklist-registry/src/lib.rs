@@ -63,8 +63,11 @@ pub enum Reason {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Entry {
-    pub subject: Address,  // the flagged address
-    pub reporter: Address, // most recent reporter (attribution)
+    pub subject: Address, // the flagged address
+    // Attribution: the FIRST reporter for an Active or Disputed entry (a repeat
+    // report can't rewrite the audit trail), and the new reporter when a Revoked
+    // entry is resurrected.
+    pub reporter: Address,
     pub reason: Reason,
     pub evidence: BytesN<32>, // sha256 of off-chain evidence; all-zero = none
     pub reported_at: u64,     // ledger timestamp of the FIRST report
