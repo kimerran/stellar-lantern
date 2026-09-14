@@ -157,7 +157,8 @@ requires and answers *who is authorising what*:
   (strict-send: "you receive at least"), or `total` (accountMerge: the
   whole balance, `amount: null` — never a fake zero).
 - `net[]` — per (address, asset) aggregate across every op: `in` / `out`
-  sums plus `inAtLeast` / `outUpTo` / `outIsTotal` flags. A three-op
+  sums plus `inAtLeast` / `outUpTo` / `outIsTotal` / `inIsTotal` flags (the
+  last two mark a merged account's whole balance, which no sum can state). A three-op
   transaction nets per address; op-level `source` overrides are honoured.
 - `closes[]` — accounts an `accountMerge` deletes, with the merge target.
 - `contractsTouched[]` — every contract id from the op and the auth tree.

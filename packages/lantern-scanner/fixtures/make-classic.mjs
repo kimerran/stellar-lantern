@@ -58,7 +58,7 @@ const cases = {
   },
   'classic-multi-op': {
     description:
-      'Three ops: 25 XLM payment to DEST, 1.5 USDC payment to DEST, and a 0.5 XLM payment to OTHER acting for OTHER via an op-level source — aggregation must be per address, not per first op.',
+      'Three ops: 25 XLM payment to DEST, 1.5 USDC payment to DEST, and a 0.5 XLM payment from OTHER to SOURCE via an op-level source — aggregation must be per address, not per first op.',
     xdr: build((b) =>
       b
         .addOperation(Operation.payment({ destination: DEST, asset: Asset.native(), amount: '25' }))

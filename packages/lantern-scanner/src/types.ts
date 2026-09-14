@@ -324,13 +324,16 @@ export interface AssetDelta {
 }
 
 // Per address + asset aggregate over every op in the transaction. Sums are
-// exact decimal strings; `outIsTotal` means an accountMerge empties it.
+// exact decimal strings; `outIsTotal` means an accountMerge empties it, and
+// `inIsTotal` that it receives a merged account's whole balance — an amount
+// the XDR cannot state, so `in` alone would under-report it.
 export interface NetDelta {
   address: string;
   asset: AssetRef;
   // Sums scaled by `asset.decimals`; raw base-unit integers when that is null.
   in: string; // exact + min inflows summed
   inAtLeast: boolean; // any inflow was a `min` bound
+  inIsTotal: boolean;
   out: string; // exact + max outflows summed
   outUpTo: boolean; // any outflow was a `max` bound
   outIsTotal: boolean;

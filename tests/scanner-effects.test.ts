@@ -118,6 +118,11 @@ describe('effects: classic deltas', () => {
     const net = set.net.find((n) => n.address === SOURCE)!;
     expect(net.outIsTotal).toBe(true);
     expect(net.out).toBe('0.0000000');
+    // The destination's inflow is the merged balance: unknowable, and marked.
+    const dest = set.net.find((n) => n.address === DEST)!;
+    expect(dest.inIsTotal).toBe(true);
+    expect(dest.in).toBe('0.0000000');
+    expect(set.net.filter((n) => n.inIsTotal)).toHaveLength(1);
   });
 });
 

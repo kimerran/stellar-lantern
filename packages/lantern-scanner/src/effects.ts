@@ -139,9 +139,9 @@ function render(sum: bigint, decimals: number | null | undefined): string {
   return decimals === null ? sum.toString() : scaleAmount(sum, decimals ?? 7)!;
 }
 
-// Aggregate deltas per (address, asset). `total` outflows set `outIsTotal`
-// and add nothing to `out` (there is no number to add); a `total` inflow is
-// unknowable here and is left out of `in` but still keeps the row. Sums are
+// Aggregate deltas per (address, asset). `total` deltas set `outIsTotal` /
+// `inIsTotal` and add nothing to the sums (there is no number to add) — the
+// marker is what stops a merge's inflow reading as zero. Sums are
 // bigint base units, rendered once at the end by the asset's decimals.
 export function aggregate(deltas: AssetDelta[]): NetDelta[] {
   interface Acc {
@@ -160,6 +160,7 @@ export function aggregate(deltas: AssetDelta[]): NetDelta[] {
           asset: d.asset,
           in: '',
           inAtLeast: false,
+          inIsTotal: false,
           out: '',
           outUpTo: false,
           outIsTotal: false,
@@ -171,6 +172,7 @@ export function aggregate(deltas: AssetDelta[]): NetDelta[] {
     }
     if (d.bound === 'total') {
       if (d.direction === 'out') acc.row.outIsTotal = true;
+      else acc.row.inIsTotal = true;
       continue;
     }
     const u = units(d);
