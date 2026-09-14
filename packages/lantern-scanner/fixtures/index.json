@@ -7,5 +7,8 @@
   "unknown-contract",
   "malformed-xdr",
   "archived-state",
-  "deep-auth"
+  "deep-auth",
+  "classic-path-payment-receive",
+  "classic-account-merge",
+  "classic-multi-op"
 ]
