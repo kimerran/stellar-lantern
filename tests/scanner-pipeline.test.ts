@@ -13,6 +13,7 @@ import {
   type Explainer,
   type RawSimulation,
   type ScanRequest,
+  type SimulationResult,
   type Verdict,
 } from '@lantern/scanner';
 import fixtureIndex from '../packages/lantern-scanner/fixtures/index.json';
@@ -57,6 +58,17 @@ function recorded(f: Fixture): (xdr: string) => Promise<RawSimulation> {
   };
 }
 
+const EMPTY_SIM: SimulationResult = {
+  ok: false,
+  outcome: 'failed',
+  failure: 'undecodable',
+  decoded: null,
+  simulated: false,
+  auth: [],
+  footprint: { readOnly: [], readWrite: [] },
+  events: [],
+};
+
 function requestFor(f: Fixture): ScanRequest {
   return {
     xdr: f.xdr,
@@ -66,6 +78,7 @@ function requestFor(f: Fixture): ScanRequest {
 }
 
 const CORPUS = [
+  'archived-state',
   'classic-payment',
   'path-payment',
   'sac-transfer',
@@ -86,7 +99,13 @@ describe('fixture corpus', () => {
       const f = fixture(name);
       expect(f.networkPassphrase).toBe(Networks.TESTNET);
       expect(f.description.length).toBeGreaterThan(10);
-      const soroban = ['sac-transfer', 'sep41-approve', 'nested-subinvocation', 'unknown-contract'];
+      const soroban = [
+        'sac-transfer',
+        'sep41-approve',
+        'nested-subinvocation',
+        'unknown-contract',
+        'archived-state',
+      ];
       if (soroban.includes(name)) expect(f.simulation).not.toBeNull();
       else expect(f.simulation).toBeNull();
     }
@@ -181,7 +200,13 @@ describe('auth', () => {
   });
 
   it('counts an unparseable entry instead of throwing or silently dropping it', () => {
-    const tree = auth({ ok: true, decoded: null, simulated: true, auth: ['not-xdr'] });
+    const tree = auth({
+      ...EMPTY_SIM,
+      ok: true,
+      outcome: 'ok',
+      simulated: true,
+      auth: ['not-xdr'],
+    });
     expect(tree.roots).toEqual([]);
     expect(tree.unparseable).toBe(1);
   });
@@ -214,12 +239,7 @@ describe('effects', () => {
   });
 
   it('is empty with no coverage when nothing decoded', () => {
-    expect(
-      effects(
-        { ok: false, decoded: null, simulated: false, auth: [] },
-        auth({ ok: false, decoded: null, simulated: false, auth: [] }),
-      ),
-    ).toEqual({
+    expect(effects(EMPTY_SIM, auth(EMPTY_SIM))).toEqual({
       source: null,
       effects: [],
       coverage: 'none',
@@ -317,7 +337,7 @@ describe('buildVerdict', () => {
     const f = fixture('unknown-contract');
     const v = await verdictFor(f, { simulate: recorded(f) });
     expect(v.risk).toBe('high');
-    expect(v.reasons.map((r) => r.code)).toContain('simulation_failed');
+    expect(v.reasons.map((r) => r.code)).toContain('simulation_reverted');
   });
 
   it('fails closed: an auth entry it cannot read is high, not silently ignored', async () => {

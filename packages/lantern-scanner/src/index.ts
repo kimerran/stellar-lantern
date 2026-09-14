@@ -35,6 +35,9 @@ export type {
   ScanRequest,
   RawSimulation,
   StageName,
+  IngestFailure,
+  Footprint,
+  RestorePreamble,
   SimulationResult,
   AuthNode,
   AuthTree,
@@ -62,3 +65,13 @@ export {
   DEFAULT_EXPLAIN_TIMEOUT_MS,
   type PipelineDeps,
 } from './pipeline';
+export {
+  simulateWithRpc,
+  createRpcSimulator,
+  RpcError,
+  DEFAULT_RPC_TIMEOUT_MS,
+  DEFAULT_RPC_ATTEMPTS,
+  DEFAULT_RPC_BACKOFF_MS,
+  type RpcSimulateOptions,
+  type RpcFailureKind,
+} from './rpc';

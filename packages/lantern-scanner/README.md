@@ -50,7 +50,7 @@ import { runPipeline } from '@lantern/scanner';
 const result = await runPipeline(
   { xdr, networkPassphrase, context },
   {
-    simulate: (xdr) => rpc.simulateTransaction(xdr), // raw JSON-RPC body (#52)
+    simulate: createRpcSimulator({ rpcUrl: 'https://soroban-testnet.stellar.org' }), // #52
     isFlagged: (address) => registry.isFlagged(address), // true | false | null (#57)
     explain: modelExplainer, // ({ verdict, effects }) => Promise<string> (#59)
   },
@@ -77,10 +77,41 @@ explainer receives is deep-frozen too, so it cannot corrupt the stage-3
 output `ScanResult` carries. The AI layer cannot change risk by
 construction, not by policy.
 
-**Fail-closed today.** Malformed XDR, a Soroban transaction with no
-simulation, a simulation the RPC rejects, or an authorisation entry the
-scanner cannot parse all produce a `high` / `block_confirm` verdict with an
-`undecodable` / `simulation_failed` / `auth_unreadable` reason.
+### Stage 1 — Ingest (#52)
+
+`ingest` decodes the XDR and, for a Soroban transaction, runs the injected
+`simulate` and normalises the raw `simulateTransaction` body into one
+`SimulationResult`: `returnValue` (base64 ScVal), `auth` entries, `footprint`
+(`readOnly` / `readWrite` as base64 `LedgerKey` XDR, decoded from
+`transactionData`), `events` (base64 `DiagnosticEvent`), `latestLedger` and,
+when present, `restorePreamble`. Classic transactions skip simulation.
+
+`createRpcSimulator({ rpcUrl, timeoutMs, attempts, backoffMs, fetchImpl,
+sleep })` is the client: every attempt is bounded by a deadline (default 8 s),
+transient failures — network error, 5xx, 429, timeout — retry with
+exponential backoff (default 3 attempts from 250 ms), a definite 4xx does
+not. It throws `RpcError` with `kind: 'timeout' | 'transport' | 'malformed'`
+so the verdict can say what actually happened. The wallet's own
+`src/core/stellar/soroban.ts` client and its callers are unchanged.
+
+**Fail-closed, per mode.** Every way stage 1 can fail is a distinct
+high-severity reason and `action: 'block_confirm'` — never a quiet `low`:
+
+| `SimulationResult.failure` | reason code | what the user is told |
+|---|---|---|
+| `undecodable` | `undecodable` | couldn't read the transaction |
+| `simulation_unavailable` | `simulation_unavailable` | couldn't simulate (no RPC wired) |
+| `rpc_timeout` | `rpc_timeout` | the network didn't answer in time — try again |
+| `rpc_transport` | `rpc_unreachable` | couldn't reach the network — a connection problem, not a verdict |
+| `simulation_malformed` | `simulation_malformed` | the network's answer couldn't be read |
+| `simulation_reverted` | `simulation_reverted` | this transaction would fail on-chain |
+
+**The third answer.** A simulation that carries `restorePreamble` means the
+call touches archived ledger state; the result is `outcome: 'unknown'` (not
+`ok`, not `failed`) and the verdict is `high` with `state_archived` — the
+same posture `docs/blacklist-registry.md` documents for the hot read. An
+authorisation entry the scanner cannot parse also fails closed
+(`auth_unreadable`).
 
 **What is skeleton.** The stage *bodies* are interim: `auth` parses the
 `SorobanAuthorizationEntry` tree structurally (contract, function, children)
@@ -97,7 +128,10 @@ pipeline's own fail-closed and screening reasons (#58 is the real risk core).
 Soroban cases, the **raw** `simulateTransaction` body as the RPC returned it:
 classic payment, path payment, SAC `transfer`, SEP-41 `approve`, a Blend
 `submit` whose auth tree nests a `transfer` sub-invocation, a call to an
-undeployed contract, and malformed XDR. Tests load them through Vite
+undeployed contract, and malformed XDR. `archived-state.json` is marked
+`synthetic: true`: it is the real `sac-transfer` recording with a
+`restorePreamble` added, because testnet had no archived entry to record
+against. Tests load them through Vite
 (`import.meta.glob`) and never open a socket. Re-record after a testnet reset
 with `node packages/lantern-scanner/fixtures/record.mjs` (needs a funded
 source account; nothing is signed or submitted).
@@ -107,8 +141,6 @@ source account; nothing is signed or submitted).
 Be honest with users about this — the SOW's six-stage pipeline lands in
 later D2 slices (#51–#59), and none of it is here today:
 
-- **No RPC client.** The pipeline consumes a simulation you inject; `scan()`
-  reads the XDR alone. The live client with timeout and backoff is #52.
 - **No semantic `SorobanAuthorizationEntry` walk.** The pipeline parses the
   tree's shape and counts nested invocations, but does not yet say which of
   them move money or whose authorisation they consume (#53). `scan()` flags
@@ -168,12 +200,13 @@ src/defi.ts       curated DeFi function-name descriptions
 src/format.ts     address / amount display helpers (copied from the wallet so
                   the package has no import back into it)
 src/pipeline.ts   the six stages + runPipeline (#51)
+src/rpc.ts        simulateTransaction client: deadline, backoff, RpcError (#52)
 fixtures/         offline corpus: XDR + recorded RPC bodies, and record.mjs
 ```
 
 ## Tests
 
-Live in the repo's `tests/` (`scanner-pipeline.test.ts`, `scan.test.ts`, `swap-scan.test.ts`,
+Live in the repo's `tests/` (`scanner-pipeline.test.ts`, `scanner-ingest.test.ts`, `scan.test.ts`, `swap-scan.test.ts`,
 `guardians.test.ts`, `tx.test.ts`, `invoke.test.ts`, `blend*.test.ts`) and run
 with `npm test` from the repo root — no network required.
 
