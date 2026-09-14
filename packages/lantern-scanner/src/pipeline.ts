@@ -32,6 +32,7 @@ import type {
   ExplainInput,
   RawSimulation,
   RiskLevel,
+  StateChange,
   ScanRequest,
   ScanResult,
   ScreenResult,
@@ -43,6 +44,8 @@ import { decodeTransaction } from './decode';
 import { explainTransaction } from './explainer';
 import { isReportedAddress, scan } from './engine';
 import { RpcError } from './rpc';
+import { observedDeltas } from './observed';
+import { unverifiedCalls } from './unverified';
 import { decodeScVal } from './scval';
 import { aggregate, classicDeltas, opSource } from './effects';
 import {
@@ -99,6 +102,7 @@ function failed(
     auth: [],
     footprint: EMPTY_FOOTPRINT,
     events: [],
+    stateChanges: [],
   };
 }
 
@@ -117,6 +121,7 @@ export async function ingest(
       auth: [],
       footprint: EMPTY_FOOTPRINT,
       events: [],
+      stateChanges: [],
     };
   }
   if (!deps.simulate) {
@@ -185,6 +190,21 @@ function parseSimulation(raw: RawSimulation, decoded: DecodedTx): SimulationResu
     for (const ev of result.events) if (typeof ev === 'string') events.push(ev);
   }
 
+  const stateChanges: StateChange[] = [];
+  if (Array.isArray(result.stateChanges)) {
+    for (const sc of result.stateChanges) {
+      const c = sc as { type?: unknown; key?: unknown; before?: unknown; after?: unknown } | null;
+      if (!c || typeof c.key !== 'string') continue;
+      if (c.type !== 'created' && c.type !== 'updated' && c.type !== 'deleted') continue;
+      stateChanges.push({
+        type: c.type,
+        key: c.key,
+        ...(typeof c.before === 'string' ? { before: c.before } : {}),
+        ...(typeof c.after === 'string' ? { after: c.after } : {}),
+      });
+    }
+  }
+
   const latestLedger =
     typeof result.latestLedger === 'number' && Number.isFinite(result.latestLedger)
       ? result.latestLedger
@@ -209,6 +229,7 @@ function parseSimulation(raw: RawSimulation, decoded: DecodedTx): SimulationResu
     ...(returnValue !== undefined ? { returnValue } : {}),
     footprint,
     events,
+    stateChanges,
     ...(latestLedger !== undefined ? { latestLedger } : {}),
     ...(restorePreamble !== undefined ? { restorePreamble } : {}),
   };
@@ -367,6 +388,9 @@ export function effects(
       closes: [],
       contractsTouched: [],
       approvals: [],
+      unverified: [],
+      observed: [],
+      observedNet: [],
       coverage: 'none',
     };
   }
@@ -439,12 +463,18 @@ export function effects(
       ...authTree.calls.map((c) => c.contractId).filter((c): c is string => !!c),
     ]),
   );
-  // Every authorised contract call must be a recognised token function for
-  // the contract side to count as covered; anything else is 3c's.
-  const allCallsRecognised =
-    authTree.calls.filter((c) => c.kind === 'contract').length === token.recognised.length;
+  // 3c: everything neither 3a nor 3b decoded, reported raw and labelled —
+  // plus what the simulation proved about balances, semantics or not.
+  const unverified = unverifiedCalls(decoded, authTree);
+  const observed = observedDeltas(
+    simulation.stateChanges,
+    tokenMetadata,
+    request?.networkPassphrase ?? '',
+  );
+  // A coarse `contract_call` row that nothing upgraded (a create-contract
+  // entry, say) is not decoded, whatever `unverified[]` says.
   const covered =
-    out.every((e) => e.kind !== 'unknown' && e.kind !== 'contract_call') && allCallsRecognised;
+    out.every((e) => e.kind !== 'unknown' && e.kind !== 'contract_call') && unverified.length === 0;
   return {
     source: decoded,
     effects: out,
@@ -453,6 +483,9 @@ export function effects(
     closes,
     contractsTouched,
     approvals: token.approvals,
+    unverified,
+    observed,
+    observedNet: aggregate(observed),
     coverage: covered ? 'full' : 'partial',
   };
 }
@@ -645,11 +678,53 @@ export function buildVerdict(input: {
       networkPassphrase: request.networkPassphrase,
       context,
     });
-    for (const r of legacy.reasons) reasons.push(r);
+    // The generic `contract_call` reason is superseded by 3c's
+    // `unverified_contract` when the pipeline has one.
+    const hasUnverified = effectSet.unverified.length > 0;
+    for (const r of legacy.reasons) {
+      if (hasUnverified && r.code === 'contract_call') continue;
+      reasons.push(r);
+    }
     signals.push({
       stage: 'verdict',
       code: 'legacy_heuristics',
       detail: `${legacy.reasons.length} reasons`,
+    });
+  }
+
+  // 3c: an unknown contract raises risk, it never lowers it. The reason
+  // names the call and nothing about what it means; the observed balance
+  // changes ride alongside so the user still sees what simulation proved.
+  if (effectSet.unverified.length > 0) {
+    const first = effectSet.unverified[0]!;
+    const contract = `${first.contractId.slice(0, 4)}…${first.contractId.slice(-4)}`;
+    const more = effectSet.unverified.length - 1;
+    const moved = effectSet.observed.length;
+    reasons.push({
+      code: 'unverified_contract',
+      severity: 'medium',
+      title: 'Unverified contract — semantics unknown',
+      detail:
+        `This calls “${first.functionName}” on contract ${contract}${more > 0 ? ` (and ${more} more call${more > 1 ? 's' : ''})` : ''}. Lantern doesn’t know what this function does` +
+        (moved > 0
+          ? `; simulation shows ${moved} balance change${moved > 1 ? 's' : ''} — review them before signing.`
+          : '; simulation shows no balance changes, but that is not a guarantee.'),
+    });
+    signals.push({
+      stage: 'effects',
+      code: 'unverified_contract',
+      detail: effectSet.unverified
+        .map((u) => `${u.functionName}@${u.contractId.slice(0, 4)} d${u.depth}`)
+        .join(', '),
+    });
+  }
+  if (effectSet.observed.length > 0) {
+    signals.push({
+      stage: 'effects',
+      code: 'observed_balance_changes',
+      detail: effectSet.observed
+        .map((d) => `${d.direction} ${d.amount ?? d.raw} ${d.asset.code} ${d.address.slice(0, 4)}`)
+        .join(', '),
     });
   }
 

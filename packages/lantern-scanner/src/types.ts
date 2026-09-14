@@ -41,6 +41,7 @@ export interface DecodedOp {
   // function is a contract invocation (not upload-wasm / create-contract).
   contractId?: string; // the C… contract address being invoked
   contractFunction?: string; // the invoked function name
+  contractArgs?: DecodedScVal[]; // its arguments, decoded losslessly (#56)
   // pathPayment (swap) — the "from" side + slippage bound the primary
   // amount/assetCode (the dest side) don't capture. Strict-send: `sendAmount` is
   // exact, `destMin` is the received floor. Strict-receive: `sendAmount` is the
@@ -189,8 +190,18 @@ export interface SimulationResult {
   footprint: Footprint;
   // Base64 DiagnosticEvent XDR the simulation emitted, in order.
   events: string[];
+  // Ledger entries the simulation would create / update / delete, as base64
+  // LedgerKey + LedgerEntry XDR. What the simulation *proved* (#56).
+  stateChanges: StateChange[];
   latestLedger?: number;
   restorePreamble?: RestorePreamble;
+}
+
+export interface StateChange {
+  type: 'created' | 'updated' | 'deleted';
+  key: string;
+  before?: string;
+  after?: string;
 }
 
 // Stage 2 — Auth (#53). Every SorobanAuthorizationEntry the simulation
@@ -325,6 +336,25 @@ export interface NetDelta {
   outIsTotal: boolean;
 }
 
+// The label every unverified call carries, as a structured constant the UI
+// and the explainer cannot lose (3c).
+export const UNVERIFIED_LABEL = 'unverified contract — semantics unknown' as const;
+
+// A contract call the scanner does not implement (3c). Raw and honest:
+// what was called, with what, how deep — and nothing about what it means.
+export interface UnverifiedCall {
+  label: typeof UNVERIFIED_LABEL;
+  contractId: string;
+  functionName: string;
+  args: DecodedScVal[];
+  depth: number;
+  // Position in the auth tree; absent when the call is the root op itself
+  // and required no authorisation entry.
+  entryIndex?: number;
+  path?: number[];
+  credentials?: AuthCredentials;
+}
+
 // An allowance granted to a spender (3b).
 export interface Approval {
   owner: string;
@@ -351,8 +381,15 @@ export interface EffectSet {
   closes: Array<{ address: string; destination: string; opIndex: number }>;
   contractsTouched: string[];
   approvals: Approval[];
-  // 'full' once stages 3a–3c cover every op type present; 'partial' whenever
-  // any op is `unknown`/`contract_call`.
+  // Calls neither 3a nor 3b decoded (3c). Never guessed at.
+  unverified: UnverifiedCall[];
+  // Balance changes the simulation observed (`stateChanges`), independent of
+  // whether the call's semantics are known: "we don't know what this
+  // function means" and "we don't know what it does" are different claims.
+  observed: AssetDelta[];
+  observedNet: NetDelta[];
+  // 'full' when every op and every authorised call was decoded by 3a/3b;
+  // 'partial' whenever anything is `unverified`.
   coverage: 'none' | 'partial' | 'full';
 }
 

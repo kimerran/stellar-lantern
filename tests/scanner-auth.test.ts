@@ -110,6 +110,7 @@ describe('auth: create-contract entries', () => {
       auth: [entry.toXDR('base64')],
       footprint: { readOnly: [], readWrite: [] },
       events: [],
+      stateChanges: [],
     };
     const tree = auth(sim);
     expect(tree.unparseable).toBe(0);

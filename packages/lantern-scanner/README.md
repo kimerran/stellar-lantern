@@ -113,9 +113,7 @@ same posture `docs/blacklist-registry.md` documents for the hot read. An
 authorisation entry the scanner cannot parse also fails closed
 (`auth_unreadable`).
 
-**What is skeleton.** The stage *bodies* after 3b are interim: a contract call
-that is not a token function is still a coarse `contract_call` row with
-`coverage: 'partial'` (#56); `screen` defaults to the demo list (#57 injects the D1
+**What is skeleton.** The stage *bodies* after 3 are interim: `screen` defaults to the demo list (#57 injects the D1
 registry); `buildVerdict` reuses today's `scan()` heuristics plus the
 pipeline's own fail-closed and screening reasons (#58 is the real risk core).
 `signals[]` on the verdict is the audit trail of what each stage evaluated.
@@ -201,6 +199,36 @@ net into the same row.
 (`LONG_LIVED_ALLOWANCE_LEDGERS`), or whose horizon cannot be bounded, adds
 a `long_lived_allowance` signal. Both are in `signals[]` for stage 5.
 
+### Stage 3c — the unverified-contract fallback (#56)
+
+Anything 3a and 3b did not decode lands in `EffectSet.unverified[]` as a raw
+`UnverifiedCall`: `contractId`, `functionName`, losslessly decoded `args`,
+`depth` (plus `entryIndex` / `path` / `credentials` from the auth tree), under
+the structured constant `label: UNVERIFIED_LABEL` = `unverified contract —
+semantics unknown`, so the UI and the explainer cannot lose it. A root
+`invokeHostFunction` that needed no authorisation entry is reported too,
+with the op's own decoded arguments.
+
+**Never guess.** No name matching, no inference from argument shapes:
+`transfer_from`, `transferAll`, a 2-arg `transfer` and a function called
+`supply` are all just unverified calls, and a test asserts a DeFi-sounding
+name and a meaningless one yield the identical verdict.
+`describeDefiFunction()` (`defi.ts`) is confined to the explainer's wording;
+a test reads the stage sources and asserts none of them import it.
+
+**Still report what simulation proved.** `observed[]` / `observedNet[]` are
+the balance changes the simulation's `stateChanges` show — a G… account's
+native balance and a SAC's `Balance(holder)` entries — as `AssetDelta`s with
+`source: 'simulation'`, kept separate from the declared `deltas[]` so nothing
+double-counts. Other contract data (a pool's positions) is not interpreted.
+"We don't know what this function means" and "we don't know what it does"
+are different claims; only the first is made.
+
+**Risk.** An unverified call adds a `medium` `unverified_contract` reason
+(superseding the generic legacy `contract_call`) whose detail names the call
+and says whether simulation showed balance changes; `unverified_contract`
+and `observed_balance_changes` signals carry the rows for stage 5.
+
 ### Fixture corpus
 
 `fixtures/*.json` — one file per case, each with real testnet XDR and, for
@@ -231,9 +259,9 @@ no network and are rebuilt by `make-classic.mjs`.
 Be honest with users about this — the SOW's six-stage pipeline lands in
 later D2 slices (#51–#59), and none of it is here today:
 
-- **Non-token contract calls are not decoded.** A call that is not one of
-  the five token functions is a coarse `contract_call` row; the raw decoded
-  call with its "unverified contract" label is #56. `scan()` still flags
+- **Non-token contract calls are not interpreted — on purpose.** They are
+  reported raw and labelled unverified (3c); the SOW puts full semantic
+  decoding of arbitrary contracts out of scope. `scan()` still flags
   `invokeHostFunction` as a contract call and nothing more.
 - **Metadata for non-SAC SEP-41 tokens.** The resolver reads the SAC storage
   layout; a custom token that keeps its metadata elsewhere resolves to
@@ -297,12 +325,14 @@ src/scval.ts      lossless ScVal → DecodedScVal rendering (#53)
 src/effects.ts    classic ops → AssetDelta[] + per-address NetDelta[] (#54)
 src/decimal.ts    exact 7-decimal arithmetic over bigint stroops (#54)
 src/token.ts      SEP-41 / SAC recognition, metadata resolver + cache, approvals (#55)
+src/unverified.ts the raw, labelled fallback for undecoded calls (#56)
+src/observed.ts   balance changes from the simulation's stateChanges (#56)
 fixtures/         offline corpus: XDR + recorded RPC bodies, and record.mjs
 ```
 
 ## Tests
 
-Live in the repo's `tests/` (`scanner-pipeline.test.ts`, `scanner-ingest.test.ts`, `scanner-auth.test.ts`, `scanner-effects.test.ts`, `scanner-token.test.ts`, `scan.test.ts`, `swap-scan.test.ts`,
+Live in the repo's `tests/` (`scanner-pipeline.test.ts`, `scanner-ingest.test.ts`, `scanner-auth.test.ts`, `scanner-effects.test.ts`, `scanner-token.test.ts`, `scanner-unverified.test.ts`, `scan.test.ts`, `swap-scan.test.ts`,
 `guardians.test.ts`, `tx.test.ts`, `invoke.test.ts`, `blend*.test.ts`) and run
 with `npm test` from the repo root — no network required.
 

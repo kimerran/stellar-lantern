@@ -1,5 +1,6 @@
-import { Address, TransactionBuilder, Memo } from '@stellar/stellar-sdk';
+import { Address, TransactionBuilder, Memo, type xdr } from '@stellar/stellar-sdk';
 import type { DecodedOp, DecodedTx } from './types';
+import { decodeScVal } from './scval';
 
 // Decode a Stellar transaction XDR into a display/scan summary (spec §4.1).
 // Pure: no network, no chrome. Returns null if the XDR can't be parsed.
@@ -113,10 +114,12 @@ function decodeInvoke(op: Record<string, unknown>): Partial<DecodedOp> {
     const inv = func.invokeContract() as {
       contractAddress: () => unknown;
       functionName: () => { toString: () => string };
+      args: () => xdr.ScVal[];
     };
     return {
       contractId: Address.fromScAddress(inv.contractAddress() as never).toString(),
       contractFunction: inv.functionName().toString(),
+      contractArgs: inv.args().map(decodeScVal),
     };
   } catch {
     return {};
