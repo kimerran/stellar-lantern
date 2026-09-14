@@ -471,7 +471,10 @@ export function effects(
     tokenMetadata,
     request?.networkPassphrase ?? '',
   );
-  const covered = out.every((e) => e.kind !== 'unknown') && unverified.length === 0;
+  // A coarse `contract_call` row that nothing upgraded (a create-contract
+  // entry, say) is not decoded, whatever `unverified[]` says.
+  const covered =
+    out.every((e) => e.kind !== 'unknown' && e.kind !== 'contract_call') && unverified.length === 0;
   return {
     source: decoded,
     effects: out,

@@ -11,6 +11,7 @@ import {
   type RawLedgerEntries,
   type RawSimulation,
   type ScanRequest,
+  type SimulationResult,
   type TokenMetadataResolver,
 } from '@lantern/scanner';
 // The stage sources, as text, so the test can prove what they do not import.
@@ -244,6 +245,49 @@ describe('unverified: never guess', () => {
       expect(src, name).not.toMatch(/describeDefiFunction/);
       expect(src, name).not.toMatch(/from '\.\/defi'/);
     }
+  });
+});
+
+// ── Coverage ─────────────────────────────────────────────────────────────────
+describe('unverified: coverage', () => {
+  it('a contract deployment is not "fully decoded with no effects"', async () => {
+    const { Address, XdrLargeInt, xdr } = await import('@stellar/stellar-sdk');
+    const create = new xdr.CreateContractArgsV2({
+      contractIdPreimage: xdr.ContractIdPreimage.contractIdPreimageFromAddress(
+        new xdr.ContractIdPreimageFromAddress({
+          address: new Address(USER).toScAddress(),
+          salt: Buffer.alloc(32),
+        }),
+      ),
+      executable: xdr.ContractExecutable.contractExecutableWasm(Buffer.alloc(32)),
+      constructorArgs: [new XdrLargeInt('i128', '42').toScVal()],
+    });
+    const entry = new xdr.SorobanAuthorizationEntry({
+      credentials: xdr.SorobanCredentials.sorobanCredentialsSourceAccount(),
+      rootInvocation: new xdr.SorobanAuthorizedInvocation({
+        function:
+          xdr.SorobanAuthorizedFunction.sorobanAuthorizedFunctionTypeCreateContractV2HostFn(create),
+        subInvocations: [],
+      }),
+    });
+    const sim: SimulationResult = {
+      ok: true,
+      outcome: 'ok',
+      decoded: { source: USER, operations: [{ type: 'invokeHostFunction' }], isSoroban: true },
+      simulated: true,
+      auth: [entry.toXDR('base64')],
+      footprint: { readOnly: [], readWrite: [] },
+      events: [],
+      stateChanges: [],
+    };
+    const set = effects(sim, auth(sim), {
+      networkPassphrase: 'x',
+      context: { network: 'TESTNET', fromAddress: USER },
+    });
+    expect(set.effects).toEqual([{ kind: 'contract_call', opIndex: 0 }]);
+    expect(set.deltas).toEqual([]);
+    expect(set.unverified).toEqual([]);
+    expect(set.coverage).toBe('partial');
   });
 });
 
