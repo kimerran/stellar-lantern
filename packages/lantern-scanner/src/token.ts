@@ -93,7 +93,7 @@ export function metadataFromInstance(entryXdr: string): TokenMetadata | null {
           else if (val[1]) {
             for (const m of val[1].map() ?? []) {
               if (m.key().sym().toString() === 'issuer') {
-                issuer = Address.account(Buffer.from(m.val().bytes())).toString();
+                issuer = Address.account(m.val().bytes()).toString();
               }
             }
           }

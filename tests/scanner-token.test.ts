@@ -340,6 +340,22 @@ describe('approve', () => {
   });
 });
 
+// ── Screening sees token counterparties ──────────────────────────────────────
+describe('screen', () => {
+  it('checks a nested transfer recipient and an approval spender, not just the root counterparty', async () => {
+    const f = fixture('deep-auth');
+    const result = await runPipeline(requestFor(f), {
+      simulate: async () => f.simulation!,
+      isFlagged: async (a) => a === SPENDER,
+    });
+    expect(result.screen.checked).toContain(SPENDER);
+    expect(result.screen.outcome).toBe('flagged');
+    expect(result.screen.hits.map((h) => h.address)).toEqual([SPENDER]);
+    expect(result.reasons.map((r) => r.code)).toContain('reported_address');
+    expect(result.risk).toBe('high');
+  });
+});
+
 // ── Metadata failures degrade, never abort ───────────────────────────────────
 describe('resolver failures', () => {
   it('a throwing resolver leaves the token unresolved and the scan intact', async () => {

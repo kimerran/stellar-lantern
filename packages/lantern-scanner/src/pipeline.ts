@@ -465,8 +465,17 @@ export async function screen(
   request: ScanRequest,
   deps: Pick<PipelineDeps, 'isFlagged'> = {},
 ): Promise<ScreenResult> {
+  // Every counterparty: the coarse per-op list, plus every address that
+  // receives value at any auth depth (3b) and every allowance spender.
+  const self = request.context.fromAddress;
   const checked = Array.from(
-    new Set(effectSet.effects.map((e) => e.counterparty).filter((c): c is string => !!c)),
+    new Set([
+      ...effectSet.effects.map((e) => e.counterparty).filter((c): c is string => !!c),
+      ...effectSet.deltas
+        .filter((d) => d.direction === 'in' && d.address !== self)
+        .map((d) => d.address),
+      ...effectSet.approvals.map((a) => a.spender),
+    ]),
   );
   const lookup =
     deps.isFlagged ??
