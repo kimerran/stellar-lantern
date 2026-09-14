@@ -15,7 +15,7 @@ export type {
   ScanVerdict,
   MessageVerdict,
 } from './types';
-export { ACTION_FOR } from './types';
+export { ACTION_FOR, UNVERIFIED_LABEL } from './types';
 
 export { decodeTransaction } from './decode';
 export { explainTransaction } from './explainer';

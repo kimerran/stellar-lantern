@@ -68,6 +68,7 @@ const EMPTY_SIM: SimulationResult = {
   auth: [],
   footprint: { readOnly: [], readWrite: [] },
   events: [],
+  stateChanges: [],
 };
 
 function requestFor(f: Fixture): ScanRequest {
@@ -263,6 +264,9 @@ describe('effects', () => {
       closes: [],
       contractsTouched: [],
       approvals: [],
+      unverified: [],
+      observed: [],
+      observedNet: [],
       coverage: 'none',
     });
   });
