@@ -113,9 +113,9 @@ same posture `docs/blacklist-registry.md` documents for the hot read. An
 authorisation entry the scanner cannot parse also fails closed
 (`auth_unreadable`).
 
-**What is skeleton.** The stage *bodies* after 3a are interim: `effects` decodes
-classic ops fully but still reports contract calls as coarse `contract_call`
-rows with `coverage: 'partial'` (#55–#56); `screen` defaults to the demo list (#57 injects the D1
+**What is skeleton.** The stage *bodies* after 3b are interim: a contract call
+that is not a token function is still a coarse `contract_call` row with
+`coverage: 'partial'` (#56); `screen` defaults to the demo list (#57 injects the D1
 registry); `buildVerdict` reuses today's `scan()` heuristics plus the
 pipeline's own fail-closed and screening reasons (#58 is the real risk core).
 `signals[]` on the verdict is the audit trail of what each stage evaluated.
@@ -169,6 +169,38 @@ Arithmetic goes through `decimal.ts` (`toStroops` / `fromStroops` /
 `addAmounts`) — bigint stroops end to end, no float anywhere in the effect
 path.
 
+### Stage 3b — Effects: SEP-41 / SAC token-interface calls (#55)
+
+`token.ts` recognises the five value-moving token functions — `transfer`,
+`approve`, `burn`, `mint`, `clawback` — by **exact name and exact argument
+shape** in the flattened auth tree, at every depth. `transfer_from`,
+`transferAll` or a 2-arg `transfer` are not "probably a transfer"; they fall
+through to 3c. A recognised call becomes `AssetDelta`s (`source: 'token'`,
+with `raw` = the i128 base units and `depth`) or, for `approve`, an
+`Approval { owner, spender, asset, amount, amountScaled, expirationLedger,
+unlimited, depth }`.
+
+**Metadata.** `PipelineDeps.resolveToken` answers code / decimals / issuer
+per contract id; wrap it in `createTokenMetadataCache`. The live one,
+`createRpcTokenResolver({ rpcUrl })`, reads the contract's instance entry
+through `getLedgerEntries` — no source account, no signature — and parses
+the SAC's `METADATA` / `AssetInfo`. A SEP-41 token that does not use the
+SAC's storage layout, or any RPC failure, resolves to `null`, and the delta
+then carries the raw integer with `asset.decimals: null` — the explicit
+"decimals unknown" marker. **Never a guessed 7.** The native SAC is `XLM`
+at 7 decimals without a lookup.
+
+**Amounts are i128** and stay `BigInt` end to end; `scaleAmount` renders
+at the boundary only. Aggregation (`net[]`) sums base units and renders once,
+per the asset's decimals; a classic XLM payment and a native-SAC `transfer`
+net into the same row.
+
+**`approve` is the risk-bearing one.** An allowance ≥ 2^100 base units
+(`UNLIMITED_ALLOWANCE_THRESHOLD`) is `unlimited` and raises a `high`
+`unlimited_allowance` reason; one expiring more than ~a year of ledgers out
+(`LONG_LIVED_ALLOWANCE_LEDGERS`), or whose horizon cannot be bounded, adds
+a `long_lived_allowance` signal. Both are in `signals[]` for stage 5.
+
 ### Fixture corpus
 
 `fixtures/*.json` — one file per case, each with real testnet XDR and, for
@@ -179,12 +211,16 @@ merge, a three-op transaction, SAC `transfer`, SEP-41 `approve`, a Blend
 undeployed contract, and malformed XDR. Two files are marked
 `synthetic: true`: `archived-state.json` is the real `sac-transfer`
 recording with a `restorePreamble` added (testnet had no archived entry to
-record against), and `deep-auth.json` is the `nested-subinvocation`
+record against), `deep-auth.json` is the `nested-subinvocation`
 recording with its auth entries replaced by a three-level tree under address
 credentials plus a source-account entry, built with SDK constructors by
 `make-deep-auth.mjs` (no deployed contract we use asks the user to authorise
-a call two levels down). The bytes are real XDR; the scenarios are not
-recordings. Tests load them through Vite
+a call two levels down), and `token-admin.json` is the `sac-transfer`
+recording with `mint` / `burn` / `clawback` sub-invocations plus the
+look-alikes that must not be recognised (`make-token-admin.mjs`; the USDC
+SAC's admin is not ours). The bytes are real XDR; the scenarios are not
+recordings. `token-metadata.json` is a real `getLedgerEntries` recording of
+the XLM and USDC SAC instance entries (`record-token-metadata.mjs`). Tests load them through Vite
 (`import.meta.glob`) and never open a socket. Re-record after a testnet reset
 with `node packages/lantern-scanner/fixtures/record.mjs` (needs a funded
 source account; nothing is signed or submitted). The `classic-*` files need
@@ -195,14 +231,14 @@ no network and are rebuilt by `make-classic.mjs`.
 Be honest with users about this — the SOW's six-stage pipeline lands in
 later D2 slices (#51–#59), and none of it is here today:
 
-- **The auth walk feeds nothing yet.** Stage 2 flattens every authorised
-  call with decoded arguments, but stage 3 does not consume `calls[]` until
-  #54–#56 — so a nested `transfer` is *visible* in `ScanResult.auth` and
-  counted in the verdict's signals, but not yet turned into an effect or a
-  risk reason. `scan()` still flags `invokeHostFunction` as a contract call
-  and nothing more.
-- **No SEP-41 / SAC token-interface decoding.** `transfer`, `approve` and
-  friends on a token contract are not turned into structured effects.
+- **Non-token contract calls are not decoded.** A call that is not one of
+  the five token functions is a coarse `contract_call` row; the raw decoded
+  call with its "unverified contract" label is #56. `scan()` still flags
+  `invokeHostFunction` as a contract call and nothing more.
+- **Metadata for non-SAC SEP-41 tokens.** The resolver reads the SAC storage
+  layout; a custom token that keeps its metadata elsewhere resolves to
+  `null` (raw amounts, `decimals: null`) rather than being probed with a
+  simulated `decimals()` call.
 - **No on-chain registry screening.** `isReportedAddress` checks a single
   hard-coded demo address (on testnet in every build; elsewhere only when the
   host defines `__FEATURE_DEMO_AFFORDANCES__` as `true`). The D1 blacklist
@@ -260,12 +296,13 @@ src/rpc.ts        simulateTransaction client: deadline, backoff, RpcError (#52)
 src/scval.ts      lossless ScVal → DecodedScVal rendering (#53)
 src/effects.ts    classic ops → AssetDelta[] + per-address NetDelta[] (#54)
 src/decimal.ts    exact 7-decimal arithmetic over bigint stroops (#54)
+src/token.ts      SEP-41 / SAC recognition, metadata resolver + cache, approvals (#55)
 fixtures/         offline corpus: XDR + recorded RPC bodies, and record.mjs
 ```
 
 ## Tests
 
-Live in the repo's `tests/` (`scanner-pipeline.test.ts`, `scanner-ingest.test.ts`, `scanner-auth.test.ts`, `scanner-effects.test.ts`, `scan.test.ts`, `swap-scan.test.ts`,
+Live in the repo's `tests/` (`scanner-pipeline.test.ts`, `scanner-ingest.test.ts`, `scanner-auth.test.ts`, `scanner-effects.test.ts`, `scanner-token.test.ts`, `scan.test.ts`, `swap-scan.test.ts`,
 `guardians.test.ts`, `tx.test.ts`, `invoke.test.ts`, `blend*.test.ts`) and run
 with `npm test` from the repo root — no network required.
 

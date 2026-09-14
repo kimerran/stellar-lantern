@@ -39,7 +39,8 @@ const ON_DISK = import.meta.glob<Fixture>('../packages/lantern-scanner/fixtures/
 const FIXTURES: Record<string, Fixture> = {};
 for (const [path, value] of Object.entries(ON_DISK)) {
   const name = path.replace(/^.*\//, '').replace(/\.json$/, '');
-  if (name !== 'index') FIXTURES[name] = value;
+  // Only transaction cases; index.json and the token-metadata recording are not.
+  if (typeof value.xdr === 'string') FIXTURES[name] = value;
 }
 
 function fixture(name: string): Fixture {
@@ -87,6 +88,7 @@ const CORPUS = [
   'path-payment',
   'sac-transfer',
   'sep41-approve',
+  'token-admin',
   'nested-subinvocation',
   'unknown-contract',
   'malformed-xdr',
@@ -110,6 +112,7 @@ describe('fixture corpus', () => {
         'unknown-contract',
         'archived-state',
         'deep-auth',
+        'token-admin',
       ];
       if (soroban.includes(name)) expect(f.simulation).not.toBeNull();
       else expect(f.simulation).toBeNull();
@@ -242,13 +245,13 @@ describe('effects', () => {
     ]);
   });
 
-  it('reports partial coverage for a contract call the skeleton cannot decode', async () => {
-    const f = fixture('sep41-approve');
+  it('reports partial coverage for a contract call that is not a token function', async () => {
+    const f = fixture('unknown-contract');
     const sim = await ingest(requestFor(f), { simulate: recorded(f) });
     const set = effects(sim, auth(sim));
     expect(set.coverage).toBe('partial');
     expect(set.effects[0]?.kind).toBe('contract_call');
-    expect(set.effects[0]?.functionName).toBe('approve');
+    expect(set.effects[0]?.functionName).toBe('do_thing');
   });
 
   it('is empty with no coverage when nothing decoded', () => {

@@ -66,6 +66,7 @@ export {
   auth,
   effects,
   screen,
+  resolveTokenMetadata,
   buildVerdict,
   explainRulesBased,
   runPipeline,
@@ -85,3 +86,21 @@ export {
 export { decodeScVal, type DecodedScVal } from './scval';
 export { classicDeltas, aggregate, assetKey } from './effects';
 export { toStroops, fromStroops, addAmounts } from './decimal';
+export {
+  recogniseTokenCall,
+  tokenEffects,
+  scaleAmount,
+  assetForToken,
+  createTokenMetadataCache,
+  createRpcTokenResolver,
+  contractInstanceKey,
+  metadataFromInstance,
+  metadataFromLedgerEntries,
+  UNLIMITED_ALLOWANCE_THRESHOLD,
+  LONG_LIVED_ALLOWANCE_LEDGERS,
+  type TokenMetadata,
+  type TokenMetadataResolver,
+  type TokenFunction,
+  type TokenCall,
+  type RawLedgerEntries,
+} from './token';

@@ -45,6 +45,13 @@ import { isReportedAddress, scan } from './engine';
 import { RpcError } from './rpc';
 import { decodeScVal } from './scval';
 import { aggregate, classicDeltas, opSource } from './effects';
+import {
+  LONG_LIVED_ALLOWANCE_LEDGERS,
+  recogniseTokenCall,
+  tokenEffects,
+  type TokenMetadata,
+  type TokenMetadataResolver,
+} from './token';
 
 // Everything a stage needs from the outside world is injected, so the whole
 // suite runs offline against fixtures/ and #52 / #57 / #59 plug in the live
@@ -54,6 +61,10 @@ export interface PipelineDeps {
   simulate?: (xdr: string) => Promise<RawSimulation>;
   // Stage 4: is this address flagged? `null` = the lookup could not be made.
   isFlagged?: (address: string) => Promise<boolean | null>;
+  // Stage 3b: token metadata (code / decimals / issuer) per contract id.
+  // Wrap with createTokenMetadataCache; createRpcTokenResolver is the live
+  // one. Absent → every token renders raw with `decimals: null`.
+  resolveToken?: TokenMetadataResolver;
   // Stage 6: prose from the frozen verdict. Defaults to the rules-based explainer.
   explain?: Explainer;
   // Deadline for stage 6. An explainer that has not settled by then is
@@ -314,10 +325,37 @@ function flatten(
 // aggregate. The coarse `effects[]` list is kept for screening and the
 // explainer. 3b (token-interface calls) and 3c (the unverified fallback) fill
 // `approvals` / `contractsTouched` and replace the `contract_call` rows.
+// Resolve metadata for every token-interface call in the tree, once per
+// contract id, through the injected resolver. Pure stages stay sync: the
+// orchestrator awaits this and hands the map to `effects`.
+export async function resolveTokenMetadata(
+  authTree: AuthTree,
+  resolver: TokenMetadataResolver | undefined,
+): Promise<Map<string, TokenMetadata | null>> {
+  const out = new Map<string, TokenMetadata | null>();
+  if (!resolver) return out;
+  const ids = new Set(
+    authTree.calls.map((c) => recogniseTokenCall(c)?.contractId).filter((id): id is string => !!id),
+  );
+  await Promise.all(
+    [...ids].map(async (id) => {
+      let meta: TokenMetadata | null;
+      try {
+        meta = await resolver(id);
+      } catch {
+        meta = null;
+      }
+      out.set(id, meta);
+    }),
+  );
+  return out;
+}
+
 export function effects(
   simulation: SimulationResult,
   authTree: AuthTree,
-  request?: Pick<ScanRequest, 'context'>,
+  request?: Pick<ScanRequest, 'networkPassphrase' | 'context'>,
+  tokenMetadata: Map<string, TokenMetadata | null> = new Map(),
 ): EffectSet {
   const decoded = simulation.decoded;
   if (!decoded) {
@@ -369,7 +407,27 @@ export function effects(
         return { kind: 'unknown', opIndex };
     }
   });
-  const deltas = classicDeltas(decoded, fallbackSource);
+  // 3b: token-interface calls at every depth of the auth tree. The root
+  // Soroban op is op 0 in the single-op transactions Soroban allows.
+  const rootOpIndex = decoded.operations.findIndex((op) => op.type === 'invokeHostFunction');
+  const token = tokenEffects(
+    authTree.calls,
+    tokenMetadata,
+    request?.networkPassphrase ?? '',
+    rootOpIndex < 0 ? 0 : rootOpIndex,
+  );
+  const recognisedRoot = token.recognised.find((t) => t.call.depth === 0);
+  if (recognisedRoot && rootOpIndex >= 0) {
+    // The root op is a known token function: upgrade its coarse row.
+    out[rootOpIndex] = {
+      kind: recognisedRoot.fn === 'approve' ? 'token_approve' : 'token_transfer',
+      opIndex: rootOpIndex,
+      counterparty: recognisedRoot.to ?? recognisedRoot.spender ?? recognisedRoot.from ?? '',
+      functionName: recognisedRoot.fn,
+      ...(token.deltas[0]?.asset.code ? { assetCode: token.deltas[0].asset.code } : {}),
+    };
+  }
+  const deltas = [...classicDeltas(decoded, fallbackSource), ...token.deltas];
   const closes = decoded.operations.flatMap((op, opIndex) =>
     op.type === 'accountMerge' && op.destination
       ? [{ address: opSource(decoded, op, fallbackSource), destination: op.destination, opIndex }]
@@ -381,7 +439,12 @@ export function effects(
       ...authTree.calls.map((c) => c.contractId).filter((c): c is string => !!c),
     ]),
   );
-  const covered = out.every((e) => e.kind !== 'unknown' && e.kind !== 'contract_call');
+  // Every authorised contract call must be a recognised token function for
+  // the contract side to count as covered; anything else is 3c's.
+  const allCallsRecognised =
+    authTree.calls.filter((c) => c.kind === 'contract').length === token.recognised.length;
+  const covered =
+    out.every((e) => e.kind !== 'unknown' && e.kind !== 'contract_call') && allCallsRecognised;
   return {
     source: decoded,
     effects: out,
@@ -389,7 +452,7 @@ export function effects(
     net: aggregate(deltas),
     closes,
     contractsTouched,
-    approvals: [],
+    approvals: token.approvals,
     coverage: covered ? 'full' : 'partial',
   };
 }
@@ -402,8 +465,17 @@ export async function screen(
   request: ScanRequest,
   deps: Pick<PipelineDeps, 'isFlagged'> = {},
 ): Promise<ScreenResult> {
+  // Every counterparty: the coarse per-op list, plus every address that
+  // receives value at any auth depth (3b) and every allowance spender.
+  const self = request.context.fromAddress;
   const checked = Array.from(
-    new Set(effectSet.effects.map((e) => e.counterparty).filter((c): c is string => !!c)),
+    new Set([
+      ...effectSet.effects.map((e) => e.counterparty).filter((c): c is string => !!c),
+      ...effectSet.deltas
+        .filter((d) => d.direction === 'in' && d.address !== self)
+        .map((d) => d.address),
+      ...effectSet.approvals.map((a) => a.spender),
+    ]),
   );
   const lookup =
     deps.isFlagged ??
@@ -581,6 +653,35 @@ export function buildVerdict(input: {
     });
   }
 
+  // 3b: allowances. An unlimited approval is the headline scam; a long-lived
+  // one is the signal that turns a mistake into a standing liability.
+  for (const ap of effectSet.approvals) {
+    const spender = `${ap.spender.slice(0, 4)}…${ap.spender.slice(-4)}`;
+    const longLived =
+      simulation.latestLedger === undefined ||
+      ap.expirationLedger - simulation.latestLedger > LONG_LIVED_ALLOWANCE_LEDGERS;
+    signals.push({
+      stage: 'effects',
+      code: ap.unlimited ? 'unlimited_allowance' : 'allowance',
+      detail: `${ap.asset.code} → ${spender}, ${ap.amountScaled ?? `${ap.amount} (decimals unknown)`}, expires ledger ${ap.expirationLedger}${longLived ? ' (long-lived)' : ''}, depth ${ap.depth}`,
+    });
+    if (longLived) {
+      signals.push({
+        stage: 'effects',
+        code: 'long_lived_allowance',
+        detail: `expires ledger ${ap.expirationLedger}, latest ${simulation.latestLedger ?? 'unknown'}`,
+      });
+    }
+    if (ap.unlimited && !reasons.some((r) => r.code === 'unlimited_allowance')) {
+      reasons.push({
+        code: 'unlimited_allowance',
+        severity: 'high',
+        title: 'Unlimited token allowance',
+        detail: `This lets ${spender} spend an unlimited amount of your ${ap.asset.code}${longLived ? ' for a very long time' : ''}. Only continue if you fully trust that address.`,
+      });
+    }
+  }
+
   for (const hit of screenResult.hits) {
     if (reasons.some((r) => r.code === 'reported_address')) break;
     reasons.push({
@@ -631,7 +732,8 @@ export async function runPipeline(
 ): Promise<ScanResult> {
   const simulation = await ingest(request, deps);
   const authTree = auth(simulation);
-  const effectSet = effects(simulation, authTree, request);
+  const tokenMetadata = await resolveTokenMetadata(authTree, deps.resolveToken);
+  const effectSet = effects(simulation, authTree, request, tokenMetadata);
   const screenResult = await screen(effectSet, request, deps);
   const verdict = buildVerdict({
     request,
