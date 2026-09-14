@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { xdr } from '@stellar/stellar-sdk';
 import {
   auth,
+  buildVerdict,
   effects,
   ingest,
   screen,
@@ -329,6 +330,41 @@ describe('screen stage', () => {
     expect(
       res.answers.find((a) => a.address === FLAGGED)?.answer.entry?.reports,
     ).toBeGreaterThanOrEqual(1);
+  });
+
+  it('a muxed destination (M…) is screened as its base G…, so a flagged account cannot hide in a mux', async () => {
+    const { Account, Asset, BASE_FEE, MuxedAccount, Networks, Operation, TransactionBuilder } =
+      await import('@stellar/stellar-sdk');
+    const muxed = new MuxedAccount(new Account(FLAGGED, '0'), '7').accountId();
+    expect(muxed.startsWith('M')).toBe(true);
+    const f = fixture('classic-payment');
+    const xdrB64 = new TransactionBuilder(new Account(f.source, '1'), {
+      fee: BASE_FEE,
+      networkPassphrase: Networks.TESTNET,
+    })
+      .addOperation(Operation.payment({ destination: muxed, asset: Asset.native(), amount: '1' }))
+      .setTimeout(0)
+      .build()
+      .toXDR();
+    const request: ScanRequest = { ...requestFor(f), xdr: xdrB64 };
+    const sim = await ingest(request);
+    const set = effects(sim, auth(sim), request);
+    const { calls, fetchImpl } = registryFetch(REG.response);
+    const res = await screen(set, request, {
+      screen: createRegistryScreener({ rpcUrl: RPC, fetchImpl }),
+    });
+    expect(res.checked).toEqual([FLAGGED]);
+    expect(calls).toEqual([[REG.keys.flagged]]);
+    expect(res.outcome).toBe('flagged');
+    const v = buildVerdict({
+      request,
+      simulation: sim,
+      auth: auth(sim),
+      effects: set,
+      screen: res,
+    });
+    expect(v.reasons.map((r) => r.code)).toContain('reported_address');
+    expect(v.risk).toBe('high');
   });
 
   it('every counterparty in a multi-recipient transaction is screened, plus contracts touched', async () => {

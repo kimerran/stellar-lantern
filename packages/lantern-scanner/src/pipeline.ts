@@ -13,7 +13,7 @@
 // The wallet still calls the synchronous `scan()` in engine.ts; this async
 // pipeline lands alongside it and D3 rewires the wallet onto it.
 
-import { Address, xdr as XDR } from '@stellar/stellar-sdk';
+import { Address, MuxedAccount, StrKey, xdr as XDR } from '@stellar/stellar-sdk';
 import { ACTION_FOR, type ScanReason } from './types';
 import type {
   AuthCall,
@@ -507,16 +507,18 @@ export async function screen(
   // Every counterparty: the coarse per-op list, every address that receives
   // value at any auth depth (3b), every allowance spender, and every contract
   // touched. The signer is not a counterparty of their own transaction.
-  const self = request.context.fromAddress;
+  // A muxed destination (M…) is screened as its base G…: the registry stores
+  // `Entry(G…)`, and a flagged account wrapped in a mux must not screen clean.
+  const self = baseAccount(request.context.fromAddress);
   const checked = Array.from(
-    new Set([
-      ...effectSet.effects.map((e) => e.counterparty).filter((c): c is string => !!c),
-      ...effectSet.deltas
-        .filter((d) => d.direction === 'in' && d.address !== self)
-        .map((d) => d.address),
-      ...effectSet.approvals.map((a) => a.spender),
-      ...effectSet.contractsTouched,
-    ]),
+    new Set(
+      [
+        ...effectSet.effects.map((e) => e.counterparty).filter((c): c is string => !!c),
+        ...effectSet.deltas.filter((d) => d.direction === 'in').map((d) => d.address),
+        ...effectSet.approvals.map((a) => a.spender),
+        ...effectSet.contractsTouched,
+      ].map(baseAccount),
+    ),
   ).filter((a) => a !== self);
   const lookup = screenLookup(deps, request.networkPassphrase);
   const hits: ScreenResult['hits'] = [];
@@ -552,6 +554,13 @@ export async function screen(
   });
   const outcome = hits.length > 0 ? 'flagged' : unknown.length > 0 ? 'unknown' : 'clean';
   return { outcome, checked, hits, unknown, answers };
+}
+
+// M… → its base G…; anything else unchanged.
+function baseAccount(address: string): string {
+  return StrKey.isValidMed25519PublicKey(address)
+    ? MuxedAccount.fromAddress(address, '0').baseAccount().accountId()
+    : address;
 }
 
 // Which flag source answers. A registry screener wins outright; the demo

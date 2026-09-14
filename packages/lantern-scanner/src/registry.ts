@@ -4,7 +4,7 @@
 // `DataKey::Entry(subject)` ledger key client-side, read it with
 // `getLedgerEntries` — no source account, no signing, no fee — and decode the
 // contract's nine-field `Entry`. scripts/hot-read-blacklist-registry.mjs is
-// the same recipe as a CLI; tests/blacklist-hot-read.test.ts pins both to the
+// the same recipe as a CLI; tests/scanner-screen.test.ts pins both to the
 // doc's worked example so they cannot drift.
 //
 // Three outcomes, never two. `flagged` is `status === Active` only; Disputed
@@ -47,7 +47,7 @@ export interface ScreenAnswer {
 export type ScreenLookup = (address: string) => Promise<ScreenAnswer>;
 
 // The deployed testnet registry (README "Testnet smart contracts"). Testnet
-// is periodically reset; tests/blacklist-hot-read.test.ts pins this to the
+// is periodically reset; tests/scanner-screen.test.ts pins this to the
 // id docs/blacklist-registry.md publishes.
 export const TESTNET_REGISTRY_ID = 'CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F';
 
