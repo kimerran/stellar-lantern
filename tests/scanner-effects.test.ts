@@ -83,7 +83,7 @@ describe('effects: classic deltas', () => {
       `out GAMN XLM 25.0000000 exact #0`,
       `in GDVE XLM 25.0000000 exact #0`,
     ]);
-    expect(set.deltas[0]?.asset).toEqual({ code: 'XLM' });
+    expect(set.deltas[0]?.asset).toEqual({ code: 'XLM', decimals: 7 });
     expect(set.deltas.every((d) => d.source === 'classic')).toBe(true);
     expect(set.closes).toEqual([]);
     expect(set.coverage).toBe('full');
@@ -95,7 +95,7 @@ describe('effects: classic deltas', () => {
       `out GAMN XLM 10.0000000 exact #0`,
       `in GAMN USDC:GBBD 9.0000000 min #0`,
     ]);
-    expect(set.deltas[1]?.asset).toEqual({ code: 'USDC', issuer: USDC_ISSUER });
+    expect(set.deltas[1]?.asset).toEqual({ code: 'USDC', issuer: USDC_ISSUER, decimals: 7 });
   });
 
   it('pathPaymentStrictReceive: up-to send, exact receive — strict-send and strict-receive differ', async () => {
@@ -190,8 +190,9 @@ describe('effects: contracts and result', () => {
       'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
       'CAQCFVLOBK5GIULPNZRGATJJMIZL5BSP7X5YJVMGCPTUEPFM4AVSRCJU',
     ]);
-    expect(set.deltas).toEqual([]);
-    expect(set.approvals).toEqual([]);
+    // Its token calls are 3b's: two transfers and an approve.
+    expect(set.deltas.every((d) => d.source === 'token')).toBe(true);
+    expect(set.approvals).toHaveLength(1);
   });
 
   it('ScanResult carries the frozen net-effect object', async () => {

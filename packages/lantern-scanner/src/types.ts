@@ -282,6 +282,10 @@ export interface AssetRef {
   code: string;
   issuer?: string;
   contractId?: string;
+  // Scale of `amount`: 7 for classic assets and the native SAC; a token's
+  // resolved decimals; `null` when the token could not be resolved — the
+  // explicit "decimals unknown" marker (3b). Never guessed.
+  decimals?: number | null;
 }
 
 // One balance movement on one address (#54). `amount` is an exact decimal
@@ -294,9 +298,15 @@ export interface AssetDelta {
   address: string;
   direction: 'in' | 'out';
   asset: AssetRef;
+  // Scaled by `asset.decimals`; null for `total`, and for a token whose
+  // decimals are unknown (then `raw` is the only number).
   amount: string | null;
+  // The i128 base-unit integer for a token call (3b), as a decimal string.
+  raw?: string;
   bound: 'exact' | 'max' | 'min' | 'total';
   opIndex: number;
+  // Depth in the auth tree for a token call; absent for classic ops.
+  depth?: number;
   // Where the delta was established: the classic op itself, a decoded
   // token-interface call (3b), or a balance change the simulation observed.
   source: 'classic' | 'token' | 'simulation';
@@ -307,6 +317,7 @@ export interface AssetDelta {
 export interface NetDelta {
   address: string;
   asset: AssetRef;
+  // Sums scaled by `asset.decimals`; raw base-unit integers when that is null.
   in: string; // exact + min inflows summed
   inAtLeast: boolean; // any inflow was a `min` bound
   out: string; // exact + max outflows summed
@@ -319,8 +330,12 @@ export interface Approval {
   owner: string;
   spender: string;
   asset: AssetRef;
-  amount: string; // raw integer as decimal string (i128); scaled at render time
+  amount: string; // raw i128 as a decimal string
+  amountScaled: string | null; // by `asset.decimals`; null when unknown
   expirationLedger: number;
+  // At or above UNLIMITED_ALLOWANCE_THRESHOLD (token.ts): the allowance is
+  // effectively unbounded. Stage 5 turns this into the headline reason.
+  unlimited: boolean;
   opIndex: number;
   depth: number;
 }

@@ -6,9 +6,8 @@
 // decimal.ts. Token-interface calls are 3b (#55); everything else is 3c (#56).
 
 import type { AssetDelta, AssetRef, DecodedOp, DecodedTx, NetDelta } from './types';
-import { addAmounts } from './decimal';
-
-const ZERO = '0.0000000';
+import { toStroops } from './decimal';
+import { scaleAmount } from './token';
 
 // The account an op acts for: its own source override, else the tx source,
 // else the caller-supplied fallback (a hand-built DecodedTx without `source`).
@@ -18,7 +17,9 @@ export function opSource(tx: DecodedTx, op: DecodedOp, fallback: string): string
 
 function asset(code: string | undefined, issuer: string | undefined): AssetRef {
   const c = code ?? 'XLM';
-  return c === 'XLM' && !issuer ? { code: 'XLM' } : { code: c, ...(issuer ? { issuer } : {}) };
+  return c === 'XLM' && !issuer
+    ? { code: 'XLM', decimals: 7 }
+    : { code: c, ...(issuer ? { issuer } : {}), decimals: 7 };
 }
 
 // Per-op deltas for the classic ops. Ops this stage does not cover produce
@@ -118,42 +119,73 @@ function delta(
   return { address, direction, asset: a, amount, bound, opIndex, source: 'classic' };
 }
 
+// Native XLM moved by a classic op and by the native SAC are the same asset,
+// so both key as XLM:native; other tokens key by contract id.
 export function assetKey(a: AssetRef): string {
+  if (a.code === 'XLM' && !a.issuer) return 'XLM:native';
   return a.contractId ?? `${a.code}:${a.issuer ?? 'native'}`;
+}
+
+// Base units of a delta: stroops for a classic amount, the raw i128 for a
+// token call. Null when nothing can be summed (a `total`, or an amount that
+// is neither).
+function units(d: AssetDelta): bigint | null {
+  if (d.raw !== undefined) return BigInt(d.raw);
+  if (d.amount === null) return null;
+  return toStroops(d.amount);
+}
+
+function render(sum: bigint, decimals: number | null | undefined): string {
+  return decimals === null ? sum.toString() : scaleAmount(sum, decimals ?? 7)!;
 }
 
 // Aggregate deltas per (address, asset). `total` outflows set `outIsTotal`
 // and add nothing to `out` (there is no number to add); a `total` inflow is
-// unknowable here and is left out of `in` but still keeps the row.
+// unknowable here and is left out of `in` but still keeps the row. Sums are
+// bigint base units, rendered once at the end by the asset's decimals.
 export function aggregate(deltas: AssetDelta[]): NetDelta[] {
-  const rows = new Map<string, NetDelta>();
+  interface Acc {
+    row: NetDelta;
+    inUnits: bigint;
+    outUnits: bigint;
+  }
+  const rows = new Map<string, Acc>();
   for (const d of deltas) {
     const key = `${d.address}|${assetKey(d.asset)}`;
-    let row = rows.get(key);
-    if (!row) {
-      row = {
-        address: d.address,
-        asset: d.asset,
-        in: ZERO,
-        inAtLeast: false,
-        out: ZERO,
-        outUpTo: false,
-        outIsTotal: false,
+    let acc = rows.get(key);
+    if (!acc) {
+      acc = {
+        row: {
+          address: d.address,
+          asset: d.asset,
+          in: '',
+          inAtLeast: false,
+          out: '',
+          outUpTo: false,
+          outIsTotal: false,
+        },
+        inUnits: 0n,
+        outUnits: 0n,
       };
-      rows.set(key, row);
+      rows.set(key, acc);
     }
     if (d.bound === 'total') {
-      if (d.direction === 'out') row.outIsTotal = true;
+      if (d.direction === 'out') acc.row.outIsTotal = true;
       continue;
     }
-    if (d.amount === null) continue;
+    const u = units(d);
+    if (u === null) continue;
     if (d.direction === 'in') {
-      row.in = addAmounts(row.in, d.amount);
-      if (d.bound === 'min') row.inAtLeast = true;
+      acc.inUnits += u;
+      if (d.bound === 'min') acc.row.inAtLeast = true;
     } else {
-      row.out = addAmounts(row.out, d.amount);
-      if (d.bound === 'max') row.outUpTo = true;
+      acc.outUnits += u;
+      if (d.bound === 'max') acc.row.outUpTo = true;
     }
   }
-  return [...rows.values()];
+  return [...rows.values()].map(({ row, inUnits, outUnits }) => ({
+    ...row,
+    in: render(inUnits, row.asset.decimals),
+    out: render(outUnits, row.asset.decimals),
+  }));
 }
