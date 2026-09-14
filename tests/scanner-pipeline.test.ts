@@ -317,7 +317,7 @@ async function verdictFor(
   const request = requestFor(f);
   const simulation = await ingest(request, deps);
   const authTree = auth(simulation);
-  const effectSet = effects(simulation, authTree);
+  const effectSet = effects(simulation, authTree, request);
   const screenResult = await screen(effectSet, request, deps);
   return buildVerdict({
     request,
@@ -342,13 +342,9 @@ describe('buildVerdict', () => {
     const v = await verdictFor(fixture('classic-payment'));
     expect(v.risk).toBe('low');
     expect(v.action).toBe('allow');
-    expect(v.signals.map((s) => s.stage)).toEqual([
-      'ingest',
-      'auth',
-      'effects',
-      'screen',
-      'verdict',
-    ]);
+    expect(v.signals.map((s) => s.stage)).toEqual(['ingest', 'auth', 'effects', 'screen']);
+    expect(v.signals.every((s) => typeof s.ref === 'string')).toBe(true);
+    expect(v.scope).toBe('effects shown, terms not judged');
   });
 
   it('fails closed: malformed XDR is high/block_confirm', async () => {
@@ -408,7 +404,7 @@ describe('buildVerdict', () => {
     };
     const simulation = await ingest(forced);
     const authTree = auth(simulation);
-    const effectSet = effects(simulation, authTree);
+    const effectSet = effects(simulation, authTree, request);
     const screenResult = await screen(effectSet, forced);
     const vForced = buildVerdict({
       request: forced,

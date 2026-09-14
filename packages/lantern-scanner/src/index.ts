@@ -15,7 +15,7 @@ export type {
   ScanVerdict,
   MessageVerdict,
 } from './types';
-export { ACTION_FOR, UNVERIFIED_LABEL } from './types';
+export { ACTION_FOR, UNVERIFIED_LABEL, NOT_JUDGED } from './types';
 
 export { decodeTransaction } from './decode';
 export { explainTransaction } from './explainer';
@@ -120,3 +120,4 @@ export {
   type RegistryScreenerOptions,
   type RawLedgerEntriesBody,
 } from './registry';
+export { verdict, ingestReason, type VerdictInput, type VerdictContext } from './verdict';

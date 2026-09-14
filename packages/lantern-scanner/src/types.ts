@@ -16,6 +16,9 @@ export interface ScanReason {
   severity: RiskLevel;
   title: string;
   detail: string;
+  // Provenance into the stage outputs (see Signal.ref); set by the pipeline's
+  // verdict stage (#58), absent from the legacy scan().
+  ref?: string;
 }
 
 // What `scan()` learns from decoding the transaction XDR.
@@ -425,7 +428,17 @@ export interface Signal {
   stage: StageName;
   code: string;
   detail: string;
+  // Provenance: which input the signal came from, as a path into the stage
+  // output — `deltas[2]`, `approvals[0]`, `unverified[1]`, `screen.hits[0]`,
+  // `ops[1]`, `net[GABC…:XLM]` — so a reviewer can reconstruct the reasoning
+  // without re-running the scan (#58).
+  ref?: string;
 }
+
+// SOW §3.9: the verdict describes what a transaction does, never whether a
+// trade is fairly priced. Carried on every verdict as a constant so no
+// surface can present a `low` as an endorsement.
+export const NOT_JUDGED = 'effects shown, terms not judged' as const;
 
 // Stage 5 — Verdict. Deeply readonly and frozen by `buildVerdict`; the only
 // constructor. Stage 6 receives it and cannot change it.
@@ -434,6 +447,7 @@ export type Verdict = DeepReadonly<{
   action: ScanAction;
   reasons: ScanReason[];
   signals: Signal[];
+  scope: typeof NOT_JUDGED;
 }>;
 
 // Stage 6 — Explain. Prose. Nothing else.

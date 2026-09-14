@@ -113,10 +113,8 @@ same posture `docs/blacklist-registry.md` documents for the hot read. An
 authorisation entry the scanner cannot parse also fails closed
 (`auth_unreadable`).
 
-**What is skeleton.** `buildVerdict` still reuses today's `scan()` heuristics
-plus the pipeline's own fail-closed, screening, allowance and unverified
-reasons (#58 is the real risk core). `signals[]` on the verdict is the audit
-trail of what each stage evaluated.
+**What is skeleton.** Only stage 6: `explainRulesBased` is the shipped
+rules-based prose; the model-backed explainer with the same signature is #59.
 
 ### Stage 2 — Auth (#53)
 
@@ -267,6 +265,45 @@ longer contributes `reported_address` to the pipeline's verdict. Without a
 screener, the demo list answers only in a `__FEATURE_DEMO_AFFORDANCES__`
 build; otherwise every address is `unknown`.
 
+### Stage 5 — Verdict: the deterministic risk core (#58)
+
+`verdict(input)` in `verdict.ts` is a **pure** function of the stage 1–4
+outputs plus `VerdictContext { fromAddress, destinationFunded?,
+spendableXlm? }`: no I/O, no clock, no randomness, no model — same inputs,
+same output, forever. A test calls it 100× and reads the module source to
+assert it imports nothing async, nothing from the explainer, the RPC client,
+the registry or the engine. The pipeline's `buildVerdict` is a thin wrapper
+that lifts the context out of the request; `forceScenario` is never read.
+
+The signals, each with a reason and a `ref` back into the input it came from:
+
+| signal | risk | provenance |
+|---|---|---|
+| ingest failure (per mode) / archived state / unreadable auth | high | `simulation`, `auth.unparseable` |
+| blacklisted counterparty (`reported_address`, with reporter / reason / count) | high | `screen.hits[i]` |
+| unknown screening (`screen_unknown`, per reason) | medium — never low | `screen.unknown[i]` |
+| unlimited allowance | high | `approvals[i]` |
+| bounded but long-lived allowance | medium | `approvals[i]` |
+| unexpected outflow (simulation shows more leaving than the effects declare) | high | `observed[i]` |
+| drains balance (≥ 90 % of `spendableXlm`, or a merge) / large share (≥ 50 %) | high / medium | `net[addr:XLM]` |
+| unknown / unfunded destination | medium | `context.destinationFunded` |
+| unverified contract | medium | `unverified` |
+| account-control change (`setOptions` signers / thresholds), account merge | high | `ops[i]`, `closes[i]` |
+| scam memo language, unrecognised op, swap to another account | high / medium / medium | `memo`, `ops[i]` |
+
+Plus informational signals with no reason: `nested_outflow` (value leaving
+through a depth ≥ 1 call), `allowance`, `observed_balance_changes`, and the
+per-stage summaries. **Warn, don't block**: `low → allow`, `medium → warn`,
+`high → block_confirm`; the user can always proceed after an explicit
+confirmation. Every verdict carries `scope: 'effects shown, terms not
+judged'` (`NOT_JUDGED`) — it describes what a transaction does, never whether
+a trade is fairly priced.
+
+**Snapshots.** `tests/__snapshots__/scanner-verdict.test.ts.snap` records
+risk, action, reasons and signals for every fixture in the corpus. A change
+fails `npm test` until the snapshot is deliberately updated
+(`npx vitest run -u`) — a verdict diff is a decision, not a surprise.
+
 ### Fixture corpus
 
 `fixtures/*.json` — one file per case, each with real testnet XDR and, for
@@ -367,12 +404,13 @@ src/token.ts      SEP-41 / SAC recognition, metadata resolver + cache, approvals
 src/unverified.ts the raw, labelled fallback for undecoded calls (#56)
 src/observed.ts   balance changes from the simulation's stateChanges (#56)
 src/registry.ts   D1 registry hot read, three-way answers, TTL-cached screener (#57)
+src/verdict.ts    the pure, deterministic risk core (#58)
 fixtures/         offline corpus: XDR + recorded RPC bodies, and record.mjs
 ```
 
 ## Tests
 
-Live in the repo's `tests/` (`scanner-pipeline.test.ts`, `scanner-ingest.test.ts`, `scanner-auth.test.ts`, `scanner-effects.test.ts`, `scanner-token.test.ts`, `scanner-unverified.test.ts`, `scanner-screen.test.ts`, `scan.test.ts`, `swap-scan.test.ts`,
+Live in the repo's `tests/` (`scanner-pipeline.test.ts`, `scanner-ingest.test.ts`, `scanner-auth.test.ts`, `scanner-effects.test.ts`, `scanner-token.test.ts`, `scanner-unverified.test.ts`, `scanner-screen.test.ts`, `scanner-verdict.test.ts`, `scan.test.ts`, `swap-scan.test.ts`,
 `guardians.test.ts`, `tx.test.ts`, `invoke.test.ts`, `blend*.test.ts`) and run
 with `npm test` from the repo root — no network required.
 
