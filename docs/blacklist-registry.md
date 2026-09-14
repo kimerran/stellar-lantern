@@ -7,7 +7,7 @@ read it.
 ## Report once, protect everyone
 
 Lantern's scanner screens recipients against a hardcoded demo deny-list
-(`DEMO_FLAGGED_ADDRESSES` in `src/core/scan/engine.ts`). A list that lives inside
+(`DEMO_FLAGGED_ADDRESSES` in `packages/lantern-scanner/src/engine.ts`). A list that lives inside
 one wallet's bundle protects one wallet's users. This contract is what replaces
 it: anyone can report an address, and **any** Stellar wallet or dApp can read the
 result, with no key, no account and no permission.
@@ -472,5 +472,5 @@ exists to seed.
 
 Wiring the hot read into the scanner or the wallet is D2 (Screen stage) and D3.
 **The wallet does not read this registry yet** — today's scanner still screens
-against the hardcoded `DEMO_FLAGGED_ADDRESSES` in `src/core/scan/engine.ts`, not
+against the hardcoded `DEMO_FLAGGED_ADDRESSES` in `packages/lantern-scanner/src/engine.ts`, not
 against the deployed contract. This is the primitive, the proof and the recipe.

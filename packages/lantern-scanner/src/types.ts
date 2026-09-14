@@ -1,4 +1,7 @@
-import type { NetworkId } from '@shared/constants';
+// Mirrors the host wallet's `NetworkId` (src/shared/constants.ts). Declared here
+// so the package has no import back into the app — the two stay structurally
+// identical, so verdicts flow across the boundary without a cast.
+export type NetworkId = 'TESTNET' | 'PUBLIC';
 
 // ── The scan contract (spec §4.1 / §7 Phase 0) ───────────────────────────────
 // Lantern only ADVISES and gates the UI. It never signs and never sends. The

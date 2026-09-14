@@ -8,8 +8,8 @@ import { buildPathPaymentStrictSendXdr, destMinFromQuote } from '@core/stellar/s
 import { fetchStrictSendPaths } from '@core/stellar/paths';
 import { fetchSoroswapQuote, buildSoroswapSwapXdr, pickBestEngine, type SoroswapConfig } from '@core/stellar/soroswap';
 import { computeMaxXlm, type AssetRef } from '@core/stellar/tx';
-import { scan } from '@core/scan/engine';
-import type { ScanVerdict } from '@core/scan/types';
+import { scan } from '@core/scan';
+import type { ScanVerdict } from '@core/scan';
 import { FLAGS } from '@shared/flags';
 import { isNativePlatform } from '@shared/kv';
 import { formatAmount } from '@shared/format';

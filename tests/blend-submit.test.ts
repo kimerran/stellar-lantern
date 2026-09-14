@@ -6,7 +6,7 @@ import {
   Transaction,
   TransactionBuilder,
 } from '@stellar/stellar-sdk';
-import { decodeTransaction } from '@core/scan/decode';
+import { decodeTransaction } from '@lantern/scanner';
 import { toBaseUnits, prepareBlendSubmit } from '@core/blend/submit';
 
 const pp = Networks.TESTNET;

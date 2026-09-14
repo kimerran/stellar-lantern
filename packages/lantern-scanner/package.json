@@ -1,0 +1,16 @@
+{
+  "name": "@lantern/scanner",
+  "version": "0.1.0",
+  "description": "Lantern's Stellar transaction security scanner — decode, explain and risk-score a transaction XDR before it is signed.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": ["src", "README.md", "LICENSE"],
+  "sideEffects": false,
+  "peerDependencies": {
+    "@stellar/stellar-sdk": "^16.0.0"
+  }
+}

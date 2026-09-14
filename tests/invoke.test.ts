@@ -13,7 +13,7 @@ import {
   prepareInvoke,
   type InvokeArg,
 } from '@core/stellar/invoke';
-import { decodeTransaction } from '@core/scan/decode';
+import { decodeTransaction } from '@lantern/scanner';
 
 const SOURCE = 'GDRXE2BQUC3AZNPVFSCEZ76NJ3WWL25FYFK6RGZGIEKWE4SOOHSUJUJ6';
 const CONTRACT = 'CDNCUDGEUEPOEJOOKQGKXN3RBMBCLVBFRLSHUD6O7WVSMECTQRCW656Z';

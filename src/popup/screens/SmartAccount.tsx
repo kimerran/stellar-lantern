@@ -15,8 +15,8 @@ import { finalizePasskeyTransfer, preparePasskeyTransfer } from '@core/passkey/t
 import { sacContractBalance } from '@core/stellar/sac';
 import { getServer, fundWithFriendbot } from '@core/stellar/client';
 import { isValidPublicKey, isValidContractId } from '@core/wallet/wallet';
-import { scan } from '@core/scan/engine';
-import type { ScanVerdict } from '@core/scan/types';
+import { scan } from '@core/scan';
+import type { ScanVerdict } from '@core/scan';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';

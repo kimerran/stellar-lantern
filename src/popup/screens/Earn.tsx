@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { NetworkConfig } from '@shared/constants';
 import { sendMessage } from '@shared/messages';
 import { getServer } from '@core/stellar/client';
-import { scan } from '@core/scan/engine';
-import type { ScanVerdict } from '@core/scan/types';
+import { scan } from '@core/scan';
+import type { ScanVerdict } from '@core/scan';
 import { isNativePlatform } from '@shared/kv';
 import { formatAmount } from '@shared/format';
 import {

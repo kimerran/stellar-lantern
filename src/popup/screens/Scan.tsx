@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { analyzeMessage } from '@core/scan/paste';
-import { sampleVerdict, DEMO_FLAGGED_ADDRESSES } from '@core/scan/engine';
-import type { MessageVerdict, RiskLevel } from '@core/scan/types';
+import { analyzeMessage, sampleVerdict, DEMO_FLAGGED_ADDRESSES } from '@core/scan';
+import type { MessageVerdict, RiskLevel } from '@core/scan';
 import { Button } from '../components/Button';
 import { Icon } from '../components/Icon';
 import { Card } from '../components/Card';

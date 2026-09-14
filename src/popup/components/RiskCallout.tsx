@@ -1,4 +1,4 @@
-import type { RiskLevel, ScanReason } from '@core/scan/types';
+import type { RiskLevel, ScanReason } from '@core/scan';
 import { Icon } from './Icon';
 
 // Renders a risk verdict's reasons + explanation as a coloured callout. Shared by
