@@ -1,0 +1,10 @@
+{
+  "name": "classic-multi-op",
+  "description": "Three ops: 25 XLM payment to DEST, 1.5 USDC payment to DEST, and a 0.5 XLM payment to OTHER acting for OTHER via an op-level source — aggregation must be per address, not per first op.",
+  "networkPassphrase": "Test SDF Network ; September 2015",
+  "source": "GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK",
+  "recordedAt": null,
+  "rpc": null,
+  "xdr": "AAAAAgAAAAAY0gqcnifD/QFRi3Um28AFmWZwoXTXZlkgmYh/UZB/SQAAASwAAAAA/N5BswAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAQAAAADqSmxj4pxSCr71UHsTLsX5lUd2rr6+e5JCHuppFEbSLAAAAAAAAAAADuaygAAAAAAAAAABAAAAAOpKbGPinFIKvvVQexMuxfmVR3auvr57kkIe6mkURtIsAAAAAVVTREMAAAAAQj59BfLsr7/sGSshWj8b6WrtuNjnAlSr40E+AgfeVrIAAAAAAOThwAAAAAEAAAAAam2OCWgwB8w8Kp61+6GjS/8rU1Pmr+ljQBKogmaOOhIAAAABAAAAABjSCpyeJ8P9AVGLdSbbwAWZZnChdNdmWSCZiH9RkH9JAAAAAAAAAAAATEtAAAAAAAAAAAA=",
+  "simulation": null
+}

@@ -113,9 +113,9 @@ same posture `docs/blacklist-registry.md` documents for the hot read. An
 authorisation entry the scanner cannot parse also fails closed
 (`auth_unreadable`).
 
-**What is skeleton.** The stage *bodies* after 1 and 2 are interim: `effects` maps decoded ops
-to coarse kinds and reports `coverage: 'partial'` whenever a contract call is
-present (#54–#56); `screen` defaults to the demo list (#57 injects the D1
+**What is skeleton.** The stage *bodies* after 3a are interim: `effects` decodes
+classic ops fully but still reports contract calls as coarse `contract_call`
+rows with `coverage: 'partial'` (#55–#56); `screen` defaults to the demo list (#57 injects the D1
 registry); `buildVerdict` reuses today's `scan()` heuristics plus the
 pipeline's own fail-closed and screening reasons (#58 is the real risk core).
 `signals[]` on the verdict is the audit trail of what each stage evaluated.
@@ -146,11 +146,35 @@ requires and answers *who is authorising what*:
   next to `unparseable > 0` must never be read as "this call authorises
   nothing" — that is the most dangerous wrong answer available.
 
+### Stage 3a — Effects: classic operations (#54)
+
+`effects(simulation, authTree, request)` turns the value-moving classic ops
+— `payment`, `createAccount`, `pathPaymentStrictSend`,
+`pathPaymentStrictReceive`, `accountMerge` — into a net-effect object:
+
+- `deltas[]` — one `AssetDelta` per balance movement: `address`,
+  `direction`, `asset` (`code` + `issuer`, native XLM has none), `amount`
+  as an exact 7-decimal string, `bound`, `opIndex`. `bound` says what the
+  number is: `exact`, `max` (strict-receive: "you may spend up to"), `min`
+  (strict-send: "you receive at least"), or `total` (accountMerge: the
+  whole balance, `amount: null` — never a fake zero).
+- `net[]` — per (address, asset) aggregate across every op: `in` / `out`
+  sums plus `inAtLeast` / `outUpTo` / `outIsTotal` flags. A three-op
+  transaction nets per address; op-level `source` overrides are honoured.
+- `closes[]` — accounts an `accountMerge` deletes, with the merge target.
+- `contractsTouched[]` — every contract id from the op and the auth tree.
+- `approvals[]` — filled by 3b.
+
+Arithmetic goes through `decimal.ts` (`toStroops` / `fromStroops` /
+`addAmounts`) — bigint stroops end to end, no float anywhere in the effect
+path.
+
 ### Fixture corpus
 
 `fixtures/*.json` — one file per case, each with real testnet XDR and, for
 Soroban cases, the **raw** `simulateTransaction` body as the RPC returned it:
-classic payment, path payment, SAC `transfer`, SEP-41 `approve`, a Blend
+classic payment, path payment (strict-send and strict-receive), account
+merge, a three-op transaction, SAC `transfer`, SEP-41 `approve`, a Blend
 `submit` whose auth tree nests a `transfer` sub-invocation, a call to an
 undeployed contract, and malformed XDR. Two files are marked
 `synthetic: true`: `archived-state.json` is the real `sac-transfer`
@@ -163,7 +187,8 @@ a call two levels down). The bytes are real XDR; the scenarios are not
 recordings. Tests load them through Vite
 (`import.meta.glob`) and never open a socket. Re-record after a testnet reset
 with `node packages/lantern-scanner/fixtures/record.mjs` (needs a funded
-source account; nothing is signed or submitted).
+source account; nothing is signed or submitted). The `classic-*` files need
+no network and are rebuilt by `make-classic.mjs`.
 
 ## What it does **not** do (yet)
 
@@ -233,12 +258,14 @@ src/format.ts     address / amount display helpers (copied from the wallet so
 src/pipeline.ts   the six stages + runPipeline (#51)
 src/rpc.ts        simulateTransaction client: deadline, backoff, RpcError (#52)
 src/scval.ts      lossless ScVal → DecodedScVal rendering (#53)
+src/effects.ts    classic ops → AssetDelta[] + per-address NetDelta[] (#54)
+src/decimal.ts    exact 7-decimal arithmetic over bigint stroops (#54)
 fixtures/         offline corpus: XDR + recorded RPC bodies, and record.mjs
 ```
 
 ## Tests
 
-Live in the repo's `tests/` (`scanner-pipeline.test.ts`, `scanner-ingest.test.ts`, `scanner-auth.test.ts`, `scan.test.ts`, `swap-scan.test.ts`,
+Live in the repo's `tests/` (`scanner-pipeline.test.ts`, `scanner-ingest.test.ts`, `scanner-auth.test.ts`, `scanner-effects.test.ts`, `scan.test.ts`, `swap-scan.test.ts`,
 `guardians.test.ts`, `tx.test.ts`, `invoke.test.ts`, `blend*.test.ts`) and run
 with `npm test` from the repo root — no network required.
 

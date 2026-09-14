@@ -21,8 +21,11 @@ export interface ScanReason {
 // What `scan()` learns from decoding the transaction XDR.
 export interface DecodedOp {
   type: string; // 'payment' | 'createAccount' | 'invokeHostFunction' | 'setOptions' | …
+  // Per-op source override; absent = the transaction source acts (#54).
+  sourceAccount?: string;
   destination?: string;
   assetCode?: string;
+  assetIssuer?: string; // absent for native XLM
   amount?: string;
   // setOptions — account-control changes (signers / thresholds). Present only
   // for the fields the op actually sets; a value of 0 is meaningful (e.g.
@@ -43,12 +46,18 @@ export interface DecodedOp {
   // exact, `destMin` is the received floor. Strict-receive: `sendAmount` is the
   // max spent, `amount` (dest) is exact so `destMin` is unset.
   sendAssetCode?: string;
+  sendAssetIssuer?: string;
   sendAmount?: string;
   destAssetCode?: string;
+  destAssetIssuer?: string;
   destMin?: string;
 }
 
 export interface DecodedTx {
+  // The transaction (inner, for a fee-bump) source account (#54). Optional
+  // only so hand-built DecodedTx literals in older tests stay valid;
+  // decodeTransaction always sets it.
+  source?: string;
   operations: DecodedOp[];
   primaryDestination?: string;
   primaryAmount?: string;
@@ -248,7 +257,8 @@ export interface AuthTree {
   analyzed: boolean;
 }
 
-// Stage 3 — Effects. What the transaction does to the signer's assets.
+// Stage 3 — Effects. What the transaction does to the signer's assets, as a
+// net-effect object a verdict can be computed from and a reviewer can audit.
 export type EffectKind =
   | 'payment' // classic payment / createAccount / pathPayment
   | 'token_transfer' // SEP-41 / SAC transfer (3b)
@@ -265,12 +275,69 @@ export interface Effect {
   amount?: string;
   functionName?: string;
 }
+
+// A classic asset or a token contract. Native XLM has neither issuer nor
+// (until 3b resolves it) a contract id.
+export interface AssetRef {
+  code: string;
+  issuer?: string;
+  contractId?: string;
+}
+
+// One balance movement on one address (#54). `amount` is an exact decimal
+// string; `bound` says what kind of number it is:
+//   exact — this much moves
+//   max   — up to this much may leave (strict-receive send side)
+//   min   — at least this much arrives (strict-send receive side)
+//   total — the entire balance moves (accountMerge); `amount` is null
+export interface AssetDelta {
+  address: string;
+  direction: 'in' | 'out';
+  asset: AssetRef;
+  amount: string | null;
+  bound: 'exact' | 'max' | 'min' | 'total';
+  opIndex: number;
+  // Where the delta was established: the classic op itself, a decoded
+  // token-interface call (3b), or a balance change the simulation observed.
+  source: 'classic' | 'token' | 'simulation';
+}
+
+// Per address + asset aggregate over every op in the transaction. Sums are
+// exact decimal strings; `outIsTotal` means an accountMerge empties it.
+export interface NetDelta {
+  address: string;
+  asset: AssetRef;
+  in: string; // exact + min inflows summed
+  inAtLeast: boolean; // any inflow was a `min` bound
+  out: string; // exact + max outflows summed
+  outUpTo: boolean; // any outflow was a `max` bound
+  outIsTotal: boolean;
+}
+
+// An allowance granted to a spender (3b).
+export interface Approval {
+  owner: string;
+  spender: string;
+  asset: AssetRef;
+  amount: string; // raw integer as decimal string (i128); scaled at render time
+  expirationLedger: number;
+  opIndex: number;
+  depth: number;
+}
+
 export interface EffectSet {
   // The decoded tx the effects were derived from; the explainer reads it.
   source: DecodedTx | null;
   effects: Effect[];
-  // 'full' once stages 3a–3c cover every op type present; the skeleton
-  // reports 'partial' whenever any op is `unknown`/`contract_call`.
+  // Per-op balance movements and their per-address aggregate (#54).
+  deltas: AssetDelta[];
+  net: NetDelta[];
+  // Accounts this transaction closes (accountMerge), with the merge target.
+  closes: Array<{ address: string; destination: string; opIndex: number }>;
+  contractsTouched: string[];
+  approvals: Approval[];
+  // 'full' once stages 3a–3c cover every op type present; 'partial' whenever
+  // any op is `unknown`/`contract_call`.
   coverage: 'none' | 'partial' | 'full';
 }
 

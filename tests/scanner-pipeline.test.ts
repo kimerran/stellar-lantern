@@ -79,6 +79,9 @@ function requestFor(f: Fixture): ScanRequest {
 
 const CORPUS = [
   'archived-state',
+  'classic-account-merge',
+  'classic-multi-op',
+  'classic-path-payment-receive',
   'classic-payment',
   'deep-auth',
   'path-payment',
@@ -252,6 +255,11 @@ describe('effects', () => {
     expect(effects(EMPTY_SIM, auth(EMPTY_SIM))).toEqual({
       source: null,
       effects: [],
+      deltas: [],
+      net: [],
+      closes: [],
+      contractsTouched: [],
+      approvals: [],
       coverage: 'none',
     });
   });

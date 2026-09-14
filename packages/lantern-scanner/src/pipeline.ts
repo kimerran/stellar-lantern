@@ -44,6 +44,7 @@ import { explainTransaction } from './explainer';
 import { isReportedAddress, scan } from './engine';
 import { RpcError } from './rpc';
 import { decodeScVal } from './scval';
+import { aggregate, classicDeltas, opSource } from './effects';
 
 // Everything a stage needs from the outside world is injected, so the whole
 // suite runs offline against fixtures/ and #52 / #57 / #59 plug in the live
@@ -309,10 +310,29 @@ function flatten(
 }
 
 // ── Stage 3: Effects ─────────────────────────────────────────────────────────
-// Skeleton mapping from decoded ops. 3a/3b/3c replace the per-kind bodies.
-export function effects(simulation: SimulationResult, _authTree: AuthTree): EffectSet {
+// 3a (#54): classic value-moving ops → exact per-address deltas + per-address
+// aggregate. The coarse `effects[]` list is kept for screening and the
+// explainer. 3b (token-interface calls) and 3c (the unverified fallback) fill
+// `approvals` / `contractsTouched` and replace the `contract_call` rows.
+export function effects(
+  simulation: SimulationResult,
+  authTree: AuthTree,
+  request?: Pick<ScanRequest, 'context'>,
+): EffectSet {
   const decoded = simulation.decoded;
-  if (!decoded) return { source: null, effects: [], coverage: 'none' };
+  if (!decoded) {
+    return {
+      source: null,
+      effects: [],
+      deltas: [],
+      net: [],
+      closes: [],
+      contractsTouched: [],
+      approvals: [],
+      coverage: 'none',
+    };
+  }
+  const fallbackSource = request?.context.fromAddress ?? decoded.source ?? '';
   const out: Effect[] = decoded.operations.map((op, opIndex) => {
     switch (op.type) {
       case 'payment':
@@ -349,8 +369,29 @@ export function effects(simulation: SimulationResult, _authTree: AuthTree): Effe
         return { kind: 'unknown', opIndex };
     }
   });
+  const deltas = classicDeltas(decoded, fallbackSource);
+  const closes = decoded.operations.flatMap((op, opIndex) =>
+    op.type === 'accountMerge' && op.destination
+      ? [{ address: opSource(decoded, op, fallbackSource), destination: op.destination, opIndex }]
+      : [],
+  );
+  const contractsTouched = Array.from(
+    new Set([
+      ...decoded.operations.map((op) => op.contractId).filter((c): c is string => !!c),
+      ...authTree.calls.map((c) => c.contractId).filter((c): c is string => !!c),
+    ]),
+  );
   const covered = out.every((e) => e.kind !== 'unknown' && e.kind !== 'contract_call');
-  return { source: decoded, effects: out, coverage: covered ? 'full' : 'partial' };
+  return {
+    source: decoded,
+    effects: out,
+    deltas,
+    net: aggregate(deltas),
+    closes,
+    contractsTouched,
+    approvals: [],
+    coverage: covered ? 'full' : 'partial',
+  };
 }
 
 // ── Stage 4: Screen ──────────────────────────────────────────────────────────
@@ -590,7 +631,7 @@ export async function runPipeline(
 ): Promise<ScanResult> {
   const simulation = await ingest(request, deps);
   const authTree = auth(simulation);
-  const effectSet = effects(simulation, authTree);
+  const effectSet = effects(simulation, authTree, request);
   const screenResult = await screen(effectSet, request, deps);
   const verdict = buildVerdict({
     request,

@@ -47,6 +47,10 @@ export type {
   EffectKind,
   Effect,
   EffectSet,
+  AssetRef,
+  AssetDelta,
+  NetDelta,
+  Approval,
   ScreenOutcome,
   ScreenHit,
   ScreenResult,
@@ -79,3 +83,5 @@ export {
   type RpcFailureKind,
 } from './rpc';
 export { decodeScVal, type DecodedScVal } from './scval';
+export { classicDeltas, aggregate, assetKey } from './effects';
+export { toStroops, fromStroops, addAmounts } from './decimal';
