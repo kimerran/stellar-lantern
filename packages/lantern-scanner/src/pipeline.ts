@@ -20,6 +20,9 @@ import type {
   AuthTree,
   DecodedTx,
   DeepReadonly,
+  Footprint,
+  IngestFailure,
+  RestorePreamble,
   Effect,
   EffectSet,
   Explainer,
@@ -36,6 +39,7 @@ import type {
 import { decodeTransaction } from './decode';
 import { explainTransaction } from './explainer';
 import { isReportedAddress, scan } from './engine';
+import { RpcError } from './rpc';
 
 // Everything a stage needs from the outside world is injected, so the whole
 // suite runs offline against fixtures/ and #52 / #57 / #59 plug in the live
@@ -59,61 +63,149 @@ const SEVERITY: Record<RiskLevel, number> = { low: 0, medium: 1, high: 2 };
 // ── Stage 1: Ingest ──────────────────────────────────────────────────────────
 // Fail-closed: a Soroban transaction that could not be simulated is `ok: false`
 // — the pipeline never guesses what a contract call does from the XDR alone.
+// Each failure mode keeps its own `failure` code (#52) so the verdict can tell
+// the user what actually happened.
+const EMPTY_FOOTPRINT: Footprint = { readOnly: [], readWrite: [] };
+
+function failed(
+  failure: IngestFailure,
+  decoded: DecodedTx | null,
+  simulated: boolean,
+  error: string,
+): SimulationResult {
+  return {
+    ok: false,
+    outcome: 'failed',
+    failure,
+    decoded,
+    simulated,
+    error,
+    auth: [],
+    footprint: EMPTY_FOOTPRINT,
+    events: [],
+  };
+}
+
 export async function ingest(
   request: ScanRequest,
   deps: Pick<PipelineDeps, 'simulate'> = {},
 ): Promise<SimulationResult> {
   const decoded = decodeTransaction(request.xdr, request.networkPassphrase);
-  if (!decoded) {
-    return { ok: false, decoded: null, simulated: false, auth: [], error: 'undecodable' };
-  }
+  if (!decoded) return failed('undecodable', null, false, 'undecodable');
   if (!decoded.isSoroban) {
-    return { ok: true, decoded, simulated: false, auth: [] };
+    return {
+      ok: true,
+      outcome: 'ok',
+      decoded,
+      simulated: false,
+      auth: [],
+      footprint: EMPTY_FOOTPRINT,
+      events: [],
+    };
   }
   if (!deps.simulate) {
-    return { ok: false, decoded, simulated: false, auth: [], error: 'simulation_unavailable' };
+    return failed('simulation_unavailable', decoded, false, 'simulation_unavailable');
   }
   let raw: RawSimulation;
   try {
     raw = await deps.simulate(request.xdr);
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'simulation failed';
-    return { ok: false, decoded, simulated: true, auth: [], error: msg };
+    if (e instanceof RpcError) {
+      const failure: IngestFailure =
+        e.kind === 'timeout'
+          ? 'rpc_timeout'
+          : e.kind === 'malformed'
+            ? 'simulation_malformed'
+            : 'rpc_transport';
+      return failed(failure, decoded, true, msg);
+    }
+    return failed('rpc_transport', decoded, true, msg);
   }
-  return { ...parseSimulation(raw), decoded, simulated: true };
+  return parseSimulation(raw, decoded);
 }
 
-// Shape-check the raw RPC body. Mirrors src/core/stellar/soroban.ts's
-// normalisation (kept separate so the package has no import into the app).
-function parseSimulation(
-  raw: RawSimulation,
-): Pick<SimulationResult, 'ok' | 'auth' | 'error' | 'latestLedger'> {
-  if (!raw || typeof raw !== 'object')
-    return { ok: false, auth: [], error: 'unreadable simulation' };
+// Shape-check the raw RPC body and normalise it into one SimulationResult:
+// return value, auth, footprint (decoded from transactionData), events,
+// latestLedger, restorePreamble. Nothing in the body is trusted until checked.
+function parseSimulation(raw: RawSimulation, decoded: DecodedTx): SimulationResult {
+  const malformed = (why: string) => failed('simulation_malformed', decoded, true, why);
+  if (!raw || typeof raw !== 'object') return malformed('unreadable simulation');
   if (raw.error) {
+    // The RPC was reached and answered; it just could not give a simulation.
     const msg = raw.error.message;
-    return { ok: false, auth: [], error: typeof msg === 'string' && msg ? msg : 'rpc error' };
+    return malformed(typeof msg === 'string' && msg ? msg : 'rpc error');
   }
   const result = raw.result;
-  if (!result || typeof result !== 'object')
-    return { ok: false, auth: [], error: 'unreadable simulation' };
-  if (typeof result.error === 'string' && result.error)
-    return { ok: false, auth: [], error: result.error };
-  if (typeof result.minResourceFee !== 'string' || !result.minResourceFee) {
-    return { ok: false, auth: [], error: 'unreadable simulation' };
+  if (!result || typeof result !== 'object') return malformed('unreadable simulation');
+  if (typeof result.error === 'string' && result.error) {
+    return failed('simulation_reverted', decoded, true, result.error);
   }
+  if (typeof result.minResourceFee !== 'string' || !result.minResourceFee) {
+    return malformed('simulation has no minResourceFee');
+  }
+
   const auth: string[] = [];
+  let returnValue: string | undefined;
   if (Array.isArray(result.results) && result.results.length > 0) {
-    const first = result.results[0] as { auth?: unknown } | null;
+    const first = result.results[0] as { auth?: unknown; xdr?: unknown } | null;
     if (first && Array.isArray(first.auth)) {
       for (const a of first.auth) if (typeof a === 'string') auth.push(a);
     }
+    if (first && typeof first.xdr === 'string' && first.xdr) returnValue = first.xdr;
   }
+
+  let footprint: Footprint = EMPTY_FOOTPRINT;
+  if (typeof result.transactionData === 'string' && result.transactionData) {
+    try {
+      footprint = decodeFootprint(result.transactionData);
+    } catch {
+      return malformed('transactionData is not SorobanTransactionData XDR');
+    }
+  }
+
+  const events: string[] = [];
+  if (Array.isArray(result.events)) {
+    for (const ev of result.events) if (typeof ev === 'string') events.push(ev);
+  }
+
   const latestLedger =
     typeof result.latestLedger === 'number' && Number.isFinite(result.latestLedger)
       ? result.latestLedger
       : undefined;
-  return { ok: true, auth, ...(latestLedger !== undefined ? { latestLedger } : {}) };
+
+  let restorePreamble: RestorePreamble | undefined;
+  if (result.restorePreamble && typeof result.restorePreamble === 'object') {
+    const rp = result.restorePreamble as { minResourceFee?: unknown; transactionData?: unknown };
+    if (typeof rp.minResourceFee === 'string' && typeof rp.transactionData === 'string') {
+      restorePreamble = { minResourceFee: rp.minResourceFee, transactionData: rp.transactionData };
+    } else {
+      return malformed('restorePreamble is present but unreadable');
+    }
+  }
+
+  return {
+    ok: restorePreamble === undefined,
+    outcome: restorePreamble === undefined ? 'ok' : 'unknown',
+    decoded,
+    simulated: true,
+    auth,
+    ...(returnValue !== undefined ? { returnValue } : {}),
+    footprint,
+    events,
+    ...(latestLedger !== undefined ? { latestLedger } : {}),
+    ...(restorePreamble !== undefined ? { restorePreamble } : {}),
+  };
+}
+
+// The footprint's ledger keys, as base64 LedgerKey XDR, split by access.
+function decodeFootprint(transactionData: string): Footprint {
+  const td = XDR.SorobanTransactionData.fromXDR(transactionData, 'base64');
+  const fp = td.resources().footprint();
+  return {
+    readOnly: fp.readOnly().map((k) => k.toXDR('base64')),
+    readWrite: fp.readWrite().map((k) => k.toXDR('base64')),
+  };
 }
 
 // ── Stage 2: Auth ────────────────────────────────────────────────────────────
@@ -232,6 +324,79 @@ export async function screen(
   return { outcome, checked, hits };
 }
 
+// One high-severity reason per ingest failure mode (#52). Distinguishable on
+// purpose: "the network was down" and "this contract would fail" call for
+// different next steps, and neither may ever read as a clean scan.
+const CONFIRM_TAIL = ' — do not sign unless you’re certain.';
+function ingestReason(simulation: SimulationResult): ScanReason {
+  if (simulation.outcome === 'unknown') {
+    return {
+      code: 'state_archived',
+      severity: 'high',
+      title: 'Couldn’t verify — state needs restoring',
+      detail:
+        'Some of the ledger state this contract call touches is archived, so what it would do can’t be verified until that state is restored' +
+        CONFIRM_TAIL,
+    };
+  }
+  switch (simulation.failure) {
+    case 'undecodable':
+      return {
+        code: 'undecodable',
+        severity: 'high',
+        title: 'Couldn’t read this transaction',
+        detail:
+          'Lantern couldn’t decode this transaction and can’t verify it’s safe' + CONFIRM_TAIL,
+      };
+    case 'rpc_timeout':
+      return {
+        code: 'rpc_timeout',
+        severity: 'high',
+        title: 'The network didn’t answer in time',
+        detail:
+          'Soroban RPC didn’t respond before the deadline, so this contract call is unverified. Try again in a moment' +
+          CONFIRM_TAIL,
+      };
+    case 'rpc_transport':
+      return {
+        code: 'rpc_unreachable',
+        severity: 'high',
+        title: 'Couldn’t reach the network',
+        detail:
+          'Soroban RPC couldn’t be reached, so this contract call is unverified — this is a connection problem, not a verdict on the transaction' +
+          CONFIRM_TAIL,
+      };
+    case 'simulation_malformed':
+      return {
+        code: 'simulation_malformed',
+        severity: 'high',
+        title: 'The network’s answer couldn’t be read',
+        detail:
+          'Soroban RPC returned a response Lantern couldn’t interpret, so this contract call is unverified' +
+          CONFIRM_TAIL,
+      };
+    case 'simulation_reverted':
+      return {
+        code: 'simulation_reverted',
+        severity: 'high',
+        title: 'This transaction would fail',
+        detail:
+          'Simulating this contract call reports it would fail on-chain, so Lantern can’t tell what it does' +
+          CONFIRM_TAIL,
+      };
+    case 'simulation_unavailable':
+    default:
+      return {
+        code: 'simulation_unavailable',
+        severity: 'high',
+        title: 'Couldn’t simulate this transaction',
+        detail:
+          'Lantern couldn’t simulate this contract call and can’t verify what it does' +
+          CONFIRM_TAIL,
+      };
+  }
+}
+
 // ── Stage 5: Verdict ─────────────────────────────────────────────────────────
 // The only constructor of a `Verdict`, and the last stage allowed to decide
 // anything. Interim risk core: the shipped `scan()` heuristics (so the pipeline
@@ -250,17 +415,12 @@ export function buildVerdict(input: {
   const signals: Signal[] = [];
 
   if (!simulation.ok) {
-    reasons.push({
-      code: simulation.decoded ? 'simulation_failed' : 'undecodable',
-      severity: 'high',
-      title: simulation.decoded
-        ? 'Couldn’t simulate this transaction'
-        : 'Couldn’t read this transaction',
-      detail: simulation.decoded
-        ? 'Lantern couldn’t simulate this contract call and can’t verify what it does — do not sign unless you’re certain.'
-        : 'Lantern couldn’t decode this transaction and can’t verify it’s safe — do not sign unless you’re certain.',
+    reasons.push(ingestReason(simulation));
+    signals.push({
+      stage: 'ingest',
+      code: simulation.outcome === 'unknown' ? 'unknown' : 'fail_closed',
+      detail: `${simulation.failure ?? 'state_archived'}: ${simulation.error ?? 'archived state needs restoring'}`,
     });
-    signals.push({ stage: 'ingest', code: 'fail_closed', detail: simulation.error ?? 'unknown' });
   } else {
     signals.push({
       stage: 'ingest',

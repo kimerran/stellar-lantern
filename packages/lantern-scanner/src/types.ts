@@ -127,23 +127,59 @@ export interface RawSimulation {
     results?: unknown;
     latestLedger?: unknown;
     events?: unknown;
+    restorePreamble?: unknown;
+    stateChanges?: unknown;
   };
 }
 
 export type StageName = 'ingest' | 'auth' | 'effects' | 'screen' | 'verdict' | 'explain';
 
-// Stage 1 — Ingest. `ok: false` means the pipeline could not establish what the
-// transaction does (undecodable XDR, simulation failed, or a Soroban tx with
-// no simulation available) and every later stage must treat it as fail-closed.
+// Stage 1 — Ingest (#52). Every way the pipeline can fail to establish what a
+// transaction does, kept distinguishable so the verdict can say *which* — a
+// network that was down and a contract that would revert are different
+// conversations with the user. All of them fail closed.
+export type IngestFailure =
+  | 'undecodable' // the XDR is not a transaction envelope
+  | 'simulation_unavailable' // Soroban tx, but no simulate dependency was injected
+  | 'rpc_timeout' // the RPC did not answer within the deadline (after retries)
+  | 'rpc_transport' // network error / non-2xx (after retries)
+  | 'simulation_malformed' // 2xx, but the body is not a simulateTransaction result
+  | 'simulation_reverted'; // the contract itself would fail (`result.error`)
+
+// The footprint a simulation says the transaction touches, as base64 LedgerKey
+// XDR. `readWrite` is what the call may change.
+export interface Footprint {
+  readOnly: string[];
+  readWrite: string[];
+}
+
+export interface RestorePreamble {
+  minResourceFee: string;
+  transactionData: string;
+}
+
+// `ok: true` + `outcome: 'ok'` is the only state later stages may treat as a
+// verified simulation. `outcome: 'unknown'` is the third answer: the RPC ran
+// the call but reports archived state (`restorePreamble`), so the effects it
+// would have are not knowable until a restore — never a clean scan (the same
+// posture docs/blacklist-registry.md documents for the hot read).
 export interface SimulationResult {
   ok: boolean;
+  outcome: 'ok' | 'unknown' | 'failed';
+  failure?: IngestFailure;
   decoded: DecodedTx | null;
   // Whether a simulation was attempted; classic (non-Soroban) txs don't need one.
   simulated: boolean;
   error?: string;
   // Base64 SorobanAuthorizationEntry list from `results[0].auth` ([] if none).
   auth: string[];
+  // Base64 ScVal the host function returned (`results[0].xdr`), if any.
+  returnValue?: string;
+  footprint: Footprint;
+  // Base64 DiagnosticEvent XDR the simulation emitted, in order.
+  events: string[];
   latestLedger?: number;
+  restorePreamble?: RestorePreamble;
 }
 
 // Stage 2 — Auth. One node per invocation in a SorobanAuthorizationEntry tree.
