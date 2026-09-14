@@ -278,8 +278,14 @@ function toAuthNode(inv: XDR.SorobanAuthorizedInvocation, depth: number): AuthNo
       children,
     };
   }
-  // create-contract host functions (v1 and v2) carry no callable target.
-  return { kind: 'create_contract', depth, args: [], children };
+  // create-contract host functions carry no callable target. v1 has no
+  // arguments; v2 has constructor arguments, which are decoded so a
+  // deployment's constructor inputs (an admin address, say) stay visible.
+  const args =
+    fn.switch().name === 'sorobanAuthorizedFunctionTypeCreateContractV2HostFn'
+      ? fn.createContractV2HostFn().constructorArgs().map(decodeScVal)
+      : [];
+  return { kind: 'create_contract', depth, args, children };
 }
 
 function flatten(

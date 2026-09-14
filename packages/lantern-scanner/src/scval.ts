@@ -56,7 +56,10 @@ export function decodeScVal(val: xdr.ScVal): DecodedScVal {
     case 'scvString':
       return { type: 'string', value: val.str().toString() };
     case 'scvBytes':
-      return { type: 'bytes', hex: Buffer.from(val.bytes()).toString('hex') };
+      return {
+        type: 'bytes',
+        hex: Array.from(val.bytes(), (b) => b.toString(16).padStart(2, '0')).join(''),
+      };
     case 'scvAddress':
       return { type: 'address', value: Address.fromScVal(val).toString() };
     case 'scvVec':

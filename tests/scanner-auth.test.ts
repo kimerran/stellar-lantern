@@ -81,6 +81,44 @@ describe('auth: recorded entries', () => {
   });
 });
 
+// ── Create-contract entries ──────────────────────────────────────────────────
+describe('auth: create-contract entries', () => {
+  it('decodes a V2 deployment’s constructor arguments instead of hiding them', () => {
+    const create = new xdr.CreateContractArgsV2({
+      contractIdPreimage: xdr.ContractIdPreimage.contractIdPreimageFromAddress(
+        new xdr.ContractIdPreimageFromAddress({
+          address: new Address(SPENDER).toScAddress(),
+          salt: Buffer.alloc(32),
+        }),
+      ),
+      executable: xdr.ContractExecutable.contractExecutableWasm(Buffer.alloc(32)),
+      constructorArgs: [new XdrLargeInt('i128', '42').toScVal()],
+    });
+    const entry = new xdr.SorobanAuthorizationEntry({
+      credentials: xdr.SorobanCredentials.sorobanCredentialsSourceAccount(),
+      rootInvocation: new xdr.SorobanAuthorizedInvocation({
+        function:
+          xdr.SorobanAuthorizedFunction.sorobanAuthorizedFunctionTypeCreateContractV2HostFn(create),
+        subInvocations: [],
+      }),
+    });
+    const sim: SimulationResult = {
+      ok: true,
+      outcome: 'ok',
+      decoded: null,
+      simulated: true,
+      auth: [entry.toXDR('base64')],
+      footprint: { readOnly: [], readWrite: [] },
+      events: [],
+    };
+    const tree = auth(sim);
+    expect(tree.unparseable).toBe(0);
+    expect(tree.calls).toHaveLength(1);
+    expect(tree.calls[0]?.kind).toBe('create_contract');
+    expect(tree.calls[0]?.args).toEqual([{ type: 'i128', value: '42' }]);
+  });
+});
+
 // ── Three levels deep, both credential kinds ─────────────────────────────────
 describe('auth: deep tree (synthetic fixture)', () => {
   it('flattens every call in pre-order with the correct depth and path', async () => {
