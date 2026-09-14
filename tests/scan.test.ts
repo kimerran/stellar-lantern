@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { Account, Contract, nativeToScVal, Networks, Operation, TransactionBuilder } from '@stellar/stellar-sdk';
-import { scan, DEMO_FLAGGED_ADDRESSES, isReportedAddress, sampleVerdict, analyzeMessage, decodeTransaction, explainTransaction } from '@lantern/scanner';
+import {
+  scan,
+  DEMO_FLAGGED_ADDRESSES,
+  isReportedAddress,
+  sampleVerdict,
+  analyzeMessage,
+  decodeTransaction,
+  explainTransaction,
+} from '@lantern/scanner';
 import { buildTransferXdr } from '@core/stellar/tx';
 
 const SOURCE = 'GDRXE2BQUC3AZNPVFSCEZ76NJ3WWL25FYFK6RGZGIEKWE4SOOHSUJUJ6';
