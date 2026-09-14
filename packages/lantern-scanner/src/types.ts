@@ -103,6 +103,7 @@ export const ACTION_FOR: Record<RiskLevel, ScanAction> = {
 };
 
 import type { DecodedScVal } from './scval';
+import type { RegistryEntry, ScreenAnswer } from './registry';
 
 // ── D2 pipeline (#51) ────────────────────────────────────────────────────────
 // Six stages, one request in, one result out:
@@ -398,15 +399,24 @@ export interface EffectSet {
 
 // Stage 4 — Screen. Three outcomes, never two: a registry that could not be
 // reached is not the same as a clean result.
-export type ScreenOutcome = 'clean' | 'flagged' | 'unavailable';
+export type ScreenOutcome = 'clean' | 'flagged' | 'unknown';
 export interface ScreenHit {
   address: string;
   source: string; // 'demo-list' | 'registry' | …
+  // The registry entry behind the flag (#57): reporter, reason, report count
+  // — for the verdict's copy and the explainer.
+  entry?: RegistryEntry;
 }
 export interface ScreenResult {
   outcome: ScreenOutcome;
   checked: string[];
   hits: ScreenHit[];
+  // Every address whose answer was `unknown` (archived entry, RPC failure,
+  // timeout, no registry configured), with why. Never folded into `clean`.
+  unknown: Array<{ address: string; reason: string }>;
+  // Each address's full answer, including readable-but-not-flagged entries
+  // (Disputed / Revoked).
+  answers: Array<{ address: string; answer: ScreenAnswer }>;
 }
 
 // Audit trail: one line per thing a stage evaluated, whether or not it
