@@ -39,7 +39,10 @@ export type {
   Footprint,
   RestorePreamble,
   SimulationResult,
+  AuthCredentials,
   AuthNode,
+  AuthEntry,
+  AuthCall,
   AuthTree,
   EffectKind,
   Effect,
@@ -75,3 +78,4 @@ export {
   type RpcSimulateOptions,
   type RpcFailureKind,
 } from './rpc';
+export { decodeScVal, type DecodedScVal } from './scval';

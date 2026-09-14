@@ -92,6 +92,8 @@ export const ACTION_FOR: Record<RiskLevel, ScanAction> = {
   high: 'block_confirm',
 };
 
+import type { DecodedScVal } from './scval';
+
 // ── D2 pipeline (#51) ────────────────────────────────────────────────────────
 // Six stages, one request in, one result out:
 //   ScanRequest → ingest → auth → effects → screen → verdict → explain → ScanResult
@@ -182,23 +184,67 @@ export interface SimulationResult {
   restorePreamble?: RestorePreamble;
 }
 
-// Stage 2 — Auth. One node per invocation in a SorobanAuthorizationEntry tree.
+// Stage 2 — Auth (#53). Every SorobanAuthorizationEntry the simulation
+// requires, parsed into a typed tree and flattened into an ordered call list,
+// so stage 3 computes effects from *every* authorised call — a `transfer` two
+// levels down is as visible as the root.
+
+// Who is authorising. `source_account`: the transaction's source signs for it
+// implicitly. `address`: a specific address must sign this entry — that is
+// the one to show the user, because it is exactly what they are approving.
+export type AuthCredentials =
+  | { kind: 'source_account' }
+  | {
+      kind: 'address';
+      address: string; // G… or C…
+      nonce: string; // i64, as a decimal string
+      signatureExpirationLedger: number;
+    };
+
 export interface AuthNode {
+  kind: 'contract' | 'create_contract';
+  depth: number; // 0 = the entry's root invocation
   contractId?: string; // C… address; absent for create-contract nodes
   functionName?: string;
+  args: DecodedScVal[]; // lossless, see scval.ts
   children: AuthNode[];
 }
+
+export interface AuthEntry {
+  credentials: AuthCredentials;
+  root: AuthNode;
+}
+
+// One row of the flattened tree: what stage 3 iterates. `path` is the index
+// route from the entry's root (e.g. [0, 1] = root → 1st child → 2nd child).
+export interface AuthCall {
+  entryIndex: number;
+  path: number[];
+  depth: number;
+  kind: 'contract' | 'create_contract';
+  credentials: AuthCredentials;
+  contractId?: string;
+  functionName?: string;
+  args: DecodedScVal[];
+}
+
 export interface AuthTree {
+  entries: AuthEntry[];
+  // Pre-order flattening of every entry, in order: stage 3's input.
+  calls: AuthCall[];
+  // Root invocations only — kept for callers that want the shape.
   roots: AuthNode[];
   // Number of invocations at depth ≥ 1 — a nested call the top-level op
   // never shows. The product thesis: these must never be invisible.
   nestedCount: number;
+  maxDepth: number;
   // Entries the simulation returned that could not be parsed. Any value > 0
   // means the tree is incomplete and the verdict must fail closed: an
-  // authorisation the scanner cannot read is one it cannot vouch for.
+  // authorisation the scanner cannot read is one it cannot vouch for — and
+  // an empty `calls` list next to `unparseable > 0` must never be read as
+  // "this call authorises nothing".
   unparseable: number;
-  // False until #53 attaches semantics (which nodes move money, whose auth
-  // they need). The skeleton only parses structure.
+  // True once the walk has attached credentials and decoded arguments (#53).
   analyzed: boolean;
 }
 

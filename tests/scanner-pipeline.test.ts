@@ -80,6 +80,7 @@ function requestFor(f: Fixture): ScanRequest {
 const CORPUS = [
   'archived-state',
   'classic-payment',
+  'deep-auth',
   'path-payment',
   'sac-transfer',
   'sep41-approve',
@@ -105,6 +106,7 @@ describe('fixture corpus', () => {
         'nested-subinvocation',
         'unknown-contract',
         'archived-state',
+        'deep-auth',
       ];
       if (soroban.includes(name)) expect(f.simulation).not.toBeNull();
       else expect(f.simulation).toBeNull();
@@ -180,7 +182,7 @@ describe('auth', () => {
     expect(tree.roots[0]?.functionName).toBe('transfer');
     expect(tree.roots[0]?.children).toHaveLength(0);
     expect(tree.nestedCount).toBe(0);
-    expect(tree.analyzed).toBe(false);
+    expect(tree.analyzed).toBe(true);
   });
 
   it('surfaces the nested sub-invocation a Blend submit hides', async () => {
@@ -196,7 +198,15 @@ describe('auth', () => {
 
   it('returns an empty tree for a classic transaction', async () => {
     const tree = auth(await ingest(requestFor(fixture('classic-payment'))));
-    expect(tree).toEqual({ roots: [], nestedCount: 0, unparseable: 0, analyzed: false });
+    expect(tree).toEqual({
+      entries: [],
+      calls: [],
+      roots: [],
+      nestedCount: 0,
+      maxDepth: 0,
+      unparseable: 0,
+      analyzed: true,
+    });
   });
 
   it('counts an unparseable entry instead of throwing or silently dropping it', () => {
