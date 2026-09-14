@@ -113,10 +113,10 @@ same posture `docs/blacklist-registry.md` documents for the hot read. An
 authorisation entry the scanner cannot parse also fails closed
 (`auth_unreadable`).
 
-**What is skeleton.** The stage *bodies* after 3 are interim: `screen` defaults to the demo list (#57 injects the D1
-registry); `buildVerdict` reuses today's `scan()` heuristics plus the
-pipeline's own fail-closed and screening reasons (#58 is the real risk core).
-`signals[]` on the verdict is the audit trail of what each stage evaluated.
+**What is skeleton.** `buildVerdict` still reuses today's `scan()` heuristics
+plus the pipeline's own fail-closed, screening, allowance and unverified
+reasons (#58 is the real risk core). `signals[]` on the verdict is the audit
+trail of what each stage evaluated.
 
 ### Stage 2 — Auth (#53)
 
@@ -230,6 +230,43 @@ are different claims; only the first is made.
 and says whether simulation showed balance changes; `unverified_contract`
 and `observed_balance_changes` signals carry the rows for stage 5.
 
+### Stage 4 — Screen against the D1 registry (#57)
+
+`registry.ts` is the O(1) hot read from `docs/blacklist-registry.md`, typed:
+`entryLedgerKey(contractId, subject)` derives the `DataKey::Entry(subject)`
+ledger key client-side, `getLedgerEntries` reads it — no source account, no
+signing, no fee — and `decodeEntry` returns the contract's nine-field
+`RegistryEntry` (subject, reporter, reason, status, evidence, timestamps,
+report count, index), refusing any other shape. `tests/scanner-screen.test.ts`
+pins the derivation to the doc's worked example and to
+`scripts/hot-read-blacklist-registry.mjs`, so the CLI and the package cannot
+drift.
+
+`createRegistryScreener({ rpcUrl, contractId, timeoutMs, ttlMs, fetchImpl,
+now })` is `PipelineDeps.screen`: one read per address, bounded by a deadline
+(default 4 s), TTL-cached per address (default 60 s; in-flight lookups
+shared; `unknown` answers are not cached so a flaky RPC is retried next
+scan). `TESTNET_REGISTRY_ID` is the deployed registry.
+
+**Three outcomes, never two.** `flagged` is `status === 'Active'` only —
+Disputed and Revoked entries are readable (in `ScreenResult.answers[]`) but do
+not warn. An archived entry (`liveUntilLedgerSeq` behind `latestLedger`, or
+zero), an RPC failure, a timeout, a malformed body or no registry at all is
+`unknown`, listed in `ScreenResult.unknown[]` with its reason, and the verdict
+adds a `medium` `screen_unknown` reason: unknown never collapses to clean.
+
+**Every counterparty** is screened: the per-op list, every address that
+receives value at any auth depth, every allowance spender, every contract
+touched — never the signer, each once, concurrently. A flagged hit carries
+its `entry`, and the `reported_address` reason names the reason, reporter and
+report count.
+
+**The demo deny-list is retired from the live path.** With a screener
+injected it is never consulted; `scan()`'s testnet-always demo branch no
+longer contributes `reported_address` to the pipeline's verdict. Without a
+screener, the demo list answers only in a `__FEATURE_DEMO_AFFORDANCES__`
+build; otherwise every address is `unknown`.
+
 ### Fixture corpus
 
 `fixtures/*.json` — one file per case, each with real testnet XDR and, for
@@ -249,7 +286,10 @@ recording with `mint` / `burn` / `clawback` sub-invocations plus the
 look-alikes that must not be recognised (`make-token-admin.mjs`; the USDC
 SAC's admin is not ours). The bytes are real XDR; the scenarios are not
 recordings. `token-metadata.json` is a real `getLedgerEntries` recording of
-the XLM and USDC SAC instance entries (`record-token-metadata.mjs`). Tests load them through Vite
+the XLM and USDC SAC instance entries (`record-token-metadata.mjs`), and
+`registry-hot-read.json` a real one of the D1 registry's `Entry` for the demo
+flagged address (a live Active entry) and a never-reported one
+(`record-registry.mjs`). Tests load them through Vite
 (`import.meta.glob`) and never open a socket. Re-record after a testnet reset
 with `node packages/lantern-scanner/fixtures/record.mjs` (needs a funded
 source account; nothing is signed or submitted). The `classic-*` files need
@@ -268,11 +308,9 @@ later D2 slices (#51–#59), and none of it is here today:
   layout; a custom token that keeps its metadata elsewhere resolves to
   `null` (raw amounts, `decimals: null`) rather than being probed with a
   simulated `decimals()` call.
-- **No on-chain registry screening.** `isReportedAddress` checks a single
-  hard-coded demo address (on testnet in every build; elsewhere only when the
-  host defines `__FEATURE_DEMO_AFFORDANCES__` as `true`). The D1 blacklist
-  registry (`docs/blacklist-registry.md`) is **not** consulted yet — that is
-  #57.
+- **`scan()` still uses the demo deny-list.** The synchronous `scan()` the
+  wallet calls today checks a single hard-coded demo address; only the
+  pipeline screens against the D1 registry. D3 rewires the wallet.
 - **No AI explanation.** `explainTransaction` is rules-based prose.
 
 ## Install / usage
@@ -328,12 +366,13 @@ src/decimal.ts    exact 7-decimal arithmetic over bigint stroops (#54)
 src/token.ts      SEP-41 / SAC recognition, metadata resolver + cache, approvals (#55)
 src/unverified.ts the raw, labelled fallback for undecoded calls (#56)
 src/observed.ts   balance changes from the simulation's stateChanges (#56)
+src/registry.ts   D1 registry hot read, three-way answers, TTL-cached screener (#57)
 fixtures/         offline corpus: XDR + recorded RPC bodies, and record.mjs
 ```
 
 ## Tests
 
-Live in the repo's `tests/` (`scanner-pipeline.test.ts`, `scanner-ingest.test.ts`, `scanner-auth.test.ts`, `scanner-effects.test.ts`, `scanner-token.test.ts`, `scanner-unverified.test.ts`, `scan.test.ts`, `swap-scan.test.ts`,
+Live in the repo's `tests/` (`scanner-pipeline.test.ts`, `scanner-ingest.test.ts`, `scanner-auth.test.ts`, `scanner-effects.test.ts`, `scanner-token.test.ts`, `scanner-unverified.test.ts`, `scanner-screen.test.ts`, `scan.test.ts`, `swap-scan.test.ts`,
 `guardians.test.ts`, `tx.test.ts`, `invoke.test.ts`, `blend*.test.ts`) and run
 with `npm test` from the repo root — no network required.
 

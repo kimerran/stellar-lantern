@@ -293,19 +293,19 @@ describe('screen', () => {
     expect(res.hits[0]?.source).toBe('registry');
   });
 
-  it('is "unavailable", not "clean", when the lookup cannot be made', async () => {
+  it('is "unknown", not "clean", when the lookup cannot be made', async () => {
     const f = fixture('classic-payment');
     const sim = await ingest(requestFor(f));
     const nulls = await screen(effects(sim, auth(sim)), requestFor(f), {
       isFlagged: async () => null,
     });
-    expect(nulls.outcome).toBe('unavailable');
+    expect(nulls.outcome).toBe('unknown');
     const throws = await screen(effects(sim, auth(sim)), requestFor(f), {
       isFlagged: async () => {
         throw new Error('rpc down');
       },
     });
-    expect(throws.outcome).toBe('unavailable');
+    expect(throws.outcome).toBe('unknown');
   });
 });
 
@@ -391,7 +391,7 @@ describe('buildVerdict', () => {
     const f = fixture('classic-payment');
     const v = await verdictFor(f, { isFlagged: async () => null });
     expect(v.risk).toBe('medium');
-    expect(v.reasons.map((r) => r.code)).toContain('screen_unavailable');
+    expect(v.reasons.map((r) => r.code)).toContain('screen_unknown');
   });
 
   it('carries the shipped heuristics (never weaker than scan()) and ignores forceScenario', async () => {

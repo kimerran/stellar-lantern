@@ -104,3 +104,19 @@ export {
   type TokenCall,
   type RawLedgerEntries,
 } from './token';
+export {
+  entryLedgerKey,
+  decodeEntry,
+  interpretLedgerEntries,
+  createRegistryScreener,
+  TESTNET_REGISTRY_ID,
+  DEFAULT_SCREEN_TIMEOUT_MS,
+  DEFAULT_SCREEN_TTL_MS,
+  type RegistryEntry,
+  type RegistryStatus,
+  type ScreenAnswer,
+  type ScreenLookup,
+  type ScreenOutcomeFor,
+  type RegistryScreenerOptions,
+  type RawLedgerEntriesBody,
+} from './registry';

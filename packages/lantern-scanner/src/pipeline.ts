@@ -13,7 +13,7 @@
 // The wallet still calls the synchronous `scan()` in engine.ts; this async
 // pipeline lands alongside it and D3 rewires the wallet onto it.
 
-import { Address, xdr as XDR } from '@stellar/stellar-sdk';
+import { Address, MuxedAccount, StrKey, xdr as XDR } from '@stellar/stellar-sdk';
 import { ACTION_FOR, type ScanReason } from './types';
 import type {
   AuthCall,
@@ -47,6 +47,7 @@ import { RpcError } from './rpc';
 import { observedDeltas } from './observed';
 import { unverifiedCalls } from './unverified';
 import { decodeScVal } from './scval';
+import type { ScreenAnswer, ScreenLookup } from './registry';
 import { aggregate, classicDeltas, opSource } from './effects';
 import {
   LONG_LIVED_ALLOWANCE_LEDGERS,
@@ -62,7 +63,12 @@ import {
 export interface PipelineDeps {
   // Stage 1: run `simulateTransaction` and return the raw JSON-RPC body.
   simulate?: (xdr: string) => Promise<RawSimulation>;
-  // Stage 4: is this address flagged? `null` = the lookup could not be made.
+  // Stage 4: screen an address against the D1 registry (#57). The live one
+  // is createRegistryScreener; absent, the demo deny-list answers only when
+  // the host built with DEMO_AFFORDANCES on — otherwise every address is
+  // `unknown` (never a silent clean).
+  screen?: ScreenLookup;
+  // Simpler adapter kept for callers and tests: true / false / null (unknown).
   isFlagged?: (address: string) => Promise<boolean | null>;
   // Stage 3b: token metadata (code / decimals / issuer) per contract id.
   // Wrap with createTokenMetadataCache; createRpcTokenResolver is the live
@@ -496,38 +502,91 @@ export function effects(
 export async function screen(
   effectSet: EffectSet,
   request: ScanRequest,
-  deps: Pick<PipelineDeps, 'isFlagged'> = {},
+  deps: Pick<PipelineDeps, 'screen' | 'isFlagged'> = {},
 ): Promise<ScreenResult> {
-  // Every counterparty: the coarse per-op list, plus every address that
-  // receives value at any auth depth (3b) and every allowance spender.
-  const self = request.context.fromAddress;
+  // Every counterparty: the coarse per-op list, every address that receives
+  // value at any auth depth (3b), every allowance spender, and every contract
+  // touched. The signer is not a counterparty of their own transaction.
+  // A muxed destination (M…) is screened as its base G…: the registry stores
+  // `Entry(G…)`, and a flagged account wrapped in a mux must not screen clean.
+  const self = baseAccount(request.context.fromAddress);
   const checked = Array.from(
-    new Set([
-      ...effectSet.effects.map((e) => e.counterparty).filter((c): c is string => !!c),
-      ...effectSet.deltas
-        .filter((d) => d.direction === 'in' && d.address !== self)
-        .map((d) => d.address),
-      ...effectSet.approvals.map((a) => a.spender),
-    ]),
-  );
-  const lookup =
-    deps.isFlagged ??
-    (async (address: string) =>
-      isReportedAddress(address, request.networkPassphrase, __FEATURE_DEMO_AFFORDANCES__));
+    new Set(
+      [
+        ...effectSet.effects.map((e) => e.counterparty).filter((c): c is string => !!c),
+        ...effectSet.deltas.filter((d) => d.direction === 'in').map((d) => d.address),
+        ...effectSet.approvals.map((a) => a.spender),
+        ...effectSet.contractsTouched,
+      ].map(baseAccount),
+    ),
+  ).filter((a) => a !== self);
+  const lookup = screenLookup(deps, request.networkPassphrase);
   const hits: ScreenResult['hits'] = [];
-  let unavailable = false;
-  for (const address of checked) {
-    let flagged: boolean | null;
-    try {
-      flagged = await lookup(address);
-    } catch {
-      flagged = null;
+  const unknown: ScreenResult['unknown'] = [];
+  const answers: ScreenResult['answers'] = [];
+  // One round-trip per address at most, and they run concurrently; the
+  // registry screener's TTL cache keeps repeats off the network.
+  const results = await Promise.all(
+    checked.map(async (address): Promise<ScreenAnswer> => {
+      try {
+        return await lookup(address);
+      } catch (e) {
+        return {
+          outcome: 'unknown',
+          reason: e instanceof Error ? e.message : 'lookup threw',
+          source: 'registry',
+        };
+      }
+    }),
+  );
+  checked.forEach((address, i) => {
+    const answer = results[i]!;
+    answers.push({ address, answer });
+    if (answer.outcome === 'flagged') {
+      hits.push({
+        address,
+        source: answer.source,
+        ...(answer.entry ? { entry: answer.entry } : {}),
+      });
+    } else if (answer.outcome === 'unknown') {
+      unknown.push({ address, reason: answer.reason ?? 'unknown' });
     }
-    if (flagged === null) unavailable = true;
-    else if (flagged) hits.push({ address, source: deps.isFlagged ? 'registry' : 'demo-list' });
+  });
+  const outcome = hits.length > 0 ? 'flagged' : unknown.length > 0 ? 'unknown' : 'clean';
+  return { outcome, checked, hits, unknown, answers };
+}
+
+// M… → its base G…; anything else unchanged.
+function baseAccount(address: string): string {
+  return StrKey.isValidMed25519PublicKey(address)
+    ? MuxedAccount.fromAddress(address, '0').baseAccount().accountId()
+    : address;
+}
+
+// Which flag source answers. A registry screener wins outright; the demo
+// deny-list is confined to DEMO_AFFORDANCES builds and never shadows a real
+// registry answer; with neither, the honest answer is `unknown`.
+function screenLookup(
+  deps: Pick<PipelineDeps, 'screen' | 'isFlagged'>,
+  networkPassphrase: string,
+): ScreenLookup {
+  if (deps.screen) return deps.screen;
+  if (deps.isFlagged) {
+    const f = deps.isFlagged;
+    return async (address) => {
+      const r = await f(address);
+      if (r === null)
+        return { outcome: 'unknown', reason: 'lookup_unavailable', source: 'registry' };
+      return { outcome: r ? 'flagged' : 'not_flagged', source: 'registry' };
+    };
   }
-  const outcome = hits.length > 0 ? 'flagged' : unavailable ? 'unavailable' : 'clean';
-  return { outcome, checked, hits };
+  if (__FEATURE_DEMO_AFFORDANCES__) {
+    return async (address) => ({
+      outcome: isReportedAddress(address, networkPassphrase, true) ? 'flagged' : 'not_flagged',
+      source: 'demo-list',
+    });
+  }
+  return async () => ({ outcome: 'unknown', reason: 'no_registry', source: 'none' });
 }
 
 // One high-severity reason per ingest failure mode (#52). Distinguishable on
@@ -665,7 +724,7 @@ export function buildVerdict(input: {
   signals.push({
     stage: 'screen',
     code: screenResult.outcome,
-    detail: `${screenResult.checked.length} checked, ${screenResult.hits.length} hits`,
+    detail: `${screenResult.checked.length} checked, ${screenResult.hits.length} hits, ${screenResult.unknown.length} unknown`,
   });
 
   // Today's heuristics, with the demo override stripped: the pipeline's verdict
@@ -683,6 +742,9 @@ export function buildVerdict(input: {
     const hasUnverified = effectSet.unverified.length > 0;
     for (const r of legacy.reasons) {
       if (hasUnverified && r.code === 'contract_call') continue;
+      // scan()'s testnet-always demo deny-list must not shadow the registry:
+      // stage 4 is the only source of `reported_address` here.
+      if (r.code === 'reported_address') continue;
       reasons.push(r);
     }
     signals.push({
@@ -759,19 +821,31 @@ export function buildVerdict(input: {
 
   for (const hit of screenResult.hits) {
     if (reasons.some((r) => r.code === 'reported_address')) break;
+    const short = `${hit.address.slice(0, 4)}…${hit.address.slice(-4)}`;
+    const e = hit.entry;
     reasons.push({
       code: 'reported_address',
       severity: 'high',
       title: 'Reported address',
-      detail: `${hit.address.slice(0, 4)}…${hit.address.slice(-4)} has been reported as a scam address (${hit.source}).`,
+      detail: e
+        ? `${short} is on the Lantern blacklist registry: reported as ${e.reason} by ${e.reporter.slice(0, 4)}…${e.reporter.slice(-4)}, ${e.reports} report${e.reports === 1 ? '' : 's'}.`
+        : `${short} has been reported as a scam address (${hit.source}).`,
     });
   }
-  if (screenResult.outcome === 'unavailable' && !reasons.some((r) => r.severity === 'high')) {
+  // Unknown is a third answer: an archived entry, an RPC failure, a timeout
+  // or no registry at all. It never reads as clean.
+  if (screenResult.unknown.length > 0 && !reasons.some((r) => r.severity === 'high')) {
+    const why = screenResult.unknown[0]!.reason;
     reasons.push({
-      code: 'screen_unavailable',
+      code: 'screen_unknown',
       severity: 'medium',
       title: 'Couldn’t check the recipient',
-      detail: 'The reported-address registry couldn’t be reached, so this recipient is unverified.',
+      detail:
+        why === 'archived'
+          ? 'This recipient’s registry entry is archived, so whether it is still flagged can’t be read until it is restored — treat it as unverified.'
+          : why === 'no_registry'
+            ? 'No reported-address registry is configured, so this recipient is unverified.'
+            : 'The reported-address registry couldn’t be reached, so this recipient is unverified.',
     });
   }
 
