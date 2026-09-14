@@ -1,0 +1,9 @@
+[
+  "classic-payment",
+  "path-payment",
+  "sac-transfer",
+  "sep41-approve",
+  "nested-subinvocation",
+  "unknown-contract",
+  "malformed-xdr"
+]

@@ -28,3 +28,37 @@ export {
   DEMO_FLAGGED_ADDRESSES,
   type ScanInput,
 } from './engine';
+
+// D2 pipeline (#51). Async, six stages, verdict frozen before the explainer.
+export type {
+  DeepReadonly,
+  ScanRequest,
+  RawSimulation,
+  StageName,
+  SimulationResult,
+  AuthNode,
+  AuthTree,
+  EffectKind,
+  Effect,
+  EffectSet,
+  ScreenOutcome,
+  ScreenHit,
+  ScreenResult,
+  Signal,
+  Verdict,
+  Explanation,
+  ExplainInput,
+  Explainer,
+  ScanResult,
+} from './types';
+export {
+  ingest,
+  auth,
+  effects,
+  screen,
+  buildVerdict,
+  explainRulesBased,
+  runPipeline,
+  DEFAULT_EXPLAIN_TIMEOUT_MS,
+  type PipelineDeps,
+} from './pipeline';

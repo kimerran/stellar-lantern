@@ -35,16 +35,84 @@ same.
 - `isReportedAddress` / `DEMO_FLAGGED_ADDRESSES` — the *demo* deny-list. See
   the honesty note below.
 
+## The six-stage pipeline (#51)
+
+Alongside the synchronous `scan()` the wallet calls today, the package exports
+the async pipeline every later D2 slice builds into:
+
+```
+ScanRequest → ingest → auth → effects → screen → verdict → explain → ScanResult
+```
+
+```ts
+import { runPipeline } from '@lantern/scanner';
+
+const result = await runPipeline(
+  { xdr, networkPassphrase, context },
+  {
+    simulate: (xdr) => rpc.simulateTransaction(xdr), // raw JSON-RPC body (#52)
+    isFlagged: (address) => registry.isFlagged(address), // true | false | null (#57)
+    explain: modelExplainer, // ({ verdict, effects }) => Promise<string> (#59)
+  },
+);
+result.risk; // 'low' | 'medium' | 'high'
+result.explanation; // prose — and nothing else the explainer returned
+```
+
+Each stage (`ingest`, `auth`, `effects`, `screen`, `buildVerdict`,
+`explainRulesBased`) is exported and testable on its own; `runPipeline` is the
+only thing that knows the order. Everything external is injected through
+`PipelineDeps`, so the suite runs entirely from `fixtures/`.
+
+**The invariant.** `buildVerdict` is the only constructor of a `Verdict`; the
+type is deeply `readonly` and the object is `Object.freeze`d recursively
+before stage 6 sees it. The explainer's signature is
+`({ verdict: Readonly<Verdict>, effects }) => Promise<string>` — it returns a
+string, never a verdict. The orchestrator copies `risk` / `action` /
+`reasons` from the frozen verdict; a non-string, empty or thrown explainer
+result — or one that has not settled within `explainTimeoutMs` (default
+5 s) — is replaced by the rules-based sentence (`explanationSource:
+'fallback'`) and can reach no field but `explanation`. The `EffectSet` the
+explainer receives is deep-frozen too, so it cannot corrupt the stage-3
+output `ScanResult` carries. The AI layer cannot change risk by
+construction, not by policy.
+
+**Fail-closed today.** Malformed XDR, a Soroban transaction with no
+simulation, a simulation the RPC rejects, or an authorisation entry the
+scanner cannot parse all produce a `high` / `block_confirm` verdict with an
+`undecodable` / `simulation_failed` / `auth_unreadable` reason.
+
+**What is skeleton.** The stage *bodies* are interim: `auth` parses the
+`SorobanAuthorizationEntry` tree structurally (contract, function, children)
+but attaches no semantics (`analyzed: false`, #53); `effects` maps decoded ops
+to coarse kinds and reports `coverage: 'partial'` whenever a contract call is
+present (#54–#56); `screen` defaults to the demo list (#57 injects the D1
+registry); `buildVerdict` reuses today's `scan()` heuristics plus the
+pipeline's own fail-closed and screening reasons (#58 is the real risk core).
+`signals[]` on the verdict is the audit trail of what each stage evaluated.
+
+### Fixture corpus
+
+`fixtures/*.json` — one file per case, each with real testnet XDR and, for
+Soroban cases, the **raw** `simulateTransaction` body as the RPC returned it:
+classic payment, path payment, SAC `transfer`, SEP-41 `approve`, a Blend
+`submit` whose auth tree nests a `transfer` sub-invocation, a call to an
+undeployed contract, and malformed XDR. Tests load them through Vite
+(`import.meta.glob`) and never open a socket. Re-record after a testnet reset
+with `node packages/lantern-scanner/fixtures/record.mjs` (needs a funded
+source account; nothing is signed or submitted).
+
 ## What it does **not** do (yet)
 
 Be honest with users about this — the SOW's six-stage pipeline lands in
 later D2 slices (#51–#59), and none of it is here today:
 
-- **No RPC simulation.** The verdict is derived from the XDR alone; nothing is
-  simulated, so effects that only appear at execution time are invisible.
-- **No `SorobanAuthorizationEntry` tree walk.** A nested sub-invocation that
-  moves money is *not* surfaced. `invokeHostFunction` is flagged as a
-  contract call and nothing more.
+- **No RPC client.** The pipeline consumes a simulation you inject; `scan()`
+  reads the XDR alone. The live client with timeout and backoff is #52.
+- **No semantic `SorobanAuthorizationEntry` walk.** The pipeline parses the
+  tree's shape and counts nested invocations, but does not yet say which of
+  them move money or whose authorisation they consume (#53). `scan()` flags
+  `invokeHostFunction` as a contract call and nothing more.
 - **No SEP-41 / SAC token-interface decoding.** `transfer`, `approve` and
   friends on a token contract are not turned into structured effects.
 - **No on-chain registry screening.** `isReportedAddress` checks a single
@@ -99,11 +167,13 @@ src/paste.ts      pasted message → MessageVerdict
 src/defi.ts       curated DeFi function-name descriptions
 src/format.ts     address / amount display helpers (copied from the wallet so
                   the package has no import back into it)
+src/pipeline.ts   the six stages + runPipeline (#51)
+fixtures/         offline corpus: XDR + recorded RPC bodies, and record.mjs
 ```
 
 ## Tests
 
-Live in the repo's `tests/` (`scan.test.ts`, `swap-scan.test.ts`,
+Live in the repo's `tests/` (`scanner-pipeline.test.ts`, `scan.test.ts`, `swap-scan.test.ts`,
 `guardians.test.ts`, `tx.test.ts`, `invoke.test.ts`, `blend*.test.ts`) and run
 with `npm test` from the repo root — no network required.
 

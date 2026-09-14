@@ -1,0 +1,10 @@
+{
+  "name": "malformed-xdr",
+  "description": "Not a transaction envelope at all; the pipeline must fail closed.",
+  "networkPassphrase": "Test SDF Network ; September 2015",
+  "source": "GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK",
+  "recordedAt": "2026-09-14T02:58:12.621Z",
+  "rpc": null,
+  "xdr": "AAAAAgAAAABub3QtYS10cmFuc2FjdGlvbg==",
+  "simulation": null
+}
