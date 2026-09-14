@@ -1,0 +1,10 @@
+{
+  "name": "path-payment",
+  "description": "pathPaymentStrictSend: 10 XLM → at least 9 USDC, proceeds to the source itself.",
+  "networkPassphrase": "Test SDF Network ; September 2015",
+  "source": "GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK",
+  "recordedAt": "2026-09-14T02:58:11.445Z",
+  "rpc": null,
+  "xdr": "AAAAAgAAAAAY0gqcnifD/QFRi3Um28AFmWZwoXTXZlkgmYh/UZB/SQAAAGQANjQYAAAATAAAAAEAAAAAAAAAAAAAAABqp2PvAAAAAAAAAAEAAAAAAAAADQAAAAAAAAAABfXhAAAAAAAY0gqcnifD/QFRi3Um28AFmWZwoXTXZlkgmYh/UZB/SQAAAAFVU0RDAAAAAEI+fQXy7K+/7BkrIVo/G+lq7bjY5wJUq+NBPgIH3layAAAAAAVdSoAAAAAAAAAAAAAAAAA=",
+  "simulation": null
+}
