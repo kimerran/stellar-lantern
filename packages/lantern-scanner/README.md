@@ -113,14 +113,38 @@ same posture `docs/blacklist-registry.md` documents for the hot read. An
 authorisation entry the scanner cannot parse also fails closed
 (`auth_unreadable`).
 
-**What is skeleton.** The stage *bodies* are interim: `auth` parses the
-`SorobanAuthorizationEntry` tree structurally (contract, function, children)
-but attaches no semantics (`analyzed: false`, #53); `effects` maps decoded ops
+**What is skeleton.** The stage *bodies* after 1 and 2 are interim: `effects` maps decoded ops
 to coarse kinds and reports `coverage: 'partial'` whenever a contract call is
 present (#54–#56); `screen` defaults to the demo list (#57 injects the D1
 registry); `buildVerdict` reuses today's `scan()` heuristics plus the
 pipeline's own fail-closed and screening reasons (#58 is the real risk core).
 `signals[]` on the verdict is the audit trail of what each stage evaluated.
+
+### Stage 2 — Auth (#53)
+
+`auth(simulation)` walks every `SorobanAuthorizationEntry` the simulation
+requires and answers *who is authorising what*:
+
+- **Credentials** — `{ kind: 'source_account' }` (the transaction source
+  signs implicitly) or `{ kind: 'address', address, nonce,
+  signatureExpirationLedger }` (a specific address must sign this entry —
+  exactly what the user is approving).
+- **Root + recursive sub-invocations** — `entries[]` keeps the tree
+  (`AuthNode`: `kind`, `depth`, `contractId`, `functionName`, `args`,
+  `children`); `calls[]` is its pre-order flattening with `entryIndex`,
+  `path` and `depth`, so stage 3 computes effects from *every* authorised
+  call. A `transfer` two levels down is a row like any other. `nestedCount`
+  and `maxDepth` summarise it.
+- **Arguments** are decoded losslessly by `decodeScVal` (`src/scval.ts`):
+  addresses as `G…`/`C…`, all integers as decimal strings (`i128` and
+  `u256` don't fit a JS number), symbols/strings as text, bytes as hex,
+  `Vec`/`Map` structurally, and anything without a human form kept as its
+  base64 XDR under `{ type: 'opaque' }`.
+- **Fail closed** — an entry that cannot be parsed is counted in
+  `unparseable`, the good entries are still walked, and the verdict is
+  `high` / `block_confirm` with `auth_unreadable`. An empty `calls` list
+  next to `unparseable > 0` must never be read as "this call authorises
+  nothing" — that is the most dangerous wrong answer available.
 
 ### Fixture corpus
 
@@ -128,10 +152,15 @@ pipeline's own fail-closed and screening reasons (#58 is the real risk core).
 Soroban cases, the **raw** `simulateTransaction` body as the RPC returned it:
 classic payment, path payment, SAC `transfer`, SEP-41 `approve`, a Blend
 `submit` whose auth tree nests a `transfer` sub-invocation, a call to an
-undeployed contract, and malformed XDR. `archived-state.json` is marked
-`synthetic: true`: it is the real `sac-transfer` recording with a
-`restorePreamble` added, because testnet had no archived entry to record
-against. Tests load them through Vite
+undeployed contract, and malformed XDR. Two files are marked
+`synthetic: true`: `archived-state.json` is the real `sac-transfer`
+recording with a `restorePreamble` added (testnet had no archived entry to
+record against), and `deep-auth.json` is the `nested-subinvocation`
+recording with its auth entries replaced by a three-level tree under address
+credentials plus a source-account entry, built with SDK constructors by
+`make-deep-auth.mjs` (no deployed contract we use asks the user to authorise
+a call two levels down). The bytes are real XDR; the scenarios are not
+recordings. Tests load them through Vite
 (`import.meta.glob`) and never open a socket. Re-record after a testnet reset
 with `node packages/lantern-scanner/fixtures/record.mjs` (needs a funded
 source account; nothing is signed or submitted).
@@ -141,10 +170,12 @@ source account; nothing is signed or submitted).
 Be honest with users about this — the SOW's six-stage pipeline lands in
 later D2 slices (#51–#59), and none of it is here today:
 
-- **No semantic `SorobanAuthorizationEntry` walk.** The pipeline parses the
-  tree's shape and counts nested invocations, but does not yet say which of
-  them move money or whose authorisation they consume (#53). `scan()` flags
-  `invokeHostFunction` as a contract call and nothing more.
+- **The auth walk feeds nothing yet.** Stage 2 flattens every authorised
+  call with decoded arguments, but stage 3 does not consume `calls[]` until
+  #54–#56 — so a nested `transfer` is *visible* in `ScanResult.auth` and
+  counted in the verdict's signals, but not yet turned into an effect or a
+  risk reason. `scan()` still flags `invokeHostFunction` as a contract call
+  and nothing more.
 - **No SEP-41 / SAC token-interface decoding.** `transfer`, `approve` and
   friends on a token contract are not turned into structured effects.
 - **No on-chain registry screening.** `isReportedAddress` checks a single
@@ -201,12 +232,13 @@ src/format.ts     address / amount display helpers (copied from the wallet so
                   the package has no import back into it)
 src/pipeline.ts   the six stages + runPipeline (#51)
 src/rpc.ts        simulateTransaction client: deadline, backoff, RpcError (#52)
+src/scval.ts      lossless ScVal → DecodedScVal rendering (#53)
 fixtures/         offline corpus: XDR + recorded RPC bodies, and record.mjs
 ```
 
 ## Tests
 
-Live in the repo's `tests/` (`scanner-pipeline.test.ts`, `scanner-ingest.test.ts`, `scan.test.ts`, `swap-scan.test.ts`,
+Live in the repo's `tests/` (`scanner-pipeline.test.ts`, `scanner-ingest.test.ts`, `scanner-auth.test.ts`, `scan.test.ts`, `swap-scan.test.ts`,
 `guardians.test.ts`, `tx.test.ts`, `invoke.test.ts`, `blend*.test.ts`) and run
 with `npm test` from the repo root — no network required.
 

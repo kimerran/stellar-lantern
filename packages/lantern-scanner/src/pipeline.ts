@@ -16,6 +16,9 @@
 import { Address, xdr as XDR } from '@stellar/stellar-sdk';
 import { ACTION_FOR, type ScanReason } from './types';
 import type {
+  AuthCall,
+  AuthCredentials,
+  AuthEntry,
   AuthNode,
   AuthTree,
   DecodedTx,
@@ -40,6 +43,7 @@ import { decodeTransaction } from './decode';
 import { explainTransaction } from './explainer';
 import { isReportedAddress, scan } from './engine';
 import { RpcError } from './rpc';
+import { decodeScVal } from './scval';
 
 // Everything a stage needs from the outside world is injected, so the whole
 // suite runs offline against fixtures/ and #52 / #57 / #59 plug in the live
@@ -209,43 +213,93 @@ function decodeFootprint(transactionData: string): Footprint {
 }
 
 // ── Stage 2: Auth ────────────────────────────────────────────────────────────
-// Parses each SorobanAuthorizationEntry into a tree of invocations. Structure
-// only — #53 attaches the semantics. An entry that fails to parse is counted
-// in `unparseable` rather than silently dropped, and the verdict fails closed
-// on it.
+// Walks every SorobanAuthorizationEntry: credentials, root invocation and
+// recursive sub-invocations, with arguments decoded losslessly. An entry that
+// fails to parse is counted in `unparseable` rather than silently dropped —
+// the verdict fails closed on it, because an empty list reads as "this call
+// authorises nothing", the most dangerous wrong answer available.
 export function auth(simulation: SimulationResult): AuthTree {
-  const roots: AuthNode[] = [];
-  let nestedCount = 0;
+  const entries: AuthEntry[] = [];
+  const calls: AuthCall[] = [];
   let unparseable = 0;
-  const count = (node: AuthNode, depth: number): void => {
-    if (depth >= 1) nestedCount += 1;
-    for (const c of node.children) count(c, depth + 1);
-  };
-  for (const entry of simulation.auth) {
+  simulation.auth.forEach((raw, entryIndex) => {
+    let entry: AuthEntry;
     try {
-      const parsed = XDR.SorobanAuthorizationEntry.fromXDR(entry, 'base64');
-      const root = toAuthNode(parsed.rootInvocation());
-      count(root, 0);
-      roots.push(root);
+      const parsed = XDR.SorobanAuthorizationEntry.fromXDR(raw, 'base64');
+      entry = {
+        credentials: toCredentials(parsed.credentials()),
+        root: toAuthNode(parsed.rootInvocation(), 0),
+      };
     } catch {
       unparseable += 1;
+      return;
     }
-  }
-  return { roots, nestedCount, unparseable, analyzed: false };
+    entries.push(entry);
+    flatten(entry.root, entryIndex, entry.credentials, [], calls);
+  });
+  const nestedCount = calls.filter((c) => c.depth >= 1).length;
+  const maxDepth = calls.reduce((m, c) => Math.max(m, c.depth), 0);
+  return {
+    entries,
+    calls,
+    roots: entries.map((e) => e.root),
+    nestedCount,
+    maxDepth,
+    unparseable,
+    analyzed: true,
+  };
 }
 
-function toAuthNode(inv: XDR.SorobanAuthorizedInvocation): AuthNode {
+function toCredentials(cred: XDR.SorobanCredentials): AuthCredentials {
+  if (cred.switch().name === 'sorobanCredentialsSourceAccount') return { kind: 'source_account' };
+  const a = cred.address();
+  return {
+    kind: 'address',
+    address: Address.fromScAddress(a.address()).toString(),
+    nonce: a.nonce().toString(),
+    signatureExpirationLedger: a.signatureExpirationLedger(),
+  };
+}
+
+function toAuthNode(inv: XDR.SorobanAuthorizedInvocation, depth: number): AuthNode {
   const fn = inv.function();
-  const node: AuthNode = { children: inv.subInvocations().map(toAuthNode) };
+  const children = inv.subInvocations().map((sub) => toAuthNode(sub, depth + 1));
   if (fn.switch().name === 'sorobanAuthorizedFunctionTypeContractFn') {
     const call = fn.contractFn();
     const addr = call.contractAddress();
-    if (addr.switch().name === 'scAddressTypeContract') {
-      node.contractId = Address.fromScAddress(addr).toString();
-    }
-    node.functionName = call.functionName().toString();
+    return {
+      kind: 'contract',
+      depth,
+      ...(addr.switch().name === 'scAddressTypeContract'
+        ? { contractId: Address.fromScAddress(addr).toString() }
+        : {}),
+      functionName: call.functionName().toString(),
+      args: call.args().map(decodeScVal),
+      children,
+    };
   }
-  return node;
+  // create-contract host functions (v1 and v2) carry no callable target.
+  return { kind: 'create_contract', depth, args: [], children };
+}
+
+function flatten(
+  node: AuthNode,
+  entryIndex: number,
+  credentials: AuthCredentials,
+  path: number[],
+  out: AuthCall[],
+): void {
+  out.push({
+    entryIndex,
+    path,
+    depth: node.depth,
+    kind: node.kind,
+    credentials,
+    ...(node.contractId ? { contractId: node.contractId } : {}),
+    ...(node.functionName ? { functionName: node.functionName } : {}),
+    args: node.args,
+  });
+  node.children.forEach((child, i) => flatten(child, entryIndex, credentials, [...path, i], out));
 }
 
 // ── Stage 3: Effects ─────────────────────────────────────────────────────────
@@ -448,7 +502,7 @@ export function buildVerdict(input: {
     signals.push({
       stage: 'auth',
       code: authTree.nestedCount > 0 ? 'nested_invocations' : 'flat',
-      detail: `${authTree.roots.length} roots, ${authTree.nestedCount} nested`,
+      detail: `${authTree.entries.length} entries, ${authTree.calls.length} calls, ${authTree.nestedCount} nested, depth ${authTree.maxDepth}`,
     });
   }
   signals.push({
