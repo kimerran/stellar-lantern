@@ -26,8 +26,8 @@ import {
   intentAssetCode,
   type PaymentIntent,
 } from '@core/miniapps/bridge';
-import { scan } from '@core/scan/engine';
-import type { ScanVerdict } from '@core/scan/types';
+import { scan } from '@core/scan';
+import type { ScanVerdict } from '@core/scan';
 import { Icon } from '../components/Icon';
 import { Card } from '../components/Card';
 import { RiskCallout } from '../components/RiskCallout';

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { NetworkConfig } from '@shared/constants';
 import { sendMessage } from '@shared/messages';
-import { scan } from '@core/scan/engine';
-import type { ScanVerdict } from '@core/scan/types';
+import { scan } from '@core/scan';
+import type { ScanVerdict } from '@core/scan';
 import { recoveryCoSignError } from '@core/recovery/guardians';
 import { isNativePlatform } from '@shared/kv';
 import { Button } from '../components/Button';

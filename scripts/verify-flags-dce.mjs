@@ -11,7 +11,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 // Unique to the demo "preview warnings" gallery — sampleVerdict()'s sample text
-// (src/core/scan/engine.ts), imported only by the DEMO_AFFORDANCES-gated
+// (packages/lantern-scanner/src/engine.ts), imported only by the DEMO_AFFORDANCES-gated
 // <DemoWarnings> in Scan.tsx, so it tree-shakes away when the flag is off.
 // (The demo deny-list ADDRESS is no longer a valid marker: it now intentionally
 // ships in every build because isReportedAddress flags it on testnet — see #22.)

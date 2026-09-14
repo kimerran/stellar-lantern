@@ -1,8 +1,8 @@
 import { ACTION_FOR, type DecodedOp, type ScanContext, type ScanReason, type ScanVerdict } from './types';
 import { decodeTransaction } from './decode';
 import { explainTransaction } from './explainer';
-import { truncateAddress } from '@shared/format';
-import { NETWORKS } from '@shared/constants';
+import { Networks } from '@stellar/stellar-sdk';
+import { truncateAddress } from './format';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MOCK scan engine.
@@ -36,7 +36,7 @@ export function isReportedAddress(
   demoAffordances: boolean,
 ): boolean {
   if (!dest) return false;
-  if (!demoAffordances && networkPassphrase !== NETWORKS.TESTNET.passphrase) return false;
+  if (!demoAffordances && networkPassphrase !== Networks.TESTNET) return false;
   return DEMO_FLAGGED_ADDRESSES.has(dest);
 }
 

@@ -12,8 +12,8 @@ import {
   guardianDiff,
   type GuardianConfig,
 } from '@core/recovery/guardians';
-import { scan } from '@core/scan/engine';
-import type { ScanVerdict } from '@core/scan/types';
+import { scan } from '@core/scan';
+import type { ScanVerdict } from '@core/scan';
 import { isNativePlatform } from '@shared/kv';
 import { formatAmount, truncateAddress } from '@shared/format';
 import { Button } from '../components/Button';

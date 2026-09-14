@@ -2,9 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { Networks } from '@stellar/stellar-sdk';
 import { buildPathPaymentStrictSendXdr } from '@core/stellar/swap';
 import type { AssetRef } from '@core/stellar/tx';
-import { decodeTransaction } from '@core/scan/decode';
-import { explainTransaction } from '@core/scan/explainer';
-import { scan } from '@core/scan/engine';
+import { decodeTransaction, explainTransaction, scan } from '@lantern/scanner';
 
 const pp = Networks.TESTNET;
 // Non-flagged addresses (avoid the engine's DEMO_FLAGGED_ADDRESSES set).

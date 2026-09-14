@@ -23,7 +23,7 @@ IDENTITY="${2:-lantern-deployer}"
 RPC="${RPC:-https://soroban-testnet.stellar.org}"
 PASSPHRASE="Test SDF Network ; September 2015"
 
-# Lantern's demo flagged address (src/core/scan/engine.ts, DEMO_FLAGGED_ADDRESSES),
+# Lantern's demo flagged address (packages/lantern-scanner/src/engine.ts, DEMO_FLAGGED_ADDRESSES),
 # so the seeded on-chain entry lines up with the demo the scanner already shows.
 SUBJECT="${SUBJECT:-GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ}"
 EVIDENCE="$(printf 'lantern-d1-smoke' | sha256sum | cut -d' ' -f1)"

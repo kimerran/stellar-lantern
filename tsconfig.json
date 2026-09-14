@@ -26,8 +26,9 @@
     "paths": {
       "@core/*": ["src/core/*"],
       "@shared/*": ["src/shared/*"],
-      "@popup/*": ["src/popup/*"]
+      "@popup/*": ["src/popup/*"],
+      "@lantern/scanner": ["packages/lantern-scanner/src/index.ts"]
     }
   },
-  "include": ["src", "tests", "vite.config.ts", "tailwind.config.ts", "manifest.config.ts"]
+  "include": ["src", "packages", "tests", "vite.config.ts", "tailwind.config.ts", "manifest.config.ts"]
 }

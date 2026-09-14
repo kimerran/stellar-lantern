@@ -154,7 +154,7 @@ Lantern is split into a thin platform shell, a UI layer that **never holds the d
   - `crypto/` — AES-GCM vault · `wallet/` — SEP-0005 derivation
   - `session/` — the unlocked session (in-memory `Keypair`, sign/submit, auto-lock)
   - `stellar/` — network-aware Horizon client, tx builders, Soroban `invoke`/`simulate`
-  - `scan/` — decode · explain · reputation/risk engine
+  - `scan/` — one-line shim over **`packages/lantern-scanner/`** (the MIT scanner package: decode · explain · risk engine)
   - `recovery/` — guardian multisig setup / update / recovery / co-signature merge
   - `anchor/` — SEP-1 toml · SEP-10 auth · SEP-24 interactive + status poll · curated directory
   - `miniapps/` — dApp bridge + curated directory · `history/` — op → display model · `receive/` — QR payload
@@ -306,3 +306,7 @@ Lantern's shipped scope is a coherent, tested product; these extend it further a
 - **Platform hardening** — lifecycle auto-lock, release signing, Android QR-scan, iOS.
 
 See `docs/features.md` for the full shipped-changes log and `AGENT.md` for the contributor/agent guide.
+
+## License
+
+[MIT](./LICENSE). The transaction scanner is also packaged on its own under the same license at [`packages/lantern-scanner/`](./packages/lantern-scanner/README.md).

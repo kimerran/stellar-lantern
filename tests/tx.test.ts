@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Networks, TransactionBuilder } from '@stellar/stellar-sdk';
 import { buildSetOptionsXdr, buildTransferXdr, computeMaxXlm, memoByteLength } from '@core/stellar/tx';
-import { decodeTransaction } from '@core/scan/decode';
+import { decodeTransaction } from '@lantern/scanner';
 
 const SOURCE = 'GDRXE2BQUC3AZNPVFSCEZ76NJ3WWL25FYFK6RGZGIEKWE4SOOHSUJUJ6';
 const DEST = 'GBK4XQYHX7K3X2R7L4K4Z2K3X2R7L4K4Z2K3X2R7L4K4Z2K3X2R7L4K4'; // placeholder
