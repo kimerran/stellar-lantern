@@ -142,7 +142,7 @@ export type IngestFailure =
   | 'undecodable' // the XDR is not a transaction envelope
   | 'simulation_unavailable' // Soroban tx, but no simulate dependency was injected
   | 'rpc_timeout' // the RPC did not answer within the deadline (after retries)
-  | 'rpc_transport' // network error / non-2xx / JSON-RPC-level error (after retries)
+  | 'rpc_transport' // network error / non-2xx (after retries)
   | 'simulation_malformed' // 2xx, but the body is not a simulateTransaction result
   | 'simulation_reverted'; // the contract itself would fail (`result.error`)
 

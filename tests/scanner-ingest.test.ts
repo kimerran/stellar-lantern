@@ -163,10 +163,10 @@ describe('ingest: fail closed, per mode', () => {
       },
     },
     {
-      mode: 'rpc_transport',
-      reason: 'rpc_unreachable',
+      mode: 'simulation_malformed',
+      reason: 'simulation_malformed',
       fixtureName: 'sac-transfer',
-      // A JSON-RPC-level error object is a transport-class failure too.
+      // A JSON-RPC-level error object: the RPC was reached, so it is malformed, not transport.
       simulate: async () => ({
         jsonrpc: '2.0',
         id: 1,
@@ -326,6 +326,7 @@ describe('simulateWithRpc', () => {
       (e: unknown) => e,
     );
     expect((err as RpcError).kind).toBe('transport');
+    expect((err as RpcError).attempts).toBe(1);
     expect(n).toBe(1);
     expect(waits).toEqual([]);
   });
@@ -341,6 +342,7 @@ describe('simulateWithRpc', () => {
       (e: unknown) => e,
     );
     expect((err as RpcError).kind).toBe('malformed');
+    expect((err as RpcError).attempts).toBe(1);
     expect(n).toBe(1);
   });
 

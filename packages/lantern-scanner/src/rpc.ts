@@ -115,7 +115,9 @@ export async function simulateWithRpc(
   const backoffMs = opts.backoffMs ?? DEFAULT_RPC_BACKOFF_MS;
   const sleep = opts.sleep ?? realSleep;
   let last: unknown;
+  let made = 0;
   for (let n = 1; n <= attempts; n += 1) {
+    made = n;
     try {
       return await attempt(xdr, opts, timeoutMs, n);
     } catch (e) {
@@ -126,7 +128,7 @@ export async function simulateWithRpc(
     }
   }
   if (last instanceof RpcError) {
-    throw new RpcError(last.kind, last.message, attempts);
+    throw new RpcError(last.kind, last.message, made);
   }
   throw last;
 }

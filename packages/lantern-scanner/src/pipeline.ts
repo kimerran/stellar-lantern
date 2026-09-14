@@ -132,13 +132,9 @@ function parseSimulation(raw: RawSimulation, decoded: DecodedTx): SimulationResu
   const malformed = (why: string) => failed('simulation_malformed', decoded, true, why);
   if (!raw || typeof raw !== 'object') return malformed('unreadable simulation');
   if (raw.error) {
+    // The RPC was reached and answered; it just could not give a simulation.
     const msg = raw.error.message;
-    return failed(
-      'rpc_transport',
-      decoded,
-      true,
-      typeof msg === 'string' && msg ? msg : 'rpc error',
-    );
+    return malformed(typeof msg === 'string' && msg ? msg : 'rpc error');
   }
   const result = raw.result;
   if (!result || typeof result !== 'object') return malformed('unreadable simulation');
