@@ -177,12 +177,13 @@ describe('auth', () => {
 
   it('returns an empty tree for a classic transaction', async () => {
     const tree = auth(await ingest(requestFor(fixture('classic-payment'))));
-    expect(tree).toEqual({ roots: [], nestedCount: 0, analyzed: false });
+    expect(tree).toEqual({ roots: [], nestedCount: 0, unparseable: 0, analyzed: false });
   });
 
-  it('drops an unparseable entry instead of throwing', () => {
+  it('counts an unparseable entry instead of throwing or silently dropping it', () => {
     const tree = auth({ ok: true, decoded: null, simulated: true, auth: ['not-xdr'] });
     expect(tree.roots).toEqual([]);
+    expect(tree.unparseable).toBe(1);
   });
 });
 
@@ -319,6 +320,21 @@ describe('buildVerdict', () => {
     expect(v.reasons.map((r) => r.code)).toContain('simulation_failed');
   });
 
+  it('fails closed: an auth entry it cannot read is high, not silently ignored', async () => {
+    const f = fixture('sac-transfer');
+    const good = f.simulation!;
+    const first = (good.result!.results as Array<{ auth: string[] }>)[0]!;
+    const corrupted: RawSimulation = {
+      ...good,
+      result: { ...good.result, results: [{ ...first, auth: [...first.auth, 'not-xdr'] }] },
+    };
+    const v = await verdictFor(f, { simulate: async () => corrupted });
+    expect(v.risk).toBe('high');
+    expect(v.action).toBe('block_confirm');
+    expect(v.reasons.map((r) => r.code)).toContain('auth_unreadable');
+    expect(v.signals.find((s) => s.stage === 'auth')?.code).toBe('fail_closed');
+  });
+
   it('raises a reported counterparty to high', async () => {
     const f = fixture('classic-payment');
     const v = await verdictFor(f, { isFlagged: async () => true });
@@ -448,6 +464,52 @@ describe('runPipeline', () => {
     const empty = await runPipeline(requestFor(f), { explain: async () => '   ' });
     expect(empty.explanationSource).toBe('fallback');
     expect(empty.risk).toBe('low');
+  });
+
+  it('deep-freezes the effects handed to the explainer so stage-3 output cannot be corrupted', async () => {
+    const f = fixture('classic-payment');
+    let mutationThrew = false;
+    const result = await runPipeline(requestFor(f), {
+      explain: async ({ effects: fx }) => {
+        const m = fx as unknown as {
+          effects: Array<{ counterparty?: string }>;
+          source: { operations: Array<{ amount?: string }> };
+        };
+        try {
+          m.effects[0]!.counterparty = 'GHOSTILE';
+          m.effects.push({ counterparty: 'GINJECTED' });
+          m.source.operations[0]!.amount = '0';
+        } catch {
+          mutationThrew = true;
+        }
+        return 'fine';
+      },
+    });
+    expect(mutationThrew).toBe(true);
+    expect(Object.isFrozen(result.effects)).toBe(true);
+    expect(Object.isFrozen(result.effects.effects)).toBe(true);
+    expect(Object.isFrozen(result.effects.effects[0])).toBe(true);
+    expect(Object.isFrozen(result.effects.source?.operations[0])).toBe(true);
+    expect(result.effects.effects).toHaveLength(1);
+    expect(result.effects.effects[0]?.counterparty).toBe(
+      'GDVEU3DD4KOFECV66VIHWEZOYX4ZKR3WV27L464SIIPOU2IUI3JCZA57',
+    );
+    expect(result.effects.source?.operations[0]?.amount).toBe('25.0000000');
+  });
+
+  it('abandons an explainer that never settles and falls back after the deadline', async () => {
+    const f = fixture('classic-payment');
+    const started = Date.now();
+    const result = await runPipeline(requestFor(f), {
+      explain: () => new Promise<string>(() => {}),
+      explainTimeoutMs: 50,
+    });
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(result.explanationSource).toBe('fallback');
+    expect(result.explanation).toBe(
+      await explainRulesBased({ verdict: result.verdict, effects: result.effects }),
+    );
+    expect(result.risk).toBe('low');
   });
 
   it('the explainer output reaches only the explanation field', async () => {

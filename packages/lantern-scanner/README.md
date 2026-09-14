@@ -70,13 +70,17 @@ before stage 6 sees it. The explainer's signature is
 `({ verdict: Readonly<Verdict>, effects }) => Promise<string>` — it returns a
 string, never a verdict. The orchestrator copies `risk` / `action` /
 `reasons` from the frozen verdict; a non-string, empty or thrown explainer
-result is replaced by the rules-based sentence (`explanationSource:
-'fallback'`) and can reach no field but `explanation`. The AI layer cannot
-change risk by construction, not by policy.
+result — or one that has not settled within `explainTimeoutMs` (default
+5 s) — is replaced by the rules-based sentence (`explanationSource:
+'fallback'`) and can reach no field but `explanation`. The `EffectSet` the
+explainer receives is deep-frozen too, so it cannot corrupt the stage-3
+output `ScanResult` carries. The AI layer cannot change risk by
+construction, not by policy.
 
 **Fail-closed today.** Malformed XDR, a Soroban transaction with no
-simulation, or a simulation the RPC rejects all produce a `high` /
-`block_confirm` verdict with an `undecodable` / `simulation_failed` reason.
+simulation, a simulation the RPC rejects, or an authorisation entry the
+scanner cannot parse all produce a `high` / `block_confirm` verdict with an
+`undecodable` / `simulation_failed` / `auth_unreadable` reason.
 
 **What is skeleton.** The stage *bodies* are interim: `auth` parses the
 `SorobanAuthorizationEntry` tree structurally (contract, function, children)

@@ -18,6 +18,8 @@ import { ACTION_FOR, type ScanReason } from './types';
 import type {
   AuthNode,
   AuthTree,
+  DecodedTx,
+  DeepReadonly,
   Effect,
   EffectSet,
   Explainer,
@@ -45,7 +47,12 @@ export interface PipelineDeps {
   isFlagged?: (address: string) => Promise<boolean | null>;
   // Stage 6: prose from the frozen verdict. Defaults to the rules-based explainer.
   explain?: Explainer;
+  // Deadline for stage 6. An explainer that has not settled by then is
+  // abandoned for the rules-based prose (`explanationSource: 'fallback'`).
+  explainTimeoutMs?: number;
 }
+
+export const DEFAULT_EXPLAIN_TIMEOUT_MS = 5_000;
 
 const SEVERITY: Record<RiskLevel, number> = { low: 0, medium: 1, high: 2 };
 
@@ -111,11 +118,13 @@ function parseSimulation(
 
 // ── Stage 2: Auth ────────────────────────────────────────────────────────────
 // Parses each SorobanAuthorizationEntry into a tree of invocations. Structure
-// only — #53 attaches the semantics. An entry that fails to parse is dropped
-// and the tree is marked incomplete rather than silently shortened.
+// only — #53 attaches the semantics. An entry that fails to parse is counted
+// in `unparseable` rather than silently dropped, and the verdict fails closed
+// on it.
 export function auth(simulation: SimulationResult): AuthTree {
   const roots: AuthNode[] = [];
   let nestedCount = 0;
+  let unparseable = 0;
   const count = (node: AuthNode, depth: number): void => {
     if (depth >= 1) nestedCount += 1;
     for (const c of node.children) count(c, depth + 1);
@@ -127,10 +136,10 @@ export function auth(simulation: SimulationResult): AuthTree {
       count(root, 0);
       roots.push(root);
     } catch {
-      // Unparseable entry: nothing to add; `analyzed` stays false below anyway.
+      unparseable += 1;
     }
   }
-  return { roots, nestedCount, analyzed: false };
+  return { roots, nestedCount, unparseable, analyzed: false };
 }
 
 function toAuthNode(inv: XDR.SorobanAuthorizedInvocation): AuthNode {
@@ -262,11 +271,26 @@ export function buildVerdict(input: {
     });
   }
 
-  signals.push({
-    stage: 'auth',
-    code: authTree.nestedCount > 0 ? 'nested_invocations' : 'flat',
-    detail: `${authTree.roots.length} roots, ${authTree.nestedCount} nested`,
-  });
+  if (authTree.unparseable > 0) {
+    reasons.push({
+      code: 'auth_unreadable',
+      severity: 'high',
+      title: 'Couldn’t read what this transaction authorises',
+      detail:
+        'Part of the authorisation this contract call requires couldn’t be decoded, so Lantern can’t tell what it permits — do not sign unless you’re certain.',
+    });
+    signals.push({
+      stage: 'auth',
+      code: 'fail_closed',
+      detail: `${authTree.unparseable} of ${simulation.auth.length} auth entries unparseable`,
+    });
+  } else {
+    signals.push({
+      stage: 'auth',
+      code: authTree.nestedCount > 0 ? 'nested_invocations' : 'flat',
+      detail: `${authTree.roots.length} roots, ${authTree.nestedCount} nested`,
+    });
+  }
   signals.push({
     stage: 'effects',
     code: `coverage_${effectSet.coverage}`,
@@ -335,7 +359,9 @@ function deepFreeze<T>(value: T): T {
 // Default explainer: the rules-based prose already shipped. #59 supplies a
 // model-backed one with the same signature — string in, string out.
 export const explainRulesBased: Explainer = async ({ effects: effectSet }: ExplainInput) =>
-  explainTransaction(effectSet.source);
+  // explainTransaction only reads its input; the cast drops the readonly
+  // wrapper the shipped signature predates, nothing else.
+  explainTransaction(effectSet.source as DecodedTx | null);
 
 // ── Orchestrator ─────────────────────────────────────────────────────────────
 export async function runPipeline(
@@ -354,23 +380,29 @@ export async function runPipeline(
     screen: screenResult,
   });
 
-  // Stage 6 gets the frozen verdict and can only hand back prose. Anything
-  // else — a throw, a non-string, an object masquerading as a verdict — is
-  // discarded for the rules-based sentence. Nothing it returns reaches any
-  // field but `explanation`.
+  // Stage 6 gets the frozen verdict and the frozen effects, and can only hand
+  // back prose. Anything else — a throw, a non-string, an object masquerading
+  // as a verdict, a promise that never settles — is discarded for the
+  // rules-based sentence. Nothing it returns reaches any field but
+  // `explanation`.
+  const frozenEffects = deepFreeze(effectSet) as DeepReadonly<EffectSet>;
   const explainer = deps.explain ?? explainRulesBased;
+  const timeoutMs = deps.explainTimeoutMs ?? DEFAULT_EXPLAIN_TIMEOUT_MS;
   let explanation: string;
   let explanationSource: ScanResult['explanationSource'] = 'explainer';
   try {
-    const prose: unknown = await explainer({ verdict, effects: effectSet });
+    const prose: unknown = await withDeadline(
+      explainer({ verdict, effects: frozenEffects }),
+      timeoutMs,
+    );
     if (typeof prose === 'string' && prose.trim() !== '') {
       explanation = prose;
     } else {
-      explanation = await explainRulesBased({ verdict, effects: effectSet });
+      explanation = await explainRulesBased({ verdict, effects: frozenEffects });
       explanationSource = 'fallback';
     }
   } catch {
-    explanation = await explainRulesBased({ verdict, effects: effectSet });
+    explanation = await explainRulesBased({ verdict, effects: frozenEffects });
     explanationSource = 'fallback';
   }
 
@@ -384,7 +416,25 @@ export async function runPipeline(
     verdict,
     simulation,
     auth: authTree,
-    effects: effectSet,
+    effects: frozenEffects,
     screen: screenResult,
   };
+}
+
+// Rejects if `promise` has not settled within `ms`. The timer is cleared on
+// settle so a fast explainer never leaves a dangling handle.
+function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`explainer exceeded ${ms}ms`)), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e: unknown) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
 }

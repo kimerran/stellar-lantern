@@ -157,6 +157,10 @@ export interface AuthTree {
   // Number of invocations at depth ≥ 1 — a nested call the top-level op
   // never shows. The product thesis: these must never be invisible.
   nestedCount: number;
+  // Entries the simulation returned that could not be parsed. Any value > 0
+  // means the tree is incomplete and the verdict must fail closed: an
+  // authorisation the scanner cannot read is one it cannot vouch for.
+  unparseable: number;
   // False until #53 attaches semantics (which nodes move money, whose auth
   // they need). The skeleton only parses structure.
   analyzed: boolean;
@@ -220,9 +224,12 @@ export type Verdict = DeepReadonly<{
 
 // Stage 6 — Explain. Prose. Nothing else.
 export type Explanation = string;
+// Both inputs are deep-frozen by the orchestrator before stage 6 runs, so
+// the explainer can neither change the verdict nor corrupt the stage-3 output
+// that `ScanResult` carries.
 export interface ExplainInput {
   verdict: Readonly<Verdict>;
-  effects: Readonly<EffectSet>;
+  effects: DeepReadonly<EffectSet>;
 }
 export type Explainer = (input: ExplainInput) => Promise<Explanation>;
 
@@ -239,6 +246,6 @@ export interface ScanResult {
   verdict: Verdict;
   simulation: SimulationResult;
   auth: AuthTree;
-  effects: EffectSet;
+  effects: DeepReadonly<EffectSet>;
   screen: ScreenResult;
 }

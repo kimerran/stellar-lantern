@@ -59,5 +59,6 @@ export {
   buildVerdict,
   explainRulesBased,
   runPipeline,
+  DEFAULT_EXPLAIN_TIMEOUT_MS,
   type PipelineDeps,
 } from './pipeline';
