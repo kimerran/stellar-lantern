@@ -1,0 +1,15 @@
+# Pinned compiler for every crate under contracts/.
+#
+# `stellar contract build` compiles with whatever cargo/rustc rustup resolves,
+# so a floating `stable` can move the emitted bytecode — and therefore the wasm
+# sha256 that README.md publishes for the deployed contracts — without a single
+# source change. Pinning here (rather than only in CI) keeps the local build
+# scripts, the contracts CI lane and the published hash on one compiler.
+#
+# 1.95.0 is the release that produced the passkey account's published hash
+# 8759fa9e49446cb8d332da8fee973c453b1178fb0525345892991f4997d8451b.
+[toolchain]
+channel = "1.95.0"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
+targets = ["wasm32v1-none"]

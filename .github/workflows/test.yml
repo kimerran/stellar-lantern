@@ -1,0 +1,44 @@
+name: Tests
+
+# The Vitest suite had no pull-request lane at all: `npm test` ran only from
+# release.yml, which triggers on main, and the other two workflows are
+# path-filtered to contracts/ and the Android build. So every test under tests/
+# — 450-odd of them — could only fail after a merge (#47).
+#
+# Deliberately not path-filtered. A change anywhere in src/, a dependency bump,
+# or a script the suite imports can all break it, and enumerating those paths is
+# how a lane quietly stops covering things.
+
+on:
+  pull_request:
+    branches: [develop]
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+# A newer push to the PR supersedes an in-flight run.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Test
+        run: npm test

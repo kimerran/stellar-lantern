@@ -97,7 +97,11 @@ impl CustomAccountInterface for PasskeyAccount {
         sig: Signature,
         _auth_contexts: Vec<Context>,
     ) -> Result<(), Error> {
-        let pk: BytesN<65> = env.storage().instance().get(&PK).ok_or(Error::NotInitialized)?;
+        let pk: BytesN<65> = env
+            .storage()
+            .instance()
+            .get(&PK)
+            .ok_or(Error::NotInitialized)?;
 
         // The authenticator signs authenticator_data ‖ SHA-256(client_data_json).
         // secp256r1_verify traps on a bad signature, which fails the auth.
