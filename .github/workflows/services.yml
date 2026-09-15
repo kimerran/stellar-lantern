@@ -41,6 +41,10 @@ jobs:
         with:
           node-version: 22
 
+      - name: Use npm 11 (npm 10 rejects esbuild's optional openharmony package)
+        working-directory: .
+        run: npm install -g npm@11 --no-audit --no-fund
+
       - name: Install (repo root, for @lantern/scanner's dependencies)
         working-directory: .
         run: npm ci

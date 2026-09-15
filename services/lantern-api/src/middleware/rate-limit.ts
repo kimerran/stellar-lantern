@@ -22,10 +22,17 @@ export function clientIp(
   headers: { get(name: string): string | null | undefined },
   fallback: string,
 ): string {
-  // Railway (and any proxy) sets X-Forwarded-For; the first hop is the client.
+  // A proxy that appends to X-Forwarded-For (Railway's edge, most others)
+  // leaves any client-supplied entries at the front, so the FIRST hop is
+  // attacker-controlled: a fresh value per request would mint a fresh window.
+  // The LAST entry is the one the trusted edge appended — and if the edge
+  // overwrites the header instead, the result is the same.
   const xff = headers.get('x-forwarded-for');
-  const first = xff?.split(',')[0]?.trim();
-  return first || fallback;
+  const hops = (xff ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return hops[hops.length - 1] || fallback;
 }
 
 export function createRateLimiter(opts: RateLimitOptions): RateLimiter {

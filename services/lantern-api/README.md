@@ -44,9 +44,12 @@ An extension cannot hold a client secret, so the proxy is public and bounded
 instead:
 
 - **Origin allowlist** — a speed bump, not a lock (headers are forgeable
-  outside a browser). Stops other sites' pages spending the budget.
+  outside a browser). Stops other sites' pages spending the budget. The same
+  list drives CORS, so a browser page (the D4 playground) can call `/v1/*`
+  from a listed origin; the extension's service worker needs no CORS.
 - **Per-IP rate limit** (`RATE_LIMIT_PER_MIN`, default 10, sliding window,
-  keyed by the first `X-Forwarded-For` hop).
+  keyed by the **last** `X-Forwarded-For` hop — the one the trusted edge
+  appends; earlier hops are client-controlled).
 - **Service-wide daily cap** (`DAILY_CAP`, default 2000 / UTC day) — a hard
   stop independent of the provider's cap.
 - **Input bounds** — 32 KB, strict schema, unknown fields rejected,

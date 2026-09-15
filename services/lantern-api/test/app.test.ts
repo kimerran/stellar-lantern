@@ -262,6 +262,30 @@ describe('origin allowlist', () => {
   });
 });
 
+describe('cors', () => {
+  it('answers a browser preflight for a listed origin and withholds CORS for an unlisted one', async () => {
+    const app = createApp({ env: env(), fetchImpl: modelSays('ok') });
+    const preflight = await app.request('/v1/explain', {
+      method: 'OPTIONS',
+      headers: {
+        Origin: ORIGIN,
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'content-type',
+      },
+    });
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get('access-control-allow-origin')).toBe(ORIGIN);
+    expect(preflight.headers.get('access-control-allow-methods')).toContain('POST');
+    const ok = await post(app, INPUT);
+    expect(ok.headers.get('access-control-allow-origin')).toBe(ORIGIN);
+    const evil = await app.request('/v1/explain', {
+      method: 'OPTIONS',
+      headers: { Origin: 'https://evil.invalid', 'Access-Control-Request-Method': 'POST' },
+    });
+    expect(evil.headers.get('access-control-allow-origin')).toBeNull();
+  });
+});
+
 describe('limits', () => {
   it('per-IP: N ok, N+1 → 429 rate_limited, window resets on a fake clock; IPs are independent', async () => {
     let t = 1_700_000_000_000;
@@ -270,7 +294,8 @@ describe('limits', () => {
       fetchImpl: modelSays('ok'),
       now: () => t,
     });
-    const ip = (a: string) => ({ 'X-Forwarded-For': `${a}, 10.0.0.1` });
+    // The distinguishing hop is the LAST one — what the trusted edge appends.
+    const ip = (a: string) => ({ 'X-Forwarded-For': `10.0.0.1, ${a}` });
     for (let i = 0; i < 3; i += 1) expect((await post(app, INPUT, ip('1.1.1.1'))).status).toBe(200);
     const blocked = await post(app, INPUT, ip('1.1.1.1'));
     expect(blocked.status).toBe(429);
@@ -278,6 +303,18 @@ describe('limits', () => {
     expect((await post(app, INPUT, ip('2.2.2.2'))).status).toBe(200);
     t += 60_001;
     expect((await post(app, INPUT, ip('1.1.1.1'))).status).toBe(200);
+  });
+
+  it('a client-supplied X-Forwarded-For prefix cannot mint a fresh window', async () => {
+    const app = createApp({ env: env({ RATE_LIMIT_PER_MIN: '3' }), fetchImpl: modelSays('ok') });
+    // Different first hop every request; the edge-appended last hop is constant.
+    for (let i = 0; i < 3; i += 1) {
+      const res = await post(app, INPUT, { 'X-Forwarded-For': `198.51.100.${i}, 203.0.113.9` });
+      expect(res.status).toBe(200);
+    }
+    const spoofed = await post(app, INPUT, { 'X-Forwarded-For': '198.51.100.99, 203.0.113.9' });
+    expect(spoofed.status).toBe(429);
+    expect(await json(spoofed)).toEqual({ error: 'rate_limited' });
   });
 
   it('daily cap: service-wide, resets at UTC midnight', async () => {

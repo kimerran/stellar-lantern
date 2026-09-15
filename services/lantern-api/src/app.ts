@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 import type { Env } from './env';
 import { originAllowlist } from './middleware/origin';
 import { createRateLimiter } from './middleware/rate-limit';
@@ -25,6 +26,19 @@ export function createApp(opts: AppOptions): Hono {
   });
   const app = new Hono();
   app.route('/', healthRoute(env.model, limiter.dailyCount));
+  // A browser page (the D4 playground) preflights with OPTIONS; the MV3
+  // service worker with a host_permissions entry does not. Same allowlist
+  // as originAllowlist, mounted before it; an unlisted origin gets no
+  // Access-Control-Allow-Origin, so the browser refuses the response.
+  app.use(
+    '/v1/*',
+    cors({
+      origin: env.allowedOrigins.length > 0 ? env.allowedOrigins : '*',
+      allowMethods: ['POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type'],
+      maxAge: 600,
+    }),
+  );
   app.use('/v1/*', originAllowlist(env.allowedOrigins));
   app.use('/v1/*', limiter.middleware);
   app.use('/v1/*', bodyLimit());
