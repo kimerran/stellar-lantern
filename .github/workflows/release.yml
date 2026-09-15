@@ -29,6 +29,7 @@ env:
   VITE_FEATURE_DEMO_AFFORDANCES: 'false' # demo-only bits — never in a release build
   VITE_FEATURE_PASSKEY: 'false'        # #53 — passkey smart accounts; experimental, testnet-only, off in release
   VITE_FEATURE_SCANNER_AI: 'false'     # #59 — scanner's hosted-LLM explainer; no key ships (D2 epic option 2), off in release
+  VITE_FEATURE_TELEMETRY: 'false'      # #81 — opt-in usage analytics; off until the ingest backend is decided and the consent UI ships
   # Soroswap aggregator config (values/secrets, not feature flags). The API key is
   # a secret; the referral wallet + fee are optional — revenue share is only
   # charged when BOTH are set. All unset → the aggregator falls back to native SDEX.

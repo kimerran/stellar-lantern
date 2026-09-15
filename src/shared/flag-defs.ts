@@ -27,6 +27,9 @@ export const FLAG_DEFS = {
   // a model key dead-code-eliminates the whole path, and the verdict never
   // depended on it. Enable for local dev / demos with LANTERN_AI_API_KEY.
   scannerAi: { envVar: 'VITE_FEATURE_SCANNER_AI', literal: '__FEATURE_SCANNER_AI__', default: false },
+  // Opt-in usage analytics (#81). OFF by default so a build with the flag
+  // off carries no telemetry code and no ingest origin at all.
+  telemetry: { envVar: 'VITE_FEATURE_TELEMETRY', literal: '__FEATURE_TELEMETRY__', default: false },
 } as const satisfies Record<string, FlagDef>;
 
 export type FlagKey = keyof typeof FLAG_DEFS;

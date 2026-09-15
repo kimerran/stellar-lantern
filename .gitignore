@@ -1,6 +1,8 @@
 node_modules
 dist
 dist-mobile
+# Generated activity reports contain real user activity — never committed (#81).
+dist-report
 *.local
 .DS_Store
 .vite
