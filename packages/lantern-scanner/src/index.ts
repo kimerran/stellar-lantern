@@ -68,7 +68,6 @@ export {
   screen,
   resolveTokenMetadata,
   buildVerdict,
-  explainRulesBased,
   runPipeline,
   DEFAULT_EXPLAIN_TIMEOUT_MS,
   type PipelineDeps,
@@ -121,3 +120,17 @@ export {
   type RawLedgerEntriesBody,
 } from './registry';
 export { verdict, ingestReason, type VerdictInput, type VerdictContext } from './verdict';
+export {
+  createHostedExplainer,
+  explainRulesBased,
+  buildPrompt,
+  sanitise,
+  contradictsVerdict,
+  ExplainError,
+  SYSTEM_PROMPT,
+  DEFAULT_EXPLAIN_MODEL,
+  DEFAULT_EXPLAIN_ENDPOINT,
+  DEFAULT_HOSTED_TIMEOUT_MS,
+  DEFAULT_MAX_OUTPUT_CHARS,
+  type HostedExplainerOptions,
+} from './explain';

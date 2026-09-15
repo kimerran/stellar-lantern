@@ -15,6 +15,7 @@
 
 import { Address, MuxedAccount, StrKey, xdr as XDR } from '@stellar/stellar-sdk';
 import { deepFreeze, verdict } from './verdict';
+import { explainRulesBased } from './explain';
 import type {
   AuthCall,
   AuthCredentials,
@@ -29,7 +30,6 @@ import type {
   Effect,
   EffectSet,
   Explainer,
-  ExplainInput,
   RawSimulation,
   StateChange,
   ScanRequest,
@@ -39,7 +39,6 @@ import type {
   Verdict,
 } from './types';
 import { decodeTransaction } from './decode';
-import { explainTransaction } from './explainer';
 import { isReportedAddress } from './engine';
 import { RpcError } from './rpc';
 import { observedDeltas } from './observed';
@@ -613,12 +612,9 @@ export function buildVerdict(input: {
 }
 
 // ── Stage 6: Explain ─────────────────────────────────────────────────────────
-// Default explainer: the rules-based prose already shipped. #59 supplies a
-// model-backed one with the same signature — string in, string out.
-export const explainRulesBased: Explainer = async ({ effects: effectSet }: ExplainInput) =>
-  // explainTransaction only reads its input; the cast drops the readonly
-  // wrapper the shipped signature predates, nothing else.
-  explainTransaction(effectSet.source as DecodedTx | null);
+// The explainers live in explain.ts (#59): `createHostedExplainer` (one hosted
+// model, bounded, sanitised) and `explainRulesBased` (the deterministic
+// fallback and the default). Both have the #51 signature — string out, only.
 
 // ── Orchestrator ─────────────────────────────────────────────────────────────
 export async function runPipeline(
