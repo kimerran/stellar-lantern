@@ -23,6 +23,10 @@ export const FLAG_DEFS = {
   miniapps: { envVar: 'VITE_FEATURE_MINIAPPS', literal: '__FEATURE_MINIAPPS__', default: true },
   demoAffordances: { envVar: 'VITE_FEATURE_DEMO_AFFORDANCES', literal: '__FEATURE_DEMO_AFFORDANCES__', default: false },
   passkey: { envVar: 'VITE_FEATURE_PASSKEY', literal: '__FEATURE_PASSKEY__', default: false },
+  // The scanner's hosted-LLM explainer (#59). OFF by default: a build without
+  // a model key dead-code-eliminates the whole path, and the verdict never
+  // depended on it. Enable for local dev / demos with LANTERN_AI_API_KEY.
+  scannerAi: { envVar: 'VITE_FEATURE_SCANNER_AI', literal: '__FEATURE_SCANNER_AI__', default: false },
 } as const satisfies Record<string, FlagDef>;
 
 export type FlagKey = keyof typeof FLAG_DEFS;
