@@ -1,0 +1,11 @@
+# Docker build context is the repo root (services/lantern-api/Dockerfile).
+node_modules
+**/node_modules
+**/dist
+dist-mobile
+android
+release
+docs
+video
+temp
+.git

@@ -1,0 +1,11 @@
+# Railway service config for services/lantern-api. Build from the repo root
+# (Root Directory = "/" in the Railway service settings) with this Dockerfile.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "services/lantern-api/Dockerfile"
+
+[deploy]
+healthcheckPath = "/healthz"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

@@ -21,6 +21,11 @@ import { explainTransaction } from './explainer';
 import type { DecodedTx } from './types';
 
 export interface HostedExplainerOptions {
+  // 'anthropic' (default): call the Messages API directly with `apiKey` —
+  // local dev and demos only. 'proxy': POST the ExplainInput to `endpoint`
+  // (the Lantern API, services/lantern-api) and read `{ explanation }`; no
+  // key leaves the client. The proxy runs this same prompt/sanitise code.
+  mode?: 'anthropic' | 'proxy';
   apiKey: string;
   // The single hosted model D2 commits to (recorded in the README). Default
   // is Claude Haiku 4.5: fast and cheap for one sentence.
@@ -150,6 +155,7 @@ interface MessagesResponse {
 }
 
 export function createHostedExplainer(opts: HostedExplainerOptions): Explainer {
+  if (opts.mode === 'proxy') return createProxyExplainer(opts);
   const fetchImpl = opts.fetchImpl ?? fetch;
   const model = opts.model ?? DEFAULT_EXPLAIN_MODEL;
   const endpoint = opts.endpoint ?? DEFAULT_EXPLAIN_ENDPOINT;
@@ -211,6 +217,61 @@ export function createHostedExplainer(opts: HostedExplainerOptions): Explainer {
       throw new ExplainError('contradiction', 'model output contradicted the verdict');
     }
     return clean;
+  };
+}
+
+// Proxy mode: the structured input goes to the Lantern API, which holds the
+// key and runs buildPrompt / sanitise / contradictsVerdict server-side. The
+// status table mirrors the proxy's error codes onto ExplainError kinds so
+// runPipeline's fallback is identical in both modes. The response is
+// displayed, never parsed for meaning: only `explanation` is read.
+function createProxyExplainer(opts: HostedExplainerOptions): Explainer {
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  const endpoint = opts.endpoint ?? '';
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_HOSTED_TIMEOUT_MS;
+  const maxChars = opts.maxOutputChars ?? DEFAULT_MAX_OUTPUT_CHARS;
+  if (!endpoint) throw new Error('proxy mode needs an endpoint');
+  return async (input: ExplainInput): Promise<string> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      let res: Response;
+      try {
+        res = await fetchImpl(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ verdict: input.verdict, effects: input.effects }),
+          signal: controller.signal,
+        });
+      } catch (e) {
+        if (controller.signal.aborted)
+          throw new ExplainError('timeout', `explainer exceeded ${timeoutMs}ms`);
+        throw new ExplainError('transport', e instanceof Error ? e.message : 'network error');
+      }
+      if (res.status === 429) throw new ExplainError('rate_limited', 'proxy rate-limited');
+      if (res.status === 504) throw new ExplainError('timeout', 'proxy upstream timeout');
+      if (!res.ok) throw new ExplainError('transport', `proxy responded ${res.status}`);
+      let body: { explanation?: unknown };
+      try {
+        body = (await res.json()) as typeof body;
+      } catch {
+        if (controller.signal.aborted)
+          throw new ExplainError('timeout', `explainer exceeded ${timeoutMs}ms`);
+        throw new ExplainError('empty', 'proxy returned a non-JSON body');
+      }
+      if (typeof body.explanation !== 'string')
+        throw new ExplainError('empty', 'proxy returned no text');
+      // Belt and braces: the proxy already sanitised, but this client does
+      // not trust any network peer with its display surface.
+      const clean = sanitise(body.explanation, maxChars);
+      if (clean === '') throw new ExplainError('empty', 'proxy returned no text');
+      if (contradictsVerdict(clean, input.verdict.risk)) {
+        throw new ExplainError('contradiction', 'proxy output contradicted the verdict');
+      }
+      return clean;
+    } finally {
+      clearTimeout(timer);
+    }
   };
 }
 
