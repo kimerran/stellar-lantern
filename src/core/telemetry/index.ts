@@ -64,11 +64,14 @@ export async function grantConsent(): Promise<void> {
 // Revoke + "delete my data": stop emitting, ask the server to drop the
 // install's rows, and forget the id locally so any future trail is unlinkable.
 export async function revokeConsentAndDelete(): Promise<void> {
+  // An install that never opted in has nothing on the server and must make
+  // no request to the ingest origin — not even a deletion.
+  const had = consent;
   sink?.emit({ name: 'consent_revoked', props: {} });
   await sink?.flush();
   await setSettings({ analyticsConsent: false });
   consent = false;
-  await sink?.requestDeletion();
+  if (had) await sink?.requestDeletion();
   await clearInstallId();
 }
 

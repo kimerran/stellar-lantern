@@ -30,7 +30,9 @@ function memKV(): KV & { store: Map<string, string> } {
   };
 }
 const ADDRESS = 'GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ';
-const SECRET = 'SB3KDOTHVCXDBQO4U2M2FSH3HLHUWSOATFPS7VONWDJ3IC7D2QL64JCJ';
+// Key-shaped for the validator's regex, built at runtime so no scanner flags it;
+// cannot be a real seed.
+const SECRET = 'S' + 'B'.repeat(55);
 const UUID = '5f3d2f1e-9c2b-4a1d-8e7f-0123456789ab';
 
 function sinkWith(over: Partial<Parameters<typeof createSink>[0]> = {}) {
@@ -126,6 +128,19 @@ describe('validate', () => {
       validateEvent({ name: 'tx_signed', props: { kind: 'sign_only', ok: 'yes' }, ts: 1 }),
     ).toBe(false);
     expect(validateEvent({ name: 'app_first_open', props: {}, ts: 1, extra: 1 })).toBe(false);
+  });
+
+  it('returns false, not a throw, for prototype-named props', () => {
+    expect(
+      validateEvent({ name: 'message_scanned', props: { constructor: 'x', risk: 'low' }, ts: 1 }),
+    ).toBe(false);
+    const parsed = JSON.parse(
+      '{"name":"message_scanned","props":{"__proto__":"x","risk":"low"},"ts":1}',
+    );
+    expect(validateEvent(parsed)).toBe(false);
+    expect(
+      validateEvent({ name: 'app_first_open', props: JSON.parse('{"constructor":"x"}'), ts: 1 }),
+    ).toBe(false);
   });
 
   it('rejects an envelope that smuggles a key anywhere, or a non-UUID install id', () => {
@@ -294,6 +309,29 @@ describe('startTelemetry', () => {
     (globalThis as unknown as { chrome: unknown }).chrome = {
       storage: { onChanged: { addListener: () => {}, removeListener: () => {} } },
     };
+  });
+
+  it('revoking without ever consenting makes no request and stores no install id', async () => {
+    const kv = memKV();
+    __setKV(kv);
+    let calls = 0;
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      calls += 1;
+      return new Response('', { status: 204 });
+    }) as typeof fetch;
+    try {
+      await startTelemetry({
+        ingestUrl: 'https://ingest.lantern.invalid/v1/telemetry',
+        appVersion: '0.1.0',
+      });
+      await revokeConsentAndDelete();
+      expect(calls).toBe(0);
+      expect(kv.store.has(INSTALL_ID_KEY)).toBe(false);
+      expect((await getSettings()).analyticsConsent).toBe(false);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
   });
 
   it('consent defaults to off, lives in Settings, and gates emission end to end', async () => {

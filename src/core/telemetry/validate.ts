@@ -23,7 +23,9 @@ export function validateEvent(e: unknown): e is StampedEvent {
   const schema = EVENT_SCHEMA[name as keyof typeof EVENT_SCHEMA];
   const p = props as Record<string, unknown>;
   for (const k of Object.keys(p)) {
-    const allowed = schema[k];
+    // Own-property only: a JSON key of "constructor" or "__proto__" would
+    // otherwise read Object.prototype through the chain and throw below.
+    const allowed = Object.prototype.hasOwnProperty.call(schema, k) ? schema[k] : undefined;
     if (allowed === undefined) return false;
     const v = p[k];
     if (allowed === 'boolean') {
