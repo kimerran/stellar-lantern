@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Settings } from '@shared/types';
 import type { NetworkId } from '@shared/constants';
 import { getSettings, setSettings, onSettingsChanged } from '@shared/storage';
+import { grantConsent, revokeConsentAndDelete, markConsentPromptSeen } from '@core/telemetry';
 
 export function useSettings() {
   const [settings, setLocal] = useState<Settings | null>(null);
@@ -24,13 +25,41 @@ export function useSettings() {
     setLocal(await setSettings({ autoLockMinutes }));
   }, []);
 
-  const setHorizonOverrides = useCallback(async (horizonOverrides: Settings['horizonOverrides']) => {
-    setLocal(await setSettings({ horizonOverrides }));
-  }, []);
+  const setHorizonOverrides = useCallback(
+    async (horizonOverrides: Settings['horizonOverrides']) => {
+      setLocal(await setSettings({ horizonOverrides }));
+    },
+    [],
+  );
 
   const setRpcOverrides = useCallback(async (rpcOverrides: Settings['rpcOverrides']) => {
     setLocal(await setSettings({ rpcOverrides }));
   }, []);
 
-  return { settings, setNetwork, toggleNetwork, setAutoLock, setHorizonOverrides, setRpcOverrides };
+  // Analytics consent (#86). Only meaningful under __FEATURE_TELEMETRY__; the
+  // telemetry module is tiny and its import is what the flag guards at the
+  // call sites in App / Settings.
+  const setAnalyticsConsent = useCallback(async (on: boolean) => {
+    if (!__FEATURE_TELEMETRY__) return;
+    if (on) await grantConsent();
+    else await revokeConsentAndDelete();
+    setLocal(await getSettings());
+  }, []);
+
+  const dismissAnalyticsPrompt = useCallback(async () => {
+    if (!__FEATURE_TELEMETRY__) return;
+    await markConsentPromptSeen();
+    setLocal(await getSettings());
+  }, []);
+
+  return {
+    settings,
+    setNetwork,
+    toggleNetwork,
+    setAutoLock,
+    setHorizonOverrides,
+    setRpcOverrides,
+    setAnalyticsConsent,
+    dismissAnalyticsPrompt,
+  };
 }

@@ -76,8 +76,12 @@ Each flush sends one envelope:
 
 - Consent is the `analyticsConsent` field of the wallet's existing Settings
   record (`src/shared/storage.ts`) — no parallel store. Default `false`.
-- The prompt appears **once**, after onboarding completes — never before,
-  never blocking.
+- **Settings → Privacy** holds the toggle ("Share anonymous usage data"), the
+  what-we-collect / what-we-never-collect lists (the same text as this
+  document, asserted by test), and **Delete my data**.
+- The prompt appears **once**, after onboarding has produced a wallet — never
+  before, never blocking; "Not now" answers it for good
+  (`analyticsPromptSeen`), and it is never shown again after either answer.
 - Granting emits `consent_granted` and starts the sink. Revoking emits
   `consent_revoked`, stops emission, sends a deletion request for the install
   id, and forgets the id locally.

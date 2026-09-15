@@ -46,6 +46,8 @@ export interface Settings {
   // no-op until this is true. Lives here so the consent toggle live-updates
   // every surface via onSettingsChanged, like every other setting.
   analyticsConsent?: boolean;
+  // The one-time analytics prompt after onboarding has been answered (#86).
+  analyticsPromptSeen?: boolean;
 }
 
 // A single asset balance for display.

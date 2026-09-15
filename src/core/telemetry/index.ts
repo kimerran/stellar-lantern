@@ -16,6 +16,7 @@ export type { TelemetryEvent, Envelope, StampedEvent, EventName } from './events
 export { validateEnvelope, validateEvent } from './validate';
 export { createSink } from './sink';
 export { getInstallId, clearInstallId, INSTALL_ID_KEY } from './install-id';
+export { CONSENT_COPY, shouldShowConsentPrompt, markConsentPromptSeen } from './consent';
 
 let sink: Sink | null = null;
 let consent = false;
@@ -55,7 +56,7 @@ export function emit(event: TelemetryEvent): void {
 }
 
 export async function grantConsent(): Promise<void> {
-  await setSettings({ analyticsConsent: true });
+  await setSettings({ analyticsConsent: true, analyticsPromptSeen: true });
   consent = true;
   sink?.emit({ name: 'consent_granted', props: {} });
   await sink?.flush();
@@ -69,7 +70,7 @@ export async function revokeConsentAndDelete(): Promise<void> {
   const had = consent;
   sink?.emit({ name: 'consent_revoked', props: {} });
   await sink?.flush();
-  await setSettings({ analyticsConsent: false });
+  await setSettings({ analyticsConsent: false, analyticsPromptSeen: true });
   consent = false;
   if (had) await sink?.requestDeletion();
   await clearInstallId();
