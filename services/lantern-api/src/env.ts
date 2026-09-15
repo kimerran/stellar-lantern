@@ -1,0 +1,39 @@
+// Typed environment. Read once at boot; the only source of configuration.
+// Boot fails loudly on a missing key — a proxy with no key is a 502 factory.
+
+export interface Env {
+  anthropicApiKey: string;
+  model: string;
+  allowedOrigins: string[]; // empty = allow all (dev only)
+  rateLimitPerMin: number;
+  dailyCap: number;
+  upstreamTimeoutMs: number;
+  port: number;
+}
+
+export const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
+
+function int(name: string, raw: string | undefined, dflt: number): number {
+  if (raw === undefined || raw === '') return dflt;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n <= 0)
+    throw new Error(`${name} must be a positive integer, got "${raw}"`);
+  return n;
+}
+
+export function readEnv(source: Record<string, string | undefined> = process.env): Env {
+  const anthropicApiKey = source.ANTHROPIC_API_KEY ?? '';
+  if (!anthropicApiKey) throw new Error('ANTHROPIC_API_KEY is required');
+  return {
+    anthropicApiKey,
+    model: source.LANTERN_AI_MODEL || DEFAULT_MODEL,
+    allowedOrigins: (source.ALLOWED_ORIGINS ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+    rateLimitPerMin: int('RATE_LIMIT_PER_MIN', source.RATE_LIMIT_PER_MIN, 10),
+    dailyCap: int('DAILY_CAP', source.DAILY_CAP, 2000),
+    upstreamTimeoutMs: int('UPSTREAM_TIMEOUT_MS', source.UPSTREAM_TIMEOUT_MS, 4000),
+    port: int('PORT', source.PORT, 8080),
+  };
+}

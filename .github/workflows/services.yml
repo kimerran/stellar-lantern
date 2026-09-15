@@ -1,0 +1,69 @@
+name: Services
+
+# Typecheck + offline tests for services/ (the Lantern API). The service has
+# its own package.json and lockfile but imports @lantern/scanner from the
+# repo, so both installs run. No key is ever set here: the suite stubs the
+# upstream and must stay green offline.
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - 'services/**'
+      - 'packages/lantern-scanner/**'
+      - '.github/workflows/services.yml'
+  push:
+    branches: [develop]
+    paths:
+      - 'services/**'
+      - 'packages/lantern-scanner/**'
+  workflow_dispatch:
+
+concurrency:
+  group: services-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lantern-api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/lantern-api
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Use npm 11 (npm 10 rejects esbuild's optional openharmony package)
+        working-directory: .
+        run: npm install -g npm@11 --no-audit --no-fund
+
+      - name: Install (repo root, for @lantern/scanner's dependencies)
+        working-directory: .
+        run: npm ci
+
+      - name: Install (service)
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test (offline, upstream stubbed)
+        run: npm test
+
+      - name: Build bundle
+        run: npm run build
+
+      - name: Boot smoke
+        run: |
+          ANTHROPIC_API_KEY=ci-smoke PORT=18080 node dist/index.js &
+          sleep 2
+          curl -fsS localhost:18080/healthz
+          kill %1

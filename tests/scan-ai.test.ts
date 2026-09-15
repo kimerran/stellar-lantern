@@ -17,8 +17,43 @@ describe('hostedExplainer', () => {
 
   it('returns an Explainer when the host supplies a key, or a proxy endpoint', () => {
     expect(typeof hostedExplainer({ apiKey: 'k' })).toBe('function');
-    expect(typeof hostedExplainer({ endpoint: 'https://proxy.invalid/v1/messages' })).toBe(
+    expect(typeof hostedExplainer({ endpoint: 'https://proxy.invalid/v1/explain' })).toBe(
       'function',
     );
+  });
+
+  it('an endpoint without a key is proxy mode: the request carries no key and posts the ExplainInput', async () => {
+    let sent: { headers: Record<string, string>; body: Record<string, unknown> } | undefined;
+    const fetchImpl: typeof fetch = async (_u, init) => {
+      sent = {
+        headers: init?.headers as Record<string, string>,
+        body: JSON.parse(String(init?.body)),
+      };
+      return new Response(JSON.stringify({ explanation: 'ok' }), { status: 200 });
+    };
+    const explainer = hostedExplainer({ endpoint: 'https://proxy.invalid/v1/explain', fetchImpl })!;
+    const verdict = {
+      risk: 'low',
+      action: 'allow',
+      reasons: [],
+      signals: [],
+      scope: 'effects shown, terms not judged',
+    } as const;
+    const effects = {
+      source: null,
+      effects: [],
+      deltas: [],
+      net: [],
+      closes: [],
+      contractsTouched: [],
+      approvals: [],
+      unverified: [],
+      observed: [],
+      observedNet: [],
+      coverage: 'full',
+    } as const;
+    expect(await explainer({ verdict, effects })).toBe('ok');
+    expect(sent?.headers['x-api-key']).toBeUndefined();
+    expect(Object.keys(sent?.body ?? {}).sort()).toEqual(['effects', 'verdict']);
   });
 });

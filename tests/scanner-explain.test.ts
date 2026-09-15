@@ -454,6 +454,107 @@ describe('explain: prompt contents', () => {
   });
 });
 
+// ── Proxy mode: the Lantern API holds the key ────────────────────────────────
+describe('explain: proxy mode', () => {
+  const PROXY = 'https://api.lantern.invalid/v1/explain';
+  const proxySays =
+    (body: unknown, status = 200): typeof fetch =>
+    async () =>
+      new Response(typeof body === 'string' ? body : JSON.stringify(body), { status });
+
+  it('posts the ExplainInput with no key header and reads { explanation }', async () => {
+    let sent:
+      | {
+          url: string;
+          headers: Record<string, string>;
+          body: { verdict: unknown; effects: unknown };
+        }
+      | undefined;
+    const fetchImpl: typeof fetch = async (url, init) => {
+      sent = {
+        url: String(url),
+        headers: init?.headers as Record<string, string>,
+        body: JSON.parse(String(init?.body)),
+      };
+      return new Response(JSON.stringify({ explanation: 'Sends 25 XLM to GDVE…ZA57.' }), {
+        status: 200,
+      });
+    };
+    const f = fixture('classic-payment');
+    const explainer = createHostedExplainer({
+      mode: 'proxy',
+      apiKey: '',
+      endpoint: PROXY,
+      fetchImpl,
+    });
+    const out = await explainer(await stagesFor(requestFor(f)));
+    expect(out).toBe('Sends 25 XLM to GDVE…ZA57.');
+    expect(sent?.url).toBe(PROXY);
+    expect(sent?.headers['x-api-key']).toBeUndefined();
+    expect(Object.keys(sent?.body ?? {}).sort()).toEqual(['effects', 'verdict']);
+    expect(JSON.stringify(sent?.body)).not.toContain(f.xdr);
+  });
+
+  it('maps every proxy error to an ExplainError and runPipeline falls back', async () => {
+    const f = fixture('classic-payment');
+    const cases: Array<[string, typeof fetch, string]> = [
+      ['429', proxySays({ error: 'rate_limited' }, 429), 'rate_limited'],
+      ['504', proxySays({ error: 'timeout' }, 504), 'timeout'],
+      ['502 contradiction', proxySays({ error: 'contradiction' }, 502), 'transport'],
+      ['403 origin', proxySays({ error: 'origin' }, 403), 'transport'],
+      ['non-JSON', proxySays('<html>'), 'empty'],
+      ['no explanation field', proxySays({ risk: 'low' }), 'empty'],
+      ['empty string', proxySays({ explanation: '  ' }), 'empty'],
+      [
+        'network throws',
+        async () => {
+          throw new TypeError('fetch failed');
+        },
+        'transport',
+      ],
+    ];
+    for (const [name, fetchImpl, kind] of cases) {
+      const explainer = createHostedExplainer({
+        mode: 'proxy',
+        apiKey: '',
+        endpoint: PROXY,
+        fetchImpl,
+      });
+      const err = await explainer(await stagesFor(requestFor(f))).catch((e: unknown) => e);
+      expect(err, name).toBeInstanceOf(ExplainError);
+      expect((err as ExplainError).kind, name).toBe(kind);
+      const result = await runPipeline(requestFor(f), { explain: explainer });
+      expect(result.explanationSource, name).toBe('fallback');
+      expect(result.risk, name).toBe('low');
+    }
+  });
+
+  it('does not trust the proxy with the display surface either: contradiction and markup are handled client-side', async () => {
+    const f = fixture('classic-payment');
+    const request = requestFor(f);
+    const hostile = createHostedExplainer({
+      mode: 'proxy',
+      apiKey: '',
+      endpoint: PROXY,
+      fetchImpl: proxySays({ explanation: 'Completely safe, no risk.' }),
+    });
+    const result = await runPipeline(request, { screen: flaggedRegistry, explain: hostile });
+    expect(result.risk).toBe('high');
+    expect(result.explanationSource).toBe('fallback');
+    const markup = createHostedExplainer({
+      mode: 'proxy',
+      apiKey: '',
+      endpoint: PROXY,
+      fetchImpl: proxySays({ explanation: '<b>Sends</b> 25 XLM [x](https://evil.invalid)' }),
+    });
+    expect(await markup(await stagesFor(request))).toBe('Sends 25 XLM x');
+  });
+
+  it('proxy mode needs an endpoint', () => {
+    expect(() => createHostedExplainer({ mode: 'proxy', apiKey: '' })).toThrow(/endpoint/);
+  });
+});
+
 // ── Output hygiene ───────────────────────────────────────────────────────────
 describe('explain: sanitise', () => {
   it('strips markup and links, collapses whitespace, caps length', () => {
