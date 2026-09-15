@@ -1,9 +1,9 @@
 # Telemetry — what Lantern collects, and what it never does
 
-**Status:** the event core, consent gate and privacy guarantees are
-implemented (#81, slice 1). The Settings toggle, the emit points and the
-ingest backend are follow-up slices; until they land the `telemetry` flag is
-**OFF** in every build and nothing here is active.
+**Status:** the event core, consent gate and privacy guarantees (#83) and the
+ingest backend (#85) are implemented. The Settings toggle (#86), the emit
+points (#87) and the build flag (#88) are follow-up slices; until they land
+the `telemetry` flag is **OFF** in every build and nothing here is active.
 
 This document is what we point the Chrome Web Store reviewer and grant
 reviewers at.
@@ -87,8 +87,9 @@ Each flush sends one envelope:
 
 ## Retention
 
-**Proposed:** raw per-install events for 90 days, then aggregate-only. To be
-confirmed with the ingest backend decision (open on #81).
+Raw per-install events for **90 days**, then deleted — enforced by the Lantern
+API's retention job (`services/lantern-api`, #85). Rows live in Postgres on
+Railway, under our control; no third party holds the data.
 
 ## Build plumbing
 

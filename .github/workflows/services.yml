@@ -11,12 +11,14 @@ on:
     paths:
       - 'services/**'
       - 'packages/lantern-scanner/**'
+      - 'src/core/telemetry/**'
       - '.github/workflows/services.yml'
   push:
     branches: [develop]
     paths:
       - 'services/**'
       - 'packages/lantern-scanner/**'
+      - 'src/core/telemetry/**'
   workflow_dispatch:
 
 concurrency:

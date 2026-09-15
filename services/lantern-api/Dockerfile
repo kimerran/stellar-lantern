@@ -11,6 +11,8 @@ COPY package.json package-lock.json ./
 COPY packages/lantern-scanner/package.json packages/lantern-scanner/package.json
 RUN npm ci --omit=dev --ignore-scripts
 COPY packages/lantern-scanner packages/lantern-scanner
+# The telemetry validator is shared with the wallet (src/core/telemetry).
+COPY src/core/telemetry src/core/telemetry
 COPY services/lantern-api services/lantern-api
 RUN cd services/lantern-api && npm ci --ignore-scripts && npm run build
 

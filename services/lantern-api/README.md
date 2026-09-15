@@ -17,8 +17,11 @@ service is down the wallet shows its rules-based sentence instead.
 
 | route | what |
 |---|---|
-| `GET /healthz` | `{ ok, model, today }` — no auth, no limits (Railway's health check) |
+| `GET /healthz` | `{ ok, model, today, db }` — no auth, no limits (Railway's health check); `db` is `true`/`false` with a store, `null` without |
 | `POST /v1/explain` | body: the scanner's `ExplainInput` (`{ verdict, effects }`); returns **exactly** `{ explanation: string }` |
+| `POST /v1/telemetry` | body: the wallet's telemetry envelope; one row per event; `204` (#85) |
+| `DELETE /v1/telemetry/install` | body `{ installId }`; that install's rows gone; `204` either way |
+| `GET /v1/telemetry/export` | `Authorization: Bearer $TELEMETRY_ADMIN_TOKEN`; `?since=&until=&after=`; `{ rows, next }`, 1000 rows a page — the report's only input |
 
 `/v1/explain` runs the scanner package's own code, imported: `buildPrompt`
 (structured facts only — no XDR, no memo, symbol / function-name guards) →
@@ -37,6 +40,28 @@ an error status and the client falls back to the rules-based sentence.
 
 The response body can never carry `risk`, `action` or `reasons` — asserted by
 test. The proxy cannot become a second verdict source.
+
+## Telemetry ingest (#85)
+
+The envelope is validated with the **same** `validateEnvelope` the wallet
+uses (`src/core/telemetry/validate.ts`, aliased in): enum-only props, no
+free text, nothing StrKey-shaped anywhere. Anything else is `400` and inserts
+nothing. Rows are exactly `install_id, platform, app_version, network, event,
+props, ts, received_at` in Postgres (`telemetry_events`; the migration is one
+idempotent statement applied at boot). Telemetry has its **own** daily cap
+(`TELEMETRY_DAILY_CAP`) so it can never starve the explainer, shares the
+origin allowlist and body limit, and logs a row count — never an event body.
+
+**Retention:** rows older than `TELEMETRY_RETENTION_DAYS` (default 90) are
+purged at boot and every 24 h in-process. "Delete my data" is
+`DELETE /v1/telemetry/install`, which the wallet's `revokeConsentAndDelete()`
+already calls.
+
+Without `DATABASE_URL` the telemetry routes answer `503` and the explainer is
+unaffected. With it, `TELEMETRY_ADMIN_TOKEN` is required (boot fails
+otherwise). Postgres is private-network only on Railway, so the `pgStore`
+integration test (`test/pg-store.test.ts`) runs only when you point
+`DATABASE_URL` at a database of your own; CI uses the in-memory store.
 
 ## Threat model: open, but bounded
 
@@ -74,6 +99,10 @@ The upgrade path once there are real users is per-install client identity
 | `DAILY_CAP` | no | `2000` |
 | `UPSTREAM_TIMEOUT_MS` | no | `4000` |
 | `PORT` | no | `8080` (Railway injects it) |
+| `DATABASE_URL` | no | — ; set by reference to the Postgres service (`${{Postgres.DATABASE_URL}}`); enables telemetry |
+| `TELEMETRY_ADMIN_TOKEN` | with `DATABASE_URL` | — ; bearer for `/v1/telemetry/export` |
+| `TELEMETRY_DAILY_CAP` | no | `50000` |
+| `TELEMETRY_RETENTION_DAYS` | no | `90` |
 
 The extension's origin is `chrome-extension://<extension id>`; add the demo
 site's origin alongside it.
@@ -93,6 +122,13 @@ Point the wallet at it with `hostedExplainer({ endpoint: 'http://localhost:8080/
 
 ## Deploy to Railway
 
+**Short version:** `scripts/deploy-lantern-api.sh` from the repo root. The
+Railway CLI's uploader fails on this tree (`prefix not found`) and would ship
+the whole repo as build context, so the script stages exactly what the
+Dockerfile copies into a scratch directory, links it to the pinned project
+(an unlinked directory makes `railway up` create a *new* project), uploads
+with `--path-as-root`, and waits for `/healthz`. First-time setup:
+
 1. **Anthropic account (human step):** create a key scoped to this project;
    set a hard monthly spend cap and a billing alert. Record the model in
    `LANTERN_AI_MODEL` if it differs from the default — the SOW commits to a
@@ -104,7 +140,9 @@ Point the wallet at it with `hostedExplainer({ endpoint: 'http://localhost:8080/
    `services/lantern-api/railway.toml` — it sets the Dockerfile, the
    `/healthz` health check and the restart policy.
 4. Variables: `ANTHROPIC_API_KEY`, `ALLOWED_ORIGINS`, and any override from the
-   table. Railway sets `PORT`.
+   table. Railway sets `PORT`. For telemetry: `railway add --database postgres`,
+   then on this service `DATABASE_URL=${{Postgres.DATABASE_URL}}` and a
+   `TELEMETRY_ADMIN_TOKEN` (`openssl rand -hex 24`).
 5. Deploy; `GET https://<service>.up.railway.app/healthz` must answer
    `{ "ok": true, … }`. Give the public URL + `/v1/explain` to the wallet
    (`hostedExplainer({ endpoint })`) and the demo site.
@@ -126,7 +164,13 @@ src/middleware/origin.ts  Origin allowlist
 src/middleware/rate-limit.ts  per-IP window + daily cap (injectable clock)
 src/middleware/body-limit.ts  32 KB
 src/upstream/anthropic.ts the one outbound call (injectable fetch)
-test/app.test.ts          offline suite
+src/routes/telemetry.ts   POST /v1/telemetry, DELETE …/install, GET …/export (#85)
+src/telemetry/store.ts    TelemetryStore interface + in-memory implementation
+src/telemetry/pg-store.ts Postgres implementation + the migration
+src/telemetry/retention.ts the 90-day purge
+test/app.test.ts          offline suite (explainer)
+test/telemetry.test.ts    offline suite (ingest, export, delete, retention)
+test/pg-store.test.ts     Postgres integration, DATABASE_URL-gated
 Dockerfile, railway.toml  deploy
 ```
 
