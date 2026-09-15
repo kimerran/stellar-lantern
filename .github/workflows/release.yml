@@ -71,6 +71,11 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # Same pin as android.yml (#74): the action's default package list
+          # requests the legacy `tools` package the SDK repository no longer
+          # serves, and sdkmanager exits 1 before Gradle runs.
+          packages: 'platform-tools platforms;android-36 build-tools;35.0.0'
 
       - name: Cache Gradle
         uses: actions/cache@v4
