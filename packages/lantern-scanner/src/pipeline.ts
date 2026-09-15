@@ -14,7 +14,7 @@
 // pipeline lands alongside it and D3 rewires the wallet onto it.
 
 import { Address, MuxedAccount, StrKey, xdr as XDR } from '@stellar/stellar-sdk';
-import { ACTION_FOR, type ScanReason } from './types';
+import { deepFreeze, verdict } from './verdict';
 import type {
   AuthCall,
   AuthCredentials,
@@ -31,18 +31,16 @@ import type {
   Explainer,
   ExplainInput,
   RawSimulation,
-  RiskLevel,
   StateChange,
   ScanRequest,
   ScanResult,
   ScreenResult,
-  Signal,
   SimulationResult,
   Verdict,
 } from './types';
 import { decodeTransaction } from './decode';
 import { explainTransaction } from './explainer';
-import { isReportedAddress, scan } from './engine';
+import { isReportedAddress } from './engine';
 import { RpcError } from './rpc';
 import { observedDeltas } from './observed';
 import { unverifiedCalls } from './unverified';
@@ -50,7 +48,6 @@ import { decodeScVal } from './scval';
 import type { ScreenAnswer, ScreenLookup } from './registry';
 import { aggregate, classicDeltas, opSource } from './effects';
 import {
-  LONG_LIVED_ALLOWANCE_LEDGERS,
   recogniseTokenCall,
   tokenEffects,
   type TokenMetadata,
@@ -82,8 +79,6 @@ export interface PipelineDeps {
 }
 
 export const DEFAULT_EXPLAIN_TIMEOUT_MS = 5_000;
-
-const SEVERITY: Record<RiskLevel, number> = { low: 0, medium: 1, high: 2 };
 
 // ── Stage 1: Ingest ──────────────────────────────────────────────────────────
 // Fail-closed: a Soroban transaction that could not be simulated is `ok: false`
@@ -589,85 +584,11 @@ function screenLookup(
   return async () => ({ outcome: 'unknown', reason: 'no_registry', source: 'none' });
 }
 
-// One high-severity reason per ingest failure mode (#52). Distinguishable on
-// purpose: "the network was down" and "this contract would fail" call for
-// different next steps, and neither may ever read as a clean scan.
-const CONFIRM_TAIL = ' — do not sign unless you’re certain.';
-function ingestReason(simulation: SimulationResult): ScanReason {
-  if (simulation.outcome === 'unknown') {
-    return {
-      code: 'state_archived',
-      severity: 'high',
-      title: 'Couldn’t verify — state needs restoring',
-      detail:
-        'Some of the ledger state this contract call touches is archived, so what it would do can’t be verified until that state is restored' +
-        CONFIRM_TAIL,
-    };
-  }
-  switch (simulation.failure) {
-    case 'undecodable':
-      return {
-        code: 'undecodable',
-        severity: 'high',
-        title: 'Couldn’t read this transaction',
-        detail:
-          'Lantern couldn’t decode this transaction and can’t verify it’s safe' + CONFIRM_TAIL,
-      };
-    case 'rpc_timeout':
-      return {
-        code: 'rpc_timeout',
-        severity: 'high',
-        title: 'The network didn’t answer in time',
-        detail:
-          'Soroban RPC didn’t respond before the deadline, so this contract call is unverified. Try again in a moment' +
-          CONFIRM_TAIL,
-      };
-    case 'rpc_transport':
-      return {
-        code: 'rpc_unreachable',
-        severity: 'high',
-        title: 'Couldn’t reach the network',
-        detail:
-          'Soroban RPC couldn’t be reached, so this contract call is unverified — this is a connection problem, not a verdict on the transaction' +
-          CONFIRM_TAIL,
-      };
-    case 'simulation_malformed':
-      return {
-        code: 'simulation_malformed',
-        severity: 'high',
-        title: 'The network’s answer couldn’t be read',
-        detail:
-          'Soroban RPC returned a response Lantern couldn’t interpret, so this contract call is unverified' +
-          CONFIRM_TAIL,
-      };
-    case 'simulation_reverted':
-      return {
-        code: 'simulation_reverted',
-        severity: 'high',
-        title: 'This transaction would fail',
-        detail:
-          'Simulating this contract call reports it would fail on-chain, so Lantern can’t tell what it does' +
-          CONFIRM_TAIL,
-      };
-    case 'simulation_unavailable':
-    default:
-      return {
-        code: 'simulation_unavailable',
-        severity: 'high',
-        title: 'Couldn’t simulate this transaction',
-        detail:
-          'Lantern couldn’t simulate this contract call and can’t verify what it does' +
-          CONFIRM_TAIL,
-      };
-  }
-}
-
 // ── Stage 5: Verdict ─────────────────────────────────────────────────────────
-// The only constructor of a `Verdict`, and the last stage allowed to decide
-// anything. Interim risk core: the shipped `scan()` heuristics (so the pipeline
-// is never weaker than today's wallet) plus the fail-closed and screening
-// reasons the pipeline itself establishes. #58 replaces the body; the freeze
-// and the signature stay.
+// The pure risk core lives in verdict.ts (#58): a function of stage 3 effects
+// + stage 4 screening, no I/O, no clock, no model. This wrapper only lifts
+// the caller's context out of the request; `forceScenario` is never read —
+// the pipeline's verdict is never demo-forced.
 export function buildVerdict(input: {
   request: ScanRequest;
   simulation: SimulationResult;
@@ -675,195 +596,20 @@ export function buildVerdict(input: {
   effects: EffectSet;
   screen: ScreenResult;
 }): Verdict {
-  const { request, simulation, auth: authTree, effects: effectSet, screen: screenResult } = input;
-  const reasons: ScanReason[] = [];
-  const signals: Signal[] = [];
-
-  if (!simulation.ok) {
-    reasons.push(ingestReason(simulation));
-    signals.push({
-      stage: 'ingest',
-      code: simulation.outcome === 'unknown' ? 'unknown' : 'fail_closed',
-      detail: `${simulation.failure ?? 'state_archived'}: ${simulation.error ?? 'archived state needs restoring'}`,
-    });
-  } else {
-    signals.push({
-      stage: 'ingest',
-      code: simulation.simulated ? 'simulated' : 'classic',
-      detail: simulation.simulated
-        ? `${simulation.auth.length} auth entries`
-        : 'no simulation needed',
-    });
-  }
-
-  if (authTree.unparseable > 0) {
-    reasons.push({
-      code: 'auth_unreadable',
-      severity: 'high',
-      title: 'Couldn’t read what this transaction authorises',
-      detail:
-        'Part of the authorisation this contract call requires couldn’t be decoded, so Lantern can’t tell what it permits — do not sign unless you’re certain.',
-    });
-    signals.push({
-      stage: 'auth',
-      code: 'fail_closed',
-      detail: `${authTree.unparseable} of ${simulation.auth.length} auth entries unparseable`,
-    });
-  } else {
-    signals.push({
-      stage: 'auth',
-      code: authTree.nestedCount > 0 ? 'nested_invocations' : 'flat',
-      detail: `${authTree.entries.length} entries, ${authTree.calls.length} calls, ${authTree.nestedCount} nested, depth ${authTree.maxDepth}`,
-    });
-  }
-  signals.push({
-    stage: 'effects',
-    code: `coverage_${effectSet.coverage}`,
-    detail: effectSet.effects.map((e) => e.kind).join(',') || 'none',
+  const { context } = input.request;
+  return verdict({
+    simulation: input.simulation,
+    auth: input.auth,
+    effects: input.effects,
+    screen: input.screen,
+    context: {
+      fromAddress: context.fromAddress,
+      ...(context.destinationFunded !== undefined
+        ? { destinationFunded: context.destinationFunded }
+        : {}),
+      ...(context.spendableXlm !== undefined ? { spendableXlm: context.spendableXlm } : {}),
+    },
   });
-  signals.push({
-    stage: 'screen',
-    code: screenResult.outcome,
-    detail: `${screenResult.checked.length} checked, ${screenResult.hits.length} hits, ${screenResult.unknown.length} unknown`,
-  });
-
-  // Today's heuristics, with the demo override stripped: the pipeline's verdict
-  // is never forced, whatever the UI is allowed to do in a demo build.
-  if (simulation.decoded) {
-    const context = { ...request.context };
-    delete context.forceScenario;
-    const legacy = scan({
-      xdr: request.xdr,
-      networkPassphrase: request.networkPassphrase,
-      context,
-    });
-    // The generic `contract_call` reason is superseded by 3c's
-    // `unverified_contract` when the pipeline has one.
-    const hasUnverified = effectSet.unverified.length > 0;
-    for (const r of legacy.reasons) {
-      if (hasUnverified && r.code === 'contract_call') continue;
-      // scan()'s testnet-always demo deny-list must not shadow the registry:
-      // stage 4 is the only source of `reported_address` here.
-      if (r.code === 'reported_address') continue;
-      reasons.push(r);
-    }
-    signals.push({
-      stage: 'verdict',
-      code: 'legacy_heuristics',
-      detail: `${legacy.reasons.length} reasons`,
-    });
-  }
-
-  // 3c: an unknown contract raises risk, it never lowers it. The reason
-  // names the call and nothing about what it means; the observed balance
-  // changes ride alongside so the user still sees what simulation proved.
-  if (effectSet.unverified.length > 0) {
-    const first = effectSet.unverified[0]!;
-    const contract = `${first.contractId.slice(0, 4)}…${first.contractId.slice(-4)}`;
-    const more = effectSet.unverified.length - 1;
-    const moved = effectSet.observed.length;
-    reasons.push({
-      code: 'unverified_contract',
-      severity: 'medium',
-      title: 'Unverified contract — semantics unknown',
-      detail:
-        `This calls “${first.functionName}” on contract ${contract}${more > 0 ? ` (and ${more} more call${more > 1 ? 's' : ''})` : ''}. Lantern doesn’t know what this function does` +
-        (moved > 0
-          ? `; simulation shows ${moved} balance change${moved > 1 ? 's' : ''} — review them before signing.`
-          : '; simulation shows no balance changes, but that is not a guarantee.'),
-    });
-    signals.push({
-      stage: 'effects',
-      code: 'unverified_contract',
-      detail: effectSet.unverified
-        .map((u) => `${u.functionName}@${u.contractId.slice(0, 4)} d${u.depth}`)
-        .join(', '),
-    });
-  }
-  if (effectSet.observed.length > 0) {
-    signals.push({
-      stage: 'effects',
-      code: 'observed_balance_changes',
-      detail: effectSet.observed
-        .map((d) => `${d.direction} ${d.amount ?? d.raw} ${d.asset.code} ${d.address.slice(0, 4)}`)
-        .join(', '),
-    });
-  }
-
-  // 3b: allowances. An unlimited approval is the headline scam; a long-lived
-  // one is the signal that turns a mistake into a standing liability.
-  for (const ap of effectSet.approvals) {
-    const spender = `${ap.spender.slice(0, 4)}…${ap.spender.slice(-4)}`;
-    const longLived =
-      simulation.latestLedger === undefined ||
-      ap.expirationLedger - simulation.latestLedger > LONG_LIVED_ALLOWANCE_LEDGERS;
-    signals.push({
-      stage: 'effects',
-      code: ap.unlimited ? 'unlimited_allowance' : 'allowance',
-      detail: `${ap.asset.code} → ${spender}, ${ap.amountScaled ?? `${ap.amount} (decimals unknown)`}, expires ledger ${ap.expirationLedger}${longLived ? ' (long-lived)' : ''}, depth ${ap.depth}`,
-    });
-    if (longLived) {
-      signals.push({
-        stage: 'effects',
-        code: 'long_lived_allowance',
-        detail: `expires ledger ${ap.expirationLedger}, latest ${simulation.latestLedger ?? 'unknown'}`,
-      });
-    }
-    if (ap.unlimited && !reasons.some((r) => r.code === 'unlimited_allowance')) {
-      reasons.push({
-        code: 'unlimited_allowance',
-        severity: 'high',
-        title: 'Unlimited token allowance',
-        detail: `This lets ${spender} spend an unlimited amount of your ${ap.asset.code}${longLived ? ' for a very long time' : ''}. Only continue if you fully trust that address.`,
-      });
-    }
-  }
-
-  for (const hit of screenResult.hits) {
-    if (reasons.some((r) => r.code === 'reported_address')) break;
-    const short = `${hit.address.slice(0, 4)}…${hit.address.slice(-4)}`;
-    const e = hit.entry;
-    reasons.push({
-      code: 'reported_address',
-      severity: 'high',
-      title: 'Reported address',
-      detail: e
-        ? `${short} is on the Lantern blacklist registry: reported as ${e.reason} by ${e.reporter.slice(0, 4)}…${e.reporter.slice(-4)}, ${e.reports} report${e.reports === 1 ? '' : 's'}.`
-        : `${short} has been reported as a scam address (${hit.source}).`,
-    });
-  }
-  // Unknown is a third answer: an archived entry, an RPC failure, a timeout
-  // or no registry at all. It never reads as clean.
-  if (screenResult.unknown.length > 0 && !reasons.some((r) => r.severity === 'high')) {
-    const why = screenResult.unknown[0]!.reason;
-    reasons.push({
-      code: 'screen_unknown',
-      severity: 'medium',
-      title: 'Couldn’t check the recipient',
-      detail:
-        why === 'archived'
-          ? 'This recipient’s registry entry is archived, so whether it is still flagged can’t be read until it is restored — treat it as unverified.'
-          : why === 'no_registry'
-            ? 'No reported-address registry is configured, so this recipient is unverified.'
-            : 'The reported-address registry couldn’t be reached, so this recipient is unverified.',
-    });
-  }
-
-  const risk = reasons.reduce<RiskLevel>(
-    (worst, r) => (SEVERITY[r.severity] > SEVERITY[worst] ? r.severity : worst),
-    'low',
-  );
-  return deepFreeze({ risk, action: ACTION_FOR[risk], reasons, signals });
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const key of Object.keys(value as object)) {
-      deepFreeze((value as Record<string, unknown>)[key]);
-    }
-  }
-  return value;
 }
 
 // ── Stage 6: Explain ─────────────────────────────────────────────────────────
