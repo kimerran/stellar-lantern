@@ -178,19 +178,28 @@ export function createHostedExplainer(opts: HostedExplainerOptions): Explainer {
         signal: controller.signal,
       });
     } catch (e) {
+      clearTimeout(timer);
       if (controller.signal.aborted)
         throw new ExplainError('timeout', `explainer exceeded ${timeoutMs}ms`);
       throw new ExplainError('transport', e instanceof Error ? e.message : 'network error');
-    } finally {
-      clearTimeout(timer);
     }
-    if (res.status === 429) throw new ExplainError('rate_limited', 'model rate-limited');
-    if (!res.ok) throw new ExplainError('transport', `model responded ${res.status}`);
+    // The deadline covers the body too: a server that sends headers and then
+    // holds the body open must still be aborted, so the timer stays armed
+    // until the body is parsed.
     let body: MessagesResponse;
     try {
-      body = (await res.json()) as MessagesResponse;
-    } catch {
-      throw new ExplainError('empty', 'model returned a non-JSON body');
+      if (res.status === 429) throw new ExplainError('rate_limited', 'model rate-limited');
+      if (!res.ok) throw new ExplainError('transport', `model responded ${res.status}`);
+      try {
+        body = (await res.json()) as MessagesResponse;
+      } catch {
+        if (controller.signal.aborted) {
+          throw new ExplainError('timeout', `explainer exceeded ${timeoutMs}ms`);
+        }
+        throw new ExplainError('empty', 'model returned a non-JSON body');
+      }
+    } finally {
+      clearTimeout(timer);
     }
     const text = (body.content ?? [])
       .filter((c) => c.type === 'text' && typeof c.text === 'string')

@@ -229,6 +229,39 @@ describe('explain: fallback', () => {
     );
   });
 
+  it('the deadline covers the body: headers then a body held open still times out', async () => {
+    vi.useFakeTimers();
+    try {
+      // Headers arrive at once; the body stream only ends when the request is aborted.
+      const fetchImpl: typeof fetch = async (_url, init) => {
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            init?.signal?.addEventListener('abort', () =>
+              controller.error(new DOMException('aborted', 'AbortError')),
+            );
+          },
+        });
+        return new Response(stream, {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      };
+      const explainer = createHostedExplainer({
+        apiKey: 'k',
+        endpoint: ENDPOINT,
+        fetchImpl,
+        timeoutMs: 500,
+      });
+      const pending = explainer(await stagesFor(requestFor(f))).catch((e: unknown) => e);
+      await vi.advanceTimersByTimeAsync(1_000);
+      const err = await pending;
+      expect(err).toBeInstanceOf(ExplainError);
+      expect((err as ExplainError).kind).toBe('timeout');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('error, rate-limit and empty response each fall back', async () => {
     for (const [name, fetchImpl, kind] of [
       ['transport 500', modelSays('', 500), 'transport'],
