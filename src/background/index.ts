@@ -1,6 +1,13 @@
 import '@shared/polyfills'; // must be first — sets Buffer/process/global before Stellar loads
 import type { Request } from '@shared/messages';
 import { handle, lock } from '@core/session/handler';
+import { bootTelemetry } from '@core/telemetry';
+import { APP_VERSION } from '@shared/version';
+
+// Telemetry (#87): the service worker signs and submits (tx_signed), so it
+// needs its own consent-gated sink. No session_start here — the popup owns
+// that — and a hard no-op until the user opts in.
+if (__FEATURE_TELEMETRY__) void bootTelemetry({ appVersion: APP_VERSION, session: false });
 
 // The service worker is now a thin transport: it routes chrome messages to the
 // shared in-process handler (which holds the unlocked session in worker memory).

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { track } from '@core/telemetry';
 import type { NetworkConfig } from '@shared/constants';
 import { sendMessage } from '@shared/messages';
 import { getServer } from '@core/stellar/client';
@@ -6,11 +7,7 @@ import { scan } from '@core/scan';
 import type { ScanVerdict } from '@core/scan';
 import { isNativePlatform } from '@shared/kv';
 import { formatAmount } from '@shared/format';
-import {
-  blendPoolsForNetwork,
-  type BlendPool,
-  type BlendReserve,
-} from '@core/blend/directory';
+import { blendPoolsForNetwork, type BlendPool, type BlendReserve } from '@core/blend/directory';
 import { toBaseUnits, prepareBlendSubmit } from '@core/blend/submit';
 import {
   readSupplyMap,
@@ -211,6 +208,7 @@ export function Earn({ address, network, onBack, embedded }: Props) {
         networkPassphrase: network.passphrase,
         context: { network: network.id, fromAddress: address },
       });
+      if (__FEATURE_TELEMETRY__) track.txScanned(verdict);
       setReview({ xdr: prepared.xdr, verdict });
       setConfirmText('');
       setStep('review');
@@ -233,6 +231,7 @@ export function Earn({ address, network, onBack, embedded }: Props) {
     });
     setSubmitting(false);
     if (res.ok) {
+      if (__FEATURE_TELEMETRY__ && sel) track.earnAction(sel.action);
       setTxHash(res.data.hash);
       setStep('success');
     } else if (res.code === 'LOCKED') {
@@ -245,33 +244,44 @@ export function Earn({ address, network, onBack, embedded }: Props) {
   // ── Success ──
   if (step === 'success' && txHash && sel) {
     return (
-      <Shell title={`${actionVerb(sel.action)} — ${sel.reserve.code}`} onBack={finish} embedded={embedded}>
+      <Shell
+        title={`${actionVerb(sel.action)} — ${sel.reserve.code}`}
+        onBack={finish}
+        embedded={embedded}
+      >
         <div className="flex flex-col items-center pt-8 text-center">
-            <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-primary-container/15">
-              <Icon name="check_circle" filled size={48} className="text-primary-container drop-shadow-glow-amber" />
-            </div>
-            <h2 className="text-title-md text-on-surface">
-              {sel.action === 'supply' ? 'Supplied!' : 'Withdrawn!'}
-            </h2>
-            <p className="mt-1 text-label-md text-on-surface-variant">
-              {formatAmount(amount)} {sel.reserve.code}{' '}
-              {sel.action === 'supply' ? 'now earning yield in' : 'withdrawn from'} {sel.pool.name}.
-            </p>
-            <p className="mt-4 break-all px-2 font-mono text-label-sm text-on-surface-variant">{txHash}</p>
-            <div className="mt-6 w-full space-y-3">
-              <Button
-                fullWidth
-                variant="secondary"
-                trailingIcon="open_in_new"
-                onClick={() => window.open(network.explorerTxUrl(txHash), '_blank')}
-              >
-                View on Explorer
-              </Button>
-              <Button fullWidth onClick={finish}>
-                Done
-              </Button>
-            </div>
+          <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-primary-container/15">
+            <Icon
+              name="check_circle"
+              filled
+              size={48}
+              className="text-primary-container drop-shadow-glow-amber"
+            />
           </div>
+          <h2 className="text-title-md text-on-surface">
+            {sel.action === 'supply' ? 'Supplied!' : 'Withdrawn!'}
+          </h2>
+          <p className="mt-1 text-label-md text-on-surface-variant">
+            {formatAmount(amount)} {sel.reserve.code}{' '}
+            {sel.action === 'supply' ? 'now earning yield in' : 'withdrawn from'} {sel.pool.name}.
+          </p>
+          <p className="mt-4 break-all px-2 font-mono text-label-sm text-on-surface-variant">
+            {txHash}
+          </p>
+          <div className="mt-6 w-full space-y-3">
+            <Button
+              fullWidth
+              variant="secondary"
+              trailingIcon="open_in_new"
+              onClick={() => window.open(network.explorerTxUrl(txHash), '_blank')}
+            >
+              View on Explorer
+            </Button>
+            <Button fullWidth onClick={finish}>
+              Done
+            </Button>
+          </div>
+        </div>
       </Shell>
     );
   }
@@ -290,74 +300,90 @@ export function Earn({ address, network, onBack, embedded }: Props) {
         embedded={embedded}
         mainClass="space-y-4 pt-3"
       >
-          <div className="rounded-2xl bg-surface-container p-5 text-center shadow-layer-1">
-            <p className="text-label-sm uppercase tracking-wide text-on-surface-variant">
-              You’re {sel.action === 'supply' ? 'supplying' : 'withdrawing'}
+        <div className="rounded-2xl bg-surface-container p-5 text-center shadow-layer-1">
+          <p className="text-label-sm uppercase tracking-wide text-on-surface-variant">
+            You’re {sel.action === 'supply' ? 'supplying' : 'withdrawing'}
+          </p>
+          <p
+            className={`mt-2 text-headline-lg ${isHigh ? 'text-on-surface-variant' : 'text-primary glow-amber-text'}`}
+          >
+            {formatAmount(amount)} {sel.reserve.code}
+          </p>
+          {sel.action === 'withdraw' && withdrawAll && (
+            <p className="mt-1 text-label-sm text-on-surface-variant">
+              Full balance — withdraws everything, no dust left.
             </p>
-            <p className={`mt-2 text-headline-lg ${isHigh ? 'text-on-surface-variant' : 'text-primary glow-amber-text'}`}>
-              {formatAmount(amount)} {sel.reserve.code}
-            </p>
-            {sel.action === 'withdraw' && withdrawAll && (
-              <p className="mt-1 text-label-sm text-on-surface-variant">
-                Full balance — withdraws everything, no dust left.
-              </p>
-            )}
-          </div>
+          )}
+        </div>
 
-          <div aria-live="polite" aria-atomic="true">
-            {verdict.action === 'allow' ? (
-              <div className="flex items-center justify-between rounded-2xl border border-tertiary-container/20 bg-surface-container p-3.5">
-                <p className="pr-2 text-label-md text-on-surface">{verdict.explanation}</p>
-                <ScanBadge risk="low" latencyMs={verdict.latencyMs} />
-              </div>
-            ) : (
-              <RiskCallout
-                risk={verdict.risk}
-                reasons={verdict.reasons}
-                explanation={verdict.explanation}
-                whatToDo={isHigh ? 'Only continue if you trust this pool. Signing cannot be reversed.' : undefined}
-              />
-            )}
-          </div>
-
-          <Card className="space-y-3">
-            <Row label="Action" value={`${actionVerb(sel.action)} to earn yield`} />
-            <Row label="Pool" value={sel.pool.name} />
-            <Row label="Asset" value={sel.reserve.code} />
-            <Row label="Network" value={network.label} />
-          </Card>
-
-          {isHigh && !native && (
-            <div className="space-y-2">
-              <p className="text-label-sm text-error">
-                To proceed anyway, type <span className="font-mono font-semibold">CONFIRM</span> below.
-              </p>
-              <Input mono placeholder="CONFIRM" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} />
+        <div aria-live="polite" aria-atomic="true">
+          {verdict.action === 'allow' ? (
+            <div className="flex items-center justify-between rounded-2xl border border-tertiary-container/20 bg-surface-container p-3.5">
+              <p className="pr-2 text-label-md text-on-surface">{verdict.explanation}</p>
+              <ScanBadge risk="low" latencyMs={verdict.latencyMs} />
             </div>
-          )}
-
-          {error && <p role="alert" className="text-center text-label-md text-error">{error}</p>}
-
-          {isHigh && native ? (
-            <HoldToConfirm
-              label={submitting ? 'Signing…' : 'Hold to Sign Anyway'}
-              danger
-              onConfirm={confirm}
-              disabled={submitting}
-            />
           ) : (
-            <Button
-              fullWidth
-              onClick={confirm}
-              loading={submitting}
-              disabled={!acknowledged}
-              variant={isHigh ? 'secondary' : 'primary'}
-              trailingIcon="lock"
-              className={isHigh ? '!border-error/50 !text-error' : ''}
-            >
-              {isHigh ? 'Sign Anyway' : `Confirm & ${actionVerb(sel.action)}`}
-            </Button>
+            <RiskCallout
+              risk={verdict.risk}
+              reasons={verdict.reasons}
+              explanation={verdict.explanation}
+              whatToDo={
+                isHigh
+                  ? 'Only continue if you trust this pool. Signing cannot be reversed.'
+                  : undefined
+              }
+            />
           )}
+        </div>
+
+        <Card className="space-y-3">
+          <Row label="Action" value={`${actionVerb(sel.action)} to earn yield`} />
+          <Row label="Pool" value={sel.pool.name} />
+          <Row label="Asset" value={sel.reserve.code} />
+          <Row label="Network" value={network.label} />
+        </Card>
+
+        {isHigh && !native && (
+          <div className="space-y-2">
+            <p className="text-label-sm text-error">
+              To proceed anyway, type <span className="font-mono font-semibold">CONFIRM</span>{' '}
+              below.
+            </p>
+            <Input
+              mono
+              placeholder="CONFIRM"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+            />
+          </div>
+        )}
+
+        {error && (
+          <p role="alert" className="text-center text-label-md text-error">
+            {error}
+          </p>
+        )}
+
+        {isHigh && native ? (
+          <HoldToConfirm
+            label={submitting ? 'Signing…' : 'Hold to Sign Anyway'}
+            danger
+            onConfirm={confirm}
+            disabled={submitting}
+          />
+        ) : (
+          <Button
+            fullWidth
+            onClick={confirm}
+            loading={submitting}
+            disabled={!acknowledged}
+            variant={isHigh ? 'secondary' : 'primary'}
+            trailingIcon="lock"
+            className={isHigh ? '!border-error/50 !text-error' : ''}
+          >
+            {isHigh ? 'Sign Anyway' : `Confirm & ${actionVerb(sel.action)}`}
+          </Button>
+        )}
       </Shell>
     );
   }
@@ -375,63 +401,72 @@ export function Earn({ address, network, onBack, embedded }: Props) {
         embedded={embedded}
         mainClass="space-y-4 pt-3"
       >
-          <p className="text-body-md text-on-surface-variant">
-            {sel.action === 'supply'
-              ? `Supply ${sel.reserve.code} into ${sel.pool.name} to earn lending yield. You can withdraw anytime.`
-              : `Withdraw ${sel.reserve.code} you previously supplied to ${sel.pool.name}.`}
-          </p>
+        <p className="text-body-md text-on-surface-variant">
+          {sel.action === 'supply'
+            ? `Supply ${sel.reserve.code} into ${sel.pool.name} to earn lending yield. You can withdraw anytime.`
+            : `Withdraw ${sel.reserve.code} you previously supplied to ${sel.pool.name}.`}
+        </p>
 
-          <div className="flex items-center justify-between rounded-2xl bg-surface-container p-3.5 shadow-layer-1">
-            <span className="text-label-md text-on-surface-variant">Est. APY</span>
-            <span className="font-mono text-title-sm text-primary glow-amber-text">{formatApy(estApy)}</span>
-          </div>
+        <div className="flex items-center justify-between rounded-2xl bg-surface-container p-3.5 shadow-layer-1">
+          <span className="text-label-md text-on-surface-variant">Est. APY</span>
+          <span className="font-mono text-title-sm text-primary glow-amber-text">
+            {formatApy(estApy)}
+          </span>
+        </div>
 
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <label htmlFor="earn-amount" className="text-label-sm uppercase tracking-wide text-on-surface-variant">
-                Amount
-              </label>
-              {sel.action === 'withdraw' && maxDisplay ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAmount(maxDisplay);
-                    setWithdrawAll(true);
-                    setError(null);
-                  }}
-                  className="rounded-md border border-primary-container/40 px-2 py-0.5 text-label-sm font-semibold text-primary-container transition-colors hover:bg-primary-container/10 active:scale-95"
-                >
-                  MAX · {formatAmount(maxDisplay)} {sel.reserve.code}
-                </button>
-              ) : (
-                <span className="text-label-sm text-on-surface-variant">{sel.reserve.code}</span>
-              )}
-            </div>
-            <div className="flex items-center gap-2 rounded-lg border border-outline-variant bg-surface-container-high px-3 py-2 focus-within:border-primary-container focus-within:shadow-focus-amber">
-              <input
-                id="earn-amount"
-                inputMode="decimal"
-                placeholder="0.00"
-                value={amount}
-                onChange={(e) => {
-                  setAmount(e.target.value.replace(/[^0-9.]/g, ''));
-                  setWithdrawAll(false);
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <label
+              htmlFor="earn-amount"
+              className="text-label-sm uppercase tracking-wide text-on-surface-variant"
+            >
+              Amount
+            </label>
+            {sel.action === 'withdraw' && maxDisplay ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setAmount(maxDisplay);
+                  setWithdrawAll(true);
+                  setError(null);
                 }}
-                className="w-full bg-transparent text-right font-mono text-headline-lg text-on-surface placeholder:text-outline focus:outline-none"
-              />
-            </div>
-            {sel.action === 'withdraw' && withdrawAll && (
-              <p className="mt-1.5 text-right text-label-sm text-primary-container">
-                Withdrawing your full balance — no dust left.
-              </p>
+                className="rounded-md border border-primary-container/40 px-2 py-0.5 text-label-sm font-semibold text-primary-container transition-colors hover:bg-primary-container/10 active:scale-95"
+              >
+                MAX · {formatAmount(maxDisplay)} {sel.reserve.code}
+              </button>
+            ) : (
+              <span className="text-label-sm text-on-surface-variant">{sel.reserve.code}</span>
             )}
           </div>
+          <div className="flex items-center gap-2 rounded-lg border border-outline-variant bg-surface-container-high px-3 py-2 focus-within:border-primary-container focus-within:shadow-focus-amber">
+            <input
+              id="earn-amount"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={amount}
+              onChange={(e) => {
+                setAmount(e.target.value.replace(/[^0-9.]/g, ''));
+                setWithdrawAll(false);
+              }}
+              className="w-full bg-transparent text-right font-mono text-headline-lg text-on-surface placeholder:text-outline focus:outline-none"
+            />
+          </div>
+          {sel.action === 'withdraw' && withdrawAll && (
+            <p className="mt-1.5 text-right text-label-sm text-primary-container">
+              Withdrawing your full balance — no dust left.
+            </p>
+          )}
+        </div>
 
-          {error && <p role="alert" className="text-center text-label-md text-error">{error}</p>}
+        {error && (
+          <p role="alert" className="text-center text-label-md text-error">
+            {error}
+          </p>
+        )}
 
-          <Button fullWidth onClick={toReview} loading={busy} trailingIcon="arrow_forward">
-            Review
-          </Button>
+        <Button fullWidth onClick={toReview} loading={busy} trailingIcon="arrow_forward">
+          Review
+        </Button>
       </Shell>
     );
   }
@@ -442,112 +477,140 @@ export function Earn({ address, network, onBack, embedded }: Props) {
     pool.reserves.flatMap((r) => {
       const supplied = suppliedDisplay(pool.id, r);
       return supplied
-        ? [{ key: `${pool.id}:${r.code}`, code: r.code, poolName: pool.name, supplied, apy: apyFor(pool.id, r.code) }]
+        ? [
+            {
+              key: `${pool.id}:${r.code}`,
+              code: r.code,
+              poolName: pool.name,
+              supplied,
+              apy: apyFor(pool.id, r.code),
+            },
+          ]
         : [];
     }),
   );
 
   return (
     <Shell title="Earn yield" onBack={embedded ? undefined : onBack} embedded={embedded}>
-        <p className="mb-3 mt-2 text-body-md text-on-surface-variant">
-          Supply your assets to a Blend lending pool and earn yield — withdraw anytime.
-        </p>
-        {pools.length === 0 ? (
-          <Card className="mt-2 p-4 text-center text-body-md text-on-surface-variant">
-            Blend pools aren’t available on {network.label} yet. Switch to Testnet to try it.
-          </Card>
-        ) : (
-          <>
-            {earning.length > 0 ? (
-              <section className="mt-3 overflow-hidden rounded-3xl bg-surface-container shadow-layer-1 ring-1 ring-primary-container/25">
-                <div className="bg-gradient-to-b from-primary-container/15 to-transparent px-4 pb-4 pt-4">
-                  <div className="flex items-center gap-2">
-                    <Icon name="savings" size={18} className="text-primary-container drop-shadow-glow-amber" />
-                    <h2 className="text-label-sm uppercase tracking-wide text-on-surface-variant">Your positions</h2>
-                  </div>
-                  <p className="mt-1 text-title-md text-primary glow-amber-text">
-                    Earning on {earning.length} {earning.length === 1 ? 'asset' : 'assets'}
-                  </p>
-                  <ul className="mt-3 space-y-2">
-                    {earning.map((e) => (
-                      <li
-                        key={e.key}
-                        className="flex items-center justify-between rounded-2xl bg-surface-container-high/60 px-3 py-2"
-                      >
-                        <div>
-                          <div className="font-mono text-label-lg text-on-surface">
-                            {e.supplied} {e.code}
-                          </div>
-                          <div className="text-label-sm text-on-surface-variant">{e.poolName}</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-mono text-label-lg text-primary-container">{formatApy(e.apy)}</div>
-                          <div className="text-label-sm text-on-surface-variant">est. APY</div>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+      <p className="mb-3 mt-2 text-body-md text-on-surface-variant">
+        Supply your assets to a Blend lending pool and earn yield — withdraw anytime.
+      </p>
+      {pools.length === 0 ? (
+        <Card className="mt-2 p-4 text-center text-body-md text-on-surface-variant">
+          Blend pools aren’t available on {network.label} yet. Switch to Testnet to try it.
+        </Card>
+      ) : (
+        <>
+          {earning.length > 0 ? (
+            <section className="mt-3 overflow-hidden rounded-3xl bg-surface-container shadow-layer-1 ring-1 ring-primary-container/25">
+              <div className="bg-gradient-to-b from-primary-container/15 to-transparent px-4 pb-4 pt-4">
+                <div className="flex items-center gap-2">
+                  <Icon
+                    name="savings"
+                    size={18}
+                    className="text-primary-container drop-shadow-glow-amber"
+                  />
+                  <h2 className="text-label-sm uppercase tracking-wide text-on-surface-variant">
+                    Your positions
+                  </h2>
                 </div>
-              </section>
-            ) : (
-              <Card className="mt-3 flex items-center gap-3 p-4">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-container/15">
-                  <Icon name="savings" size={18} className="text-primary-container" />
-                </div>
-                <p className="text-body-md text-on-surface-variant">
-                  Nothing earning yet — supply an asset to start.
+                <p className="mt-1 text-title-md text-primary glow-amber-text">
+                  Earning on {earning.length} {earning.length === 1 ? 'asset' : 'assets'}
                 </p>
-              </Card>
-            )}
-
-            <SectionLabel>Available pools</SectionLabel>
-            <ul className="space-y-3">
-              {pools.map((pool) => (
-                <li key={pool.id}>
-                  <Card className="space-y-3 p-4">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-container/20">
-                        <Icon name="savings" size={18} className="text-primary-container" />
+                <ul className="mt-3 space-y-2">
+                  {earning.map((e) => (
+                    <li
+                      key={e.key}
+                      className="flex items-center justify-between rounded-2xl bg-surface-container-high/60 px-3 py-2"
+                    >
+                      <div>
+                        <div className="font-mono text-label-lg text-on-surface">
+                          {e.supplied} {e.code}
+                        </div>
+                        <div className="text-label-sm text-on-surface-variant">{e.poolName}</div>
                       </div>
-                      <span className="truncate text-title-sm text-on-surface">{pool.name}</span>
-                      {pool.verified && <Icon name="verified" size={16} className="shrink-0 text-primary-container" />}
-                      {pool.lantern && (
-                        <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full border border-primary-container/40 bg-primary-container/15 px-2 py-0.5 text-label-sm font-semibold text-primary-container">
-                          <Icon name="lightbulb" filled size={12} />
-                          Lantern
-                        </span>
-                      )}
+                      <div className="text-right">
+                        <div className="font-mono text-label-lg text-primary-container">
+                          {formatApy(e.apy)}
+                        </div>
+                        <div className="text-label-sm text-on-surface-variant">est. APY</div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          ) : (
+            <Card className="mt-3 flex items-center gap-3 p-4">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-container/15">
+                <Icon name="savings" size={18} className="text-primary-container" />
+              </div>
+              <p className="text-body-md text-on-surface-variant">
+                Nothing earning yet — supply an asset to start.
+              </p>
+            </Card>
+          )}
+
+          <SectionLabel>Available pools</SectionLabel>
+          <ul className="space-y-3">
+            {pools.map((pool) => (
+              <li key={pool.id}>
+                <Card className="space-y-3 p-4">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-container/20">
+                      <Icon name="savings" size={18} className="text-primary-container" />
                     </div>
-                    <ul className="space-y-2">
-                      {pool.reserves.map((r) => {
-                        const supplied = suppliedDisplay(pool.id, r);
-                        return (
-                          <li key={r.assetId} className="space-y-2">
-                            <div className="flex items-baseline gap-2">
-                              <span className="font-mono text-label-md text-on-surface">{r.code}</span>
-                              <span className="text-label-sm text-primary-container">
-                                {formatApy(apyFor(pool.id, r.code))} est. APY
+                    <span className="truncate text-title-sm text-on-surface">{pool.name}</span>
+                    {pool.verified && (
+                      <Icon name="verified" size={16} className="shrink-0 text-primary-container" />
+                    )}
+                    {pool.lantern && (
+                      <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full border border-primary-container/40 bg-primary-container/15 px-2 py-0.5 text-label-sm font-semibold text-primary-container">
+                        <Icon name="lightbulb" filled size={12} />
+                        Lantern
+                      </span>
+                    )}
+                  </div>
+                  <ul className="space-y-2">
+                    {pool.reserves.map((r) => {
+                      const supplied = suppliedDisplay(pool.id, r);
+                      return (
+                        <li key={r.assetId} className="space-y-2">
+                          <div className="flex items-baseline gap-2">
+                            <span className="font-mono text-label-md text-on-surface">
+                              {r.code}
+                            </span>
+                            <span className="text-label-sm text-primary-container">
+                              {formatApy(apyFor(pool.id, r.code))} est. APY
+                            </span>
+                            {supplied && (
+                              <span className="ml-auto truncate text-label-sm text-on-surface-variant">
+                                {supplied} earning
                               </span>
-                              {supplied && (
-                                <span className="ml-auto truncate text-label-sm text-on-surface-variant">
-                                  {supplied} earning
-                                </span>
-                              )}
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <ActionButton label="Supply" icon="south_west" onClick={() => choose(pool, r, 'supply')} />
-                              <ActionButton label="Withdraw" icon="north_east" onClick={() => choose(pool, r, 'withdraw')} />
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </Card>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <ActionButton
+                              label="Supply"
+                              icon="south_west"
+                              onClick={() => choose(pool, r, 'supply')}
+                            />
+                            <ActionButton
+                              label="Withdraw"
+                              icon="north_east"
+                              onClick={() => choose(pool, r, 'withdraw')}
+                            />
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </Shell>
   );
 }
@@ -561,11 +624,21 @@ function formatApy(apy: number | null | undefined): string {
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
-    <h2 className="mb-2 mt-5 text-label-sm uppercase tracking-wide text-on-surface-variant">{children}</h2>
+    <h2 className="mb-2 mt-5 text-label-sm uppercase tracking-wide text-on-surface-variant">
+      {children}
+    </h2>
   );
 }
 
-function ActionButton({ label, icon, onClick }: { label: string; icon: string; onClick: () => void }) {
+function ActionButton({
+  label,
+  icon,
+  onClick,
+}: {
+  label: string;
+  icon: string;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
@@ -625,7 +698,9 @@ function Shell({
   return (
     <div className="flex h-full flex-col bg-background">
       <Header title={title} onBack={onBack ?? (() => undefined)} />
-      <main className={`no-scrollbar flex-1 overflow-y-auto px-4 pb-6 ${mainClass ?? ''}`}>{children}</main>
+      <main className={`no-scrollbar flex-1 overflow-y-auto px-4 pb-6 ${mainClass ?? ''}`}>
+        {children}
+      </main>
     </div>
   );
 }

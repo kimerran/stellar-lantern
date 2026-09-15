@@ -1,4 +1,6 @@
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { bootTelemetry } from '@core/telemetry';
+import { APP_VERSION } from '@shared/version';
 import { useWallet } from './hooks/useWallet';
 import { useSettings } from './hooks/useSettings';
 import { resolveNetworkConfig } from '@shared/network';
@@ -17,7 +19,9 @@ import { Settings } from './screens/Settings';
 
 // Heavier secondary screens are code-split so first paint doesn't pay for
 // features the user may never open. Named exports → mapped to `default`. (#127)
-const SmartAccount = lazy(() => import('./screens/SmartAccount').then((m) => ({ default: m.SmartAccount })));
+const SmartAccount = lazy(() =>
+  import('./screens/SmartAccount').then((m) => ({ default: m.SmartAccount })),
+);
 const Activity = lazy(() => import('./screens/Activity').then((m) => ({ default: m.Activity })));
 const Send = lazy(() => import('./screens/Send').then((m) => ({ default: m.Send })));
 const Swap = lazy(() => import('./screens/Swap').then((m) => ({ default: m.Swap })));
@@ -31,13 +35,23 @@ const Receive = lazy(() => import('./screens/Receive').then((m) => ({ default: m
 function Splash() {
   return (
     <div className="flex h-full items-center justify-center bg-background">
-      <Icon name="lightbulb" filled size={48} className="animate-subtle-glow text-primary-container" />
+      <Icon
+        name="lightbulb"
+        filled
+        size={48}
+        className="animate-subtle-glow text-primary-container"
+      />
     </div>
   );
 }
 
 export function App() {
   const { status, refresh, lock } = useWallet();
+  // Telemetry (#87): start the consent-gated sink once per popup/app open.
+  // A hard no-op until the user opts in (Settings → Privacy).
+  useEffect(() => {
+    if (__FEATURE_TELEMETRY__) void bootTelemetry({ appVersion: APP_VERSION });
+  }, []);
   const { settings, setNetwork, setAutoLock, setHorizonOverrides, setRpcOverrides } = useSettings();
   const { passkeyAccount, refresh: refreshPasskey } = usePasskeyAccount();
   const [tab, setTab] = useState<Tab>('assets');
@@ -164,45 +178,41 @@ export function App() {
         {/* top/bottom fade overlays (BRAND §4.3) */}
         <div className="pointer-events-none sticky top-0 z-10 h-3 bg-gradient-to-b from-background to-transparent" />
         <Suspense fallback={<Splash />}>
-        <div className="px-4 pb-4">
-          {tab === 'assets' && (
-            <Assets
-              address={address}
-              network={network}
-              onSend={() => setTab('send')}
-              onReceive={() => setReceiveOpen(true)}
-              onSwap={() => setSwapOpen(true)}
-              onEarn={() => setTab('earn')}
-            />
-          )}
-          {tab === 'earn' && <Earn address={address} network={network} embedded />}
-          {tab === 'send' && (
-            <Send
-              address={address}
-              network={network}
-              onDone={() => setTab('activity')}
-            />
-          )}
-          {tab === 'apps' && <Apps address={address} network={settings.network} />}
-          {tab === 'activity' && <Activity address={address} network={network} embedded />}
-          {tab === 'settings' && (
-            <Settings
-              address={address}
-              settings={settings}
-              embedded
-              onCopyAddress={copyAddress}
-              onOpenReceive={() => setReceiveOpen(true)}
-              onOpenGuardians={() => setGuardiansOpen(true)}
-              onOpenScan={() => setScanOpen(true)}
-              onOpenCashInOut={() => setCashOpen(true)}
-              onLock={lock}
-              setNetwork={setNetwork}
-              setAutoLock={setAutoLock}
-              setHorizonOverrides={setHorizonOverrides}
-              setRpcOverrides={setRpcOverrides}
-            />
-          )}
-        </div>
+          <div className="px-4 pb-4">
+            {tab === 'assets' && (
+              <Assets
+                address={address}
+                network={network}
+                onSend={() => setTab('send')}
+                onReceive={() => setReceiveOpen(true)}
+                onSwap={() => setSwapOpen(true)}
+                onEarn={() => setTab('earn')}
+              />
+            )}
+            {tab === 'earn' && <Earn address={address} network={network} embedded />}
+            {tab === 'send' && (
+              <Send address={address} network={network} onDone={() => setTab('activity')} />
+            )}
+            {tab === 'apps' && <Apps address={address} network={settings.network} />}
+            {tab === 'activity' && <Activity address={address} network={network} embedded />}
+            {tab === 'settings' && (
+              <Settings
+                address={address}
+                settings={settings}
+                embedded
+                onCopyAddress={copyAddress}
+                onOpenReceive={() => setReceiveOpen(true)}
+                onOpenGuardians={() => setGuardiansOpen(true)}
+                onOpenScan={() => setScanOpen(true)}
+                onOpenCashInOut={() => setCashOpen(true)}
+                onLock={lock}
+                setNetwork={setNetwork}
+                setAutoLock={setAutoLock}
+                setHorizonOverrides={setHorizonOverrides}
+                setRpcOverrides={setRpcOverrides}
+              />
+            )}
+          </div>
         </Suspense>
       </main>
 

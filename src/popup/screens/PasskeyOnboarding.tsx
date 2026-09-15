@@ -3,6 +3,7 @@
 // device passkey IS the signer, and the on-chain smart account verifies its
 // WebAuthn assertions. Testnet-only (friendbot pays the deploy fees).
 import { useState } from 'react';
+import { track } from '@core/telemetry';
 import { NETWORKS } from '@shared/constants';
 import { sendMessage } from '@shared/messages';
 import { setPasskeyAccount } from '@shared/storage';
@@ -54,6 +55,7 @@ export function PasskeyOnboarding({ onBack, onDone }: Props) {
     }
     await setPasskeyAccount(res.record);
     setProgress('done');
+    if (__FEATURE_TELEMETRY__) track.walletCreated('passkey');
     onDone();
   }
 
@@ -86,17 +88,28 @@ export function PasskeyOnboarding({ onBack, onDone }: Props) {
         {progress !== null && (
           <ul className="mt-6 w-full max-w-[280px] space-y-2 text-left" aria-live="polite">
             {STEPS.map((s, i) => {
-              const state = i < reachedIndex || progress === 'done' ? 'done' : i === reachedIndex ? 'active' : 'todo';
+              const state =
+                i < reachedIndex || progress === 'done'
+                  ? 'done'
+                  : i === reachedIndex
+                    ? 'active'
+                    : 'todo';
               return (
                 <li key={s.key} className="flex items-center gap-2 text-label-md">
                   {state === 'done' ? (
                     <Icon name="check_circle" filled size={18} className="text-primary-container" />
                   ) : state === 'active' ? (
-                    <Icon name="progress_activity" size={18} className="animate-spin text-primary-container" />
+                    <Icon
+                      name="progress_activity"
+                      size={18}
+                      className="animate-spin text-primary-container"
+                    />
                   ) : (
                     <Icon name="circle" size={18} className="text-outline" />
                   )}
-                  <span className={state === 'todo' ? 'text-on-surface-variant' : 'text-on-surface'}>
+                  <span
+                    className={state === 'todo' ? 'text-on-surface-variant' : 'text-on-surface'}
+                  >
                     {s.label}
                   </span>
                 </li>

@@ -5,6 +5,7 @@
 // only in this popup session's memory (testnet-only; it controls nothing —
 // the smart account answers only to the passkey).
 import { useCallback, useEffect, useState } from 'react';
+import { track } from '@core/telemetry';
 import { Keypair, TransactionBuilder } from '@stellar/stellar-sdk';
 import { NETWORKS } from '@shared/constants';
 import type { PasskeyAccountRecord } from '@shared/types';
@@ -74,7 +75,12 @@ export function SmartAccount({ account, onForget }: Props) {
   const [amount, setAmount] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [review, setReview] = useState<{ xdr: string; latestLedger: number; amount: string; to: string } | null>(null);
+  const [review, setReview] = useState<{
+    xdr: string;
+    latestLedger: number;
+    amount: string;
+    to: string;
+  } | null>(null);
   const [verdict, setVerdict] = useState<ScanVerdict | null>(null);
   const [confirmText, setConfirmText] = useState('');
   const [txHash, setTxHash] = useState<string | null>(null);
@@ -100,7 +106,12 @@ export function SmartAccount({ account, onForget }: Props) {
   }
 
   async function forget() {
-    if (!window.confirm('Forget this smart account on this device? The on-chain account (and its passkey) keep existing.')) return;
+    if (
+      !window.confirm(
+        'Forget this smart account on this device? The on-chain account (and its passkey) keep existing.',
+      )
+    )
+      return;
     await clearPasskeyAccount();
     onForget();
   }
@@ -139,13 +150,13 @@ export function SmartAccount({ account, onForget }: Props) {
         return;
       }
       // The same pre-sign scan gate as the classic Send screen (no bypass lane).
-      setVerdict(
-        scan({
-          xdr: prepared.xdr,
-          networkPassphrase: NETWORK.passphrase,
-          context: { network: NETWORK.id, fromAddress: account.contractId },
-        }),
-      );
+      const scanVerdict = scan({
+        xdr: prepared.xdr,
+        networkPassphrase: NETWORK.passphrase,
+        context: { network: NETWORK.id, fromAddress: account.contractId },
+      });
+      if (__FEATURE_TELEMETRY__) track.txScanned(scanVerdict);
+      setVerdict(scanVerdict);
       setReview({ xdr: prepared.xdr, latestLedger: prepared.latestLedger, amount, to: dest });
       setConfirmText('');
       setStep('review');
@@ -204,11 +215,18 @@ export function SmartAccount({ account, onForget }: Props) {
       <Shell>
         <div className="flex flex-col items-center pt-10 text-center">
           <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-primary-container/15">
-            <Icon name="check_circle" filled size={48} className="text-primary-container drop-shadow-glow-amber" />
+            <Icon
+              name="check_circle"
+              filled
+              size={48}
+              className="text-primary-container drop-shadow-glow-amber"
+            />
           </div>
           <h2 className="text-title-md text-on-surface">Sent!</h2>
           <p className="mt-1 text-label-md text-on-surface-variant">Authorized by your passkey.</p>
-          <p className="mt-4 break-all px-2 font-mono text-label-sm text-on-surface-variant">{txHash}</p>
+          <p className="mt-4 break-all px-2 font-mono text-label-sm text-on-surface-variant">
+            {txHash}
+          </p>
           <div className="mt-6 w-full space-y-3">
             <Button
               fullWidth
@@ -243,8 +261,12 @@ export function SmartAccount({ account, onForget }: Props) {
           <h2 className="text-title-md text-on-surface">Review Transaction</h2>
 
           <div className="rounded-2xl bg-surface-container p-5 text-center shadow-layer-1">
-            <p className="text-label-sm uppercase tracking-wide text-on-surface-variant">You're sending</p>
-            <p className={`mt-2 text-headline-lg ${isHigh ? 'text-on-surface-variant' : 'text-primary glow-amber-text'}`}>
+            <p className="text-label-sm uppercase tracking-wide text-on-surface-variant">
+              You're sending
+            </p>
+            <p
+              className={`mt-2 text-headline-lg ${isHigh ? 'text-on-surface-variant' : 'text-primary glow-amber-text'}`}
+            >
               {formatAmount(review.amount)} XLM
             </p>
           </div>
@@ -277,9 +299,15 @@ export function SmartAccount({ account, onForget }: Props) {
           {isHigh && (
             <div className="space-y-2">
               <p className="text-label-sm text-error">
-                To proceed anyway, type <span className="font-mono font-semibold">CONFIRM</span> below.
+                To proceed anyway, type <span className="font-mono font-semibold">CONFIRM</span>{' '}
+                below.
               </p>
-              <Input mono placeholder="CONFIRM" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} />
+              <Input
+                mono
+                placeholder="CONFIRM"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+              />
             </div>
           )}
 
@@ -387,7 +415,9 @@ function ReviewRow({ label, value, mono }: { label: string; value: string; mono?
   return (
     <div className="flex items-center justify-between gap-3">
       <span className="text-label-md text-on-surface-variant">{label}</span>
-      <span className={`text-right text-label-md text-on-surface ${mono ? 'font-mono' : ''}`}>{value}</span>
+      <span className={`text-right text-label-md text-on-surface ${mono ? 'font-mono' : ''}`}>
+        {value}
+      </span>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { track } from '@core/telemetry';
 import { BASE_FEE } from '@stellar/stellar-sdk';
 import type { NetworkConfig } from '@shared/constants';
 import type { AssetBalance } from '@shared/types';
@@ -6,7 +7,12 @@ import { sendMessage } from '@shared/messages';
 import { getServer, loadAccountState } from '@core/stellar/client';
 import { buildPathPaymentStrictSendXdr, destMinFromQuote } from '@core/stellar/swap';
 import { fetchStrictSendPaths } from '@core/stellar/paths';
-import { fetchSoroswapQuote, buildSoroswapSwapXdr, pickBestEngine, type SoroswapConfig } from '@core/stellar/soroswap';
+import {
+  fetchSoroswapQuote,
+  buildSoroswapSwapXdr,
+  pickBestEngine,
+  type SoroswapConfig,
+} from '@core/stellar/soroswap';
 import { computeMaxXlm, type AssetRef } from '@core/stellar/tx';
 import { scan } from '@core/scan';
 import type { ScanVerdict } from '@core/scan';
@@ -43,7 +49,8 @@ function soroswapConfig(network: NetworkConfig): SoroswapConfig | null {
   const apiKey = env.VITE_SOROSWAP_API_KEY;
   if (!apiKey) return null;
   const referralId = env.VITE_SOROSWAP_REFERRAL_ID;
-  const feeBps = referralId && env.VITE_SOROSWAP_FEE_BPS ? Number(env.VITE_SOROSWAP_FEE_BPS) : undefined;
+  const feeBps =
+    referralId && env.VITE_SOROSWAP_FEE_BPS ? Number(env.VITE_SOROSWAP_FEE_BPS) : undefined;
   return {
     apiKey,
     network: network.id === 'PUBLIC' ? 'mainnet' : 'testnet',
@@ -96,7 +103,10 @@ export function Swap({ address, network, onBack }: Props) {
   const sendBal = useMemo(() => balances.find((b) => keyOf(b) === sendKey), [balances, sendKey]);
   // You can only receive an asset you hold a trustline for — so the dest options
   // are your other balances (excluding whatever you're sending).
-  const destOptions = useMemo(() => balances.filter((b) => keyOf(b) !== sendKey), [balances, sendKey]);
+  const destOptions = useMemo(
+    () => balances.filter((b) => keyOf(b) !== sendKey),
+    [balances, sendKey],
+  );
 
   // Keep a valid dest selected as balances / send asset change.
   useEffect(() => {
@@ -146,8 +156,15 @@ export function Swap({ address, network, onBack }: Props) {
       // any aggregator failure (or no key) silently leaves the native engine.
       const soroCfg = soroswapConfig(network);
       const [nativeQuote, soroQuote] = await Promise.all([
-        fetchStrictSendPaths({ horizonUrl: network.horizonUrl, sendAsset, sendAmount: amount, destAsset }).catch(() => null),
-        soroCfg ? fetchSoroswapQuote({ config: soroCfg, sendAsset, sendAmount: amount, destAsset }) : Promise.resolve(null),
+        fetchStrictSendPaths({
+          horizonUrl: network.horizonUrl,
+          sendAsset,
+          sendAmount: amount,
+          destAsset,
+        }).catch(() => null),
+        soroCfg
+          ? fetchSoroswapQuote({ config: soroCfg, sendAsset, sendAmount: amount, destAsset })
+          : Promise.resolve(null),
       ]);
 
       const nativeReceive = nativeQuote?.destAmount ?? null;
@@ -157,7 +174,9 @@ export function Swap({ address, network, onBack }: Props) {
         return;
       }
 
-      let engine: 'sdex' | 'soroswap' = !nativeReceive ? 'soroswap' : pickBestEngine(nativeReceive, soroReceive);
+      let engine: 'sdex' | 'soroswap' = !nativeReceive
+        ? 'soroswap'
+        : pickBestEngine(nativeReceive, soroReceive);
       let xdr: string | null = null;
       let quoted = '';
       let destMin = '';
@@ -218,6 +237,7 @@ export function Swap({ address, network, onBack }: Props) {
           spendableXlm: sendBal.isNative ? spendable : undefined,
         },
       });
+      if (__FEATURE_TELEMETRY__) track.txScanned(verdict);
 
       setReview({
         xdr,
@@ -251,6 +271,7 @@ export function Swap({ address, network, onBack }: Props) {
     });
     setSubmitting(false);
     if (res.ok) {
+      if (__FEATURE_TELEMETRY__) track.swapExecuted(review.engine);
       setTxHash(res.data.hash);
       setStep('success');
     } else if (res.code === 'LOCKED') {
@@ -268,13 +289,21 @@ export function Swap({ address, network, onBack }: Props) {
         <main className="no-scrollbar flex-1 overflow-y-auto px-4 pb-6">
           <div className="flex flex-col items-center pt-8 text-center">
             <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-primary-container/15">
-              <Icon name="check_circle" filled size={48} className="text-primary-container drop-shadow-glow-amber" />
+              <Icon
+                name="check_circle"
+                filled
+                size={48}
+                className="text-primary-container drop-shadow-glow-amber"
+              />
             </div>
             <h2 className="text-title-md text-on-surface">Swapped!</h2>
             <p className="mt-1 text-label-md text-on-surface-variant">
-              {formatAmount(review.sendAmount)} {review.sendCode} → {review.destCode}. Your balances will update shortly.
+              {formatAmount(review.sendAmount)} {review.sendCode} → {review.destCode}. Your balances
+              will update shortly.
             </p>
-            <p className="mt-4 break-all px-2 font-mono text-label-sm text-on-surface-variant">{txHash}</p>
+            <p className="mt-4 break-all px-2 font-mono text-label-sm text-on-surface-variant">
+              {txHash}
+            </p>
             <div className="mt-6 w-full space-y-3">
               <Button
                 fullWidth
@@ -306,13 +335,17 @@ export function Swap({ address, network, onBack }: Props) {
         <Header title="Review swap" onBack={backToForm} />
         <main className="no-scrollbar flex-1 space-y-4 overflow-y-auto px-4 pb-6 pt-3">
           <div className="rounded-2xl bg-surface-container p-5 text-center shadow-layer-1">
-            <p className="text-label-sm uppercase tracking-wide text-on-surface-variant">You’re swapping</p>
-            <p className={`mt-2 text-headline-lg ${isHigh ? 'text-on-surface-variant' : 'text-primary glow-amber-text'}`}>
+            <p className="text-label-sm uppercase tracking-wide text-on-surface-variant">
+              You’re swapping
+            </p>
+            <p
+              className={`mt-2 text-headline-lg ${isHigh ? 'text-on-surface-variant' : 'text-primary glow-amber-text'}`}
+            >
               {formatAmount(review.sendAmount)} {review.sendCode}
             </p>
             <p className="mt-1 flex items-center justify-center gap-1 text-title-sm text-on-surface-variant">
-              <Icon name="arrow_downward" size={16} />
-              ~{formatAmount(review.quoted)} {review.destCode}
+              <Icon name="arrow_downward" size={16} />~{formatAmount(review.quoted)}{' '}
+              {review.destCode}
             </p>
           </div>
 
@@ -327,7 +360,11 @@ export function Swap({ address, network, onBack }: Props) {
                 risk={verdict.risk}
                 reasons={verdict.reasons}
                 explanation={verdict.explanation}
-                whatToDo={isHigh ? 'Only continue if you set up this swap yourself. Signing cannot be reversed.' : undefined}
+                whatToDo={
+                  isHigh
+                    ? 'Only continue if you set up this swap yourself. Signing cannot be reversed.'
+                    : undefined
+                }
               />
             )}
           </div>
@@ -335,15 +372,22 @@ export function Swap({ address, network, onBack }: Props) {
           <Card className="space-y-3">
             <Row label="You send" value={`${formatAmount(review.sendAmount)} ${review.sendCode}`} />
             <Row label="Expected" value={`~${formatAmount(review.quoted)} ${review.destCode}`} />
-            <Row label={`Minimum received (${(SLIPPAGE * 100).toFixed(1)}% slippage)`} value={`${formatAmount(review.destMin)} ${review.destCode}`} />
-            <Row label="Route" value={review.engine === 'soroswap' ? 'Soroswap — best price' : 'Stellar DEX'} />
+            <Row
+              label={`Minimum received (${(SLIPPAGE * 100).toFixed(1)}% slippage)`}
+              value={`${formatAmount(review.destMin)} ${review.destCode}`}
+            />
+            <Row
+              label="Route"
+              value={review.engine === 'soroswap' ? 'Soroswap — best price' : 'Stellar DEX'}
+            />
             <Row label="Network" value={network.label} />
           </Card>
 
           {isHigh && !native && (
             <div className="space-y-2">
               <p className="text-label-sm text-error">
-                To proceed anyway, type <span className="font-mono font-semibold">CONFIRM</span> below.
+                To proceed anyway, type <span className="font-mono font-semibold">CONFIRM</span>{' '}
+                below.
               </p>
               <input
                 className="w-full rounded-lg border border-outline-variant bg-surface-container-high px-3 py-2 font-mono text-on-surface focus:border-primary-container focus:outline-none"
@@ -354,10 +398,19 @@ export function Swap({ address, network, onBack }: Props) {
             </div>
           )}
 
-          {error && <p role="alert" className="text-center text-label-md text-error">{error}</p>}
+          {error && (
+            <p role="alert" className="text-center text-label-md text-error">
+              {error}
+            </p>
+          )}
 
           {isHigh && native ? (
-            <HoldToConfirm label={submitting ? 'Swapping…' : 'Hold to Swap Anyway'} danger onConfirm={confirm} disabled={submitting} />
+            <HoldToConfirm
+              label={submitting ? 'Swapping…' : 'Hold to Swap Anyway'}
+              danger
+              onConfirm={confirm}
+              disabled={submitting}
+            />
           ) : (
             <Button
               fullWidth
@@ -402,10 +455,16 @@ export function Swap({ address, network, onBack }: Props) {
 
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <label htmlFor="swap-amount" className="text-label-sm uppercase tracking-wide text-on-surface-variant">
+                <label
+                  htmlFor="swap-amount"
+                  className="text-label-sm uppercase tracking-wide text-on-surface-variant"
+                >
                   Amount
                 </label>
-                <button onClick={() => setAmount(spendable)} className="text-label-md font-semibold text-primary-container">
+                <button
+                  onClick={() => setAmount(spendable)}
+                  className="text-label-md font-semibold text-primary-container"
+                >
                   MAX
                 </button>
               </div>
@@ -421,7 +480,11 @@ export function Swap({ address, network, onBack }: Props) {
 
             <AssetSelect label="To" value={destKey} options={destOptions} onChange={setDestKey} />
 
-            {error && <p role="alert" className="text-center text-label-md text-error">{error}</p>}
+            {error && (
+              <p role="alert" className="text-center text-label-md text-error">
+                {error}
+              </p>
+            )}
 
             <Button fullWidth onClick={toReview} loading={busy} trailingIcon="arrow_forward">
               Get Quote
@@ -449,7 +512,9 @@ function AssetSelect({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <label className="text-label-sm uppercase tracking-wide text-on-surface-variant">{label}</label>
+        <label className="text-label-sm uppercase tracking-wide text-on-surface-variant">
+          {label}
+        </label>
         {hint && <span className="text-label-sm text-on-surface-variant">{hint}</span>}
       </div>
       <div className="relative">
@@ -467,7 +532,11 @@ function AssetSelect({
             );
           })}
         </select>
-        <Icon name="expand_more" size={20} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant" />
+        <Icon
+          name="expand_more"
+          size={20}
+          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant"
+        />
       </div>
     </div>
   );

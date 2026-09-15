@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { track } from '@core/telemetry';
 import type { NetworkConfig } from '@shared/constants';
 import { sendMessage } from '@shared/messages';
 import { anchorsForNetwork, type AnchorEntry } from '@core/anchor/directory';
@@ -94,17 +95,19 @@ export function CashInOut({ address, network, onBack }: Props) {
       transferServer,
       id: activeId,
       jwt,
-      onUpdate: (u) =>
-        setTransfer((t) => (t && t.id === activeId ? { ...t, status: u.info } : t)),
+      onUpdate: (u) => setTransfer((t) => (t && t.id === activeId ? { ...t, status: u.info } : t)),
       isCancelled: () => cancelled,
     })
-      .then((final) =>
+      .then((final) => {
+        if (__FEATURE_TELEMETRY__ && final.info.terminal) {
+          track.anchorFlow(transfer.direction, final.info.kind === 'done' ? 'completed' : 'failed');
+        }
         setTransfer((t) =>
           t && t.id === activeId
             ? { ...t, status: final.info, phase: final.info.terminal ? 'done' : t.phase }
             : t,
-        ),
-      )
+        );
+      })
       .catch(() => {
         // A polling failure is non-fatal — the anchor's own window still works and
         // the user can watch the result there; we just stop reflecting status.
@@ -134,10 +137,12 @@ export function CashInOut({ address, network, onBack }: Props) {
         asset,
         direction,
         phase: 'error',
-        error: 'This anchor isn’t set up for interactive transfers (missing SEP-10 auth or transfer server).',
+        error:
+          'This anchor isn’t set up for interactive transfers (missing SEP-10 auth or transfer server).',
       });
       return;
     }
+    if (__FEATURE_TELEMETRY__) track.anchorFlow(direction, 'started');
     setTransfer({ asset, direction, phase: 'authing' });
     try {
       const jwt = await authenticateSep10({
@@ -206,7 +211,11 @@ export function CashInOut({ address, network, onBack }: Props) {
           <ScreenHeader title={title} onBack={() => setTransfer(null)} />
           <main className="no-scrollbar flex-1 overflow-y-auto px-4 pb-6">
             <div className="flex flex-col items-center gap-3 py-12 text-on-surface-variant">
-              <Icon name="progress_activity" size={32} className="animate-spin text-primary-container" />
+              <Icon
+                name="progress_activity"
+                size={32}
+                className="animate-spin text-primary-container"
+              />
               <span className="text-label-md">Verifying with {selected?.name}…</span>
               <span className="max-w-xs text-center text-label-sm">
                 Signing a one-time authentication challenge (never submitted on-chain).
@@ -248,7 +257,10 @@ export function CashInOut({ address, network, onBack }: Props) {
             <ul className="space-y-2">
               {anchors.map((a) => (
                 <li key={a.id}>
-                  <Card onClick={() => setSelected(a)} className="flex items-center gap-3 p-4 text-left">
+                  <Card
+                    onClick={() => setSelected(a)}
+                    className="flex items-center gap-3 p-4 text-left"
+                  >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-container/20">
                       <Icon name="account_balance" size={20} className="text-primary-container" />
                     </div>
@@ -256,12 +268,20 @@ export function CashInOut({ address, network, onBack }: Props) {
                       <div className="flex items-center gap-1.5">
                         <span className="truncate text-title-sm text-on-surface">{a.name}</span>
                         {a.verified && (
-                          <Icon name="verified" size={16} className="shrink-0 text-primary-container" />
+                          <Icon
+                            name="verified"
+                            size={16}
+                            className="shrink-0 text-primary-container"
+                          />
                         )}
                       </div>
                       <span className="text-label-md text-on-surface-variant">{a.homeDomain}</span>
                     </div>
-                    <Icon name="chevron_right" size={20} className="shrink-0 text-on-surface-variant" />
+                    <Icon
+                      name="chevron_right"
+                      size={20}
+                      className="shrink-0 text-on-surface-variant"
+                    />
                   </Card>
                 </li>
               ))}
@@ -279,7 +299,11 @@ export function CashInOut({ address, network, onBack }: Props) {
       <main className="no-scrollbar flex-1 overflow-y-auto px-4 pb-6">
         {loading && (
           <div className="flex flex-col items-center gap-3 py-12 text-on-surface-variant">
-            <Icon name="progress_activity" size={32} className="animate-spin text-primary-container" />
+            <Icon
+              name="progress_activity"
+              size={32}
+              className="animate-spin text-primary-container"
+            />
             <span className="text-label-md">Checking supported assets…</span>
           </div>
         )}
@@ -305,7 +329,9 @@ export function CashInOut({ address, network, onBack }: Props) {
                 <li key={s.assetCode}>
                   <Card className="space-y-3 p-4">
                     <div className="flex items-center gap-2">
-                      <span className="text-title-sm text-on-surface">{displayCode(s.assetCode)}</span>
+                      <span className="text-title-sm text-on-surface">
+                        {displayCode(s.assetCode)}
+                      </span>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <DirectionButton

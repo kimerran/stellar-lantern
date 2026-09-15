@@ -1,4 +1,5 @@
 import '@shared/polyfills'; // must be first — sets Buffer/process/global before Stellar loads
+import { track } from '@core/telemetry';
 import { Keypair, Horizon, TransactionBuilder } from '@stellar/stellar-sdk';
 import type { Request, Result, ResponseMap } from '@shared/messages';
 import { getSettings, getVault, setVault, clearVault } from '@shared/storage';
@@ -77,7 +78,11 @@ function biometricFailure(reason: 'not-enrolled' | 'cancelled' | 'failed'): Resu
     case 'cancelled':
       return { ok: false, error: 'Biometric check was cancelled.', code: 'BIOMETRIC_CANCELLED' };
     case 'failed':
-      return { ok: false, error: 'Biometric unlock failed — use your password.', code: 'BIOMETRIC_FAILED' };
+      return {
+        ok: false,
+        error: 'Biometric unlock failed — use your password.',
+        code: 'BIOMETRIC_FAILED',
+      };
   }
 }
 
@@ -93,7 +98,8 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
         // biometric fully unavailable, so the Unlock screen never offers it —
         // keeping the in-progress (#23 M2a) surface out of store builds.
         biometricEnabled: __FEATURE_BIOMETRIC_UNLOCK__ && (await isBiometricEnabled(await getKV())),
-        biometricAvailable: __FEATURE_BIOMETRIC_UNLOCK__ && (await getBiometricStore().isAvailable()),
+        biometricAvailable:
+          __FEATURE_BIOMETRIC_UNLOCK__ && (await getBiometricStore().isAvailable()),
       });
     }
 
@@ -183,8 +189,14 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
       const tx = TransactionBuilder.fromXDR(req.xdr, req.networkPassphrase);
       tx.sign(session.keypair);
       const server = new Horizon.Server(req.horizonUrl);
-      const res = await server.submitTransaction(tx);
-      return ok<'SIGN_AND_SUBMIT'>({ hash: res.hash });
+      try {
+        const res = await server.submitTransaction(tx);
+        if (__FEATURE_TELEMETRY__) track.txSigned('sign_and_submit', true);
+        return ok<'SIGN_AND_SUBMIT'>({ hash: res.hash });
+      } catch (e) {
+        if (__FEATURE_TELEMETRY__) track.txSigned('sign_and_submit', false);
+        throw e;
+      }
     }
 
     case 'SIGN_ONLY': {
@@ -200,6 +212,7 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
       // submitted. Consumers: guardian recovery (#23), anchor SEP-10 auth (#24).
       const tx = TransactionBuilder.fromXDR(req.xdr, req.networkPassphrase);
       tx.sign(session.keypair);
+      if (__FEATURE_TELEMETRY__) track.txSigned('sign_only', true);
       return ok<'SIGN_ONLY'>({ signedXdr: tx.toXDR() });
     }
 
@@ -212,8 +225,14 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
       // (tx_bad_auth_extra). No unlock needed — this only broadcasts.
       const tx = TransactionBuilder.fromXDR(req.xdr, req.networkPassphrase);
       const server = new Horizon.Server(req.horizonUrl);
-      const res = await server.submitTransaction(tx);
-      return ok<'SUBMIT_ONLY'>({ hash: res.hash });
+      try {
+        const res = await server.submitTransaction(tx);
+        if (__FEATURE_TELEMETRY__) track.txSigned('submit_only', true);
+        return ok<'SUBMIT_ONLY'>({ hash: res.hash });
+      } catch (e) {
+        if (__FEATURE_TELEMETRY__) track.txSigned('submit_only', false);
+        throw e;
+      }
     }
 
     case 'SIGN_MESSAGE': {
@@ -269,7 +288,9 @@ function toErrorResult(err: unknown): Result<never> {
 
 function extractHorizonError(err: unknown): string | null {
   const e = err as {
-    response?: { data?: { extras?: { result_codes?: { operations?: string[]; transaction?: string } } } };
+    response?: {
+      data?: { extras?: { result_codes?: { operations?: string[]; transaction?: string } } };
+    };
   };
   const codes = e?.response?.data?.extras?.result_codes;
   if (!codes) return null;

@@ -1,0 +1,72 @@
+// The emit points (#87), as one-line helpers the screens and the session
+// handler call. Each helper builds exactly one TelemetryEvent from the
+// narrowest input it needs — a scan verdict's risk, a mini-app's id, a
+// signing outcome — so the call site cannot hand it anything else (the
+// pasted message text, an address, an amount) even by accident. Tests call
+// these with a stub sink and assert the event; a source-level test asserts
+// every screen uses the helper rather than emit() directly.
+
+import { emit } from './index';
+import type { MiniAppId, RiskLevel, ScanAction, TelemetryEvent } from './events';
+
+const MINI_APP_IDS = new Set<MiniAppId>(['stardust-faucet', 'lumen-notes', 'lantern-demo']);
+
+export function walletCreatedEvent(mode: 'create' | 'import' | 'passkey'): TelemetryEvent {
+  return { name: 'wallet_created', props: { mode } };
+}
+export function messageScannedEvent(verdict: { risk: RiskLevel }): TelemetryEvent {
+  return { name: 'message_scanned', props: { risk: verdict.risk } };
+}
+export function txScannedEvent(verdict: { risk: RiskLevel; action: ScanAction }): TelemetryEvent[] {
+  const out: TelemetryEvent[] = [
+    { name: 'tx_scanned', props: { risk: verdict.risk, action: verdict.action } },
+  ];
+  if (verdict.action === 'block_confirm')
+    out.push({ name: 'high_risk_gated', props: { risk: verdict.risk } });
+  return out;
+}
+export function swapExecutedEvent(engine: 'sdex' | 'soroswap'): TelemetryEvent {
+  return {
+    name: 'swap_executed',
+    props: { engine: engine === 'soroswap' ? 'aggregator' : 'sdex' },
+  };
+}
+export function earnActionEvent(kind: 'supply' | 'withdraw'): TelemetryEvent {
+  return { name: 'earn_action', props: { kind } };
+}
+export function anchorFlowEvent(
+  kind: 'deposit' | 'withdraw',
+  stage: 'started' | 'completed' | 'failed',
+): TelemetryEvent {
+  return { name: 'anchor_flow', props: { kind, stage } };
+}
+export function miniAppOpenedEvent(appId: string): TelemetryEvent {
+  return {
+    name: 'miniapp_opened',
+    props: { appId: MINI_APP_IDS.has(appId as MiniAppId) ? (appId as MiniAppId) : 'other' },
+  };
+}
+export function txSignedEvent(
+  kind: 'sign_and_submit' | 'sign_only' | 'submit_only',
+  ok: boolean,
+): TelemetryEvent {
+  return { name: 'tx_signed', props: { kind, ok } };
+}
+
+// Fire-and-forget wrappers. No-ops when telemetry is off or unconsented.
+export const track = {
+  walletCreated: (mode: 'create' | 'import' | 'passkey') => emit(walletCreatedEvent(mode)),
+  messageScanned: (verdict: { risk: RiskLevel }) => emit(messageScannedEvent(verdict)),
+  txScanned: (verdict: { risk: RiskLevel; action: ScanAction }) =>
+    txScannedEvent(verdict).forEach(emit),
+  swapExecuted: (engine: 'sdex' | 'soroswap') => emit(swapExecutedEvent(engine)),
+  earnAction: (kind: 'supply' | 'withdraw') => emit(earnActionEvent(kind)),
+  anchorFlow: (kind: 'deposit' | 'withdraw', stage: 'started' | 'completed' | 'failed') =>
+    emit(anchorFlowEvent(kind, stage)),
+  miniAppOpened: (appId: string) => emit(miniAppOpenedEvent(appId)),
+  txSigned: (kind: 'sign_and_submit' | 'sign_only' | 'submit_only', ok: boolean) =>
+    emit(txSignedEvent(kind, ok)),
+  guardianAdded: () => emit({ name: 'guardian_added', props: {} }),
+  sessionStart: () => emit({ name: 'session_start', props: {} }),
+  appFirstOpen: () => emit({ name: 'app_first_open', props: {} }),
+};

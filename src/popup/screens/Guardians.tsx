@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { track } from '@core/telemetry';
 import { BASE_FEE } from '@stellar/stellar-sdk';
 import type { NetworkConfig } from '@shared/constants';
 import { sendMessage } from '@shared/messages';
@@ -170,6 +171,7 @@ export function Guardians({ address, network, onBack }: Props) {
         networkPassphrase: network.passphrase,
         context: { network: network.id, fromAddress: address },
       });
+      if (__FEATURE_TELEMETRY__) track.txScanned(scanVerdict);
 
       setReview({
         xdr,
@@ -184,7 +186,9 @@ export function Guardians({ address, network, onBack }: Props) {
       setConfirmText('');
       setStep('review');
     } catch {
-      setError('Could not prepare the setup. Your account must be funded — check your connection and try again.');
+      setError(
+        'Could not prepare the setup. Your account must be funded — check your connection and try again.',
+      );
     } finally {
       setBuilding(false);
     }
@@ -202,6 +206,18 @@ export function Guardians({ address, network, onBack }: Props) {
     });
     setSubmitting(false);
     if (res.ok) {
+      // A first-time setup adds every guardian; an edit adds only the diff.
+      if (
+        __FEATURE_TELEMETRY__ &&
+        (!editing ||
+          !current ||
+          guardianDiff(
+            current.guardians.map((g) => g.key),
+            filled,
+          ).added.length > 0)
+      ) {
+        track.guardianAdded();
+      }
       setTxHash(res.data.hash);
       setStep('success');
     } else if (res.code === 'LOCKED') {
@@ -227,13 +243,22 @@ export function Guardians({ address, network, onBack }: Props) {
       <div className="flex h-full flex-col bg-background px-4">
         <div className="flex flex-1 flex-col items-center pt-10 text-center">
           <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-primary-container/15">
-            <Icon name="verified_user" filled size={48} className="text-primary-container drop-shadow-glow-amber" />
+            <Icon
+              name="verified_user"
+              filled
+              size={48}
+              className="text-primary-container drop-shadow-glow-amber"
+            />
           </div>
-          <h2 className="text-title-md text-on-surface">{editing ? 'Recovery updated' : 'Recovery set up'}</h2>
+          <h2 className="text-title-md text-on-surface">
+            {editing ? 'Recovery updated' : 'Recovery set up'}
+          </h2>
           <p className="mt-1 px-2 text-label-md text-on-surface-variant">
             {describeGuardianSetup(review.guardianCount, review.threshold)}
           </p>
-          <p className="mt-4 break-all px-2 font-mono text-label-sm text-on-surface-variant">{txHash}</p>
+          <p className="mt-4 break-all px-2 font-mono text-label-sm text-on-surface-variant">
+            {txHash}
+          </p>
           <div className="mt-6 w-full space-y-3">
             <Button
               fullWidth
@@ -257,14 +282,22 @@ export function Guardians({ address, network, onBack }: Props) {
     const isHigh = verdict?.action === 'block_confirm';
     const native = isNativePlatform();
     const acknowledged = !isHigh || native || confirmText.trim().toUpperCase() === 'CONFIRM';
-    const changes = editing && current ? guardianDiff(current.guardians.map((g) => g.key), filled) : null;
+    const changes =
+      editing && current
+        ? guardianDiff(
+            current.guardians.map((g) => g.key),
+            filled,
+          )
+        : null;
 
     return (
       <div className="flex h-full flex-col bg-background">
         <ScreenHeader title={editing ? 'Review Changes' : 'Review Setup'} onBack={backToForm} />
         <div className="no-scrollbar flex-1 space-y-4 overflow-y-auto px-4 pb-4">
           <div className="rounded-2xl bg-surface-container p-5 text-center shadow-layer-1">
-            <p className="text-label-sm uppercase tracking-wide text-on-surface-variant">Guardian recovery</p>
+            <p className="text-label-sm uppercase tracking-wide text-on-surface-variant">
+              Guardian recovery
+            </p>
             <p className="mt-2 text-title-md text-on-surface">
               {review.threshold} of {review.guardianCount} to recover
             </p>
@@ -274,7 +307,9 @@ export function Guardians({ address, network, onBack }: Props) {
             {scanning ? (
               <div className="flex items-center gap-2 rounded-2xl border border-outline-variant/40 bg-surface-container p-3.5">
                 <Icon name="security" size={18} className="animate-pulse text-on-surface-variant" />
-                <span className="text-label-md text-on-surface-variant">Lantern is checking this change…</span>
+                <span className="text-label-md text-on-surface-variant">
+                  Lantern is checking this change…
+                </span>
               </div>
             ) : verdict ? (
               <RiskCallout
@@ -293,13 +328,21 @@ export function Guardians({ address, network, onBack }: Props) {
           {changes && (changes.added.length > 0 || changes.removed.length > 0) && (
             <Card className="space-y-1.5">
               {changes.added.map((g) => (
-                <p key={g} className="flex items-center gap-2 font-mono text-label-sm text-on-surface">
-                  <Icon name="add" size={14} className="shrink-0 text-tertiary" /> {truncateAddress(g, 6, 6)}
+                <p
+                  key={g}
+                  className="flex items-center gap-2 font-mono text-label-sm text-on-surface"
+                >
+                  <Icon name="add" size={14} className="shrink-0 text-tertiary" />{' '}
+                  {truncateAddress(g, 6, 6)}
                 </p>
               ))}
               {changes.removed.map((g) => (
-                <p key={g} className="flex items-center gap-2 font-mono text-label-sm text-on-surface-variant line-through">
-                  <Icon name="close" size={14} className="shrink-0 text-error" /> {truncateAddress(g, 6, 6)}
+                <p
+                  key={g}
+                  className="flex items-center gap-2 font-mono text-label-sm text-on-surface-variant line-through"
+                >
+                  <Icon name="close" size={14} className="shrink-0 text-error" />{' '}
+                  {truncateAddress(g, 6, 6)}
                 </p>
               ))}
             </Card>
@@ -307,7 +350,10 @@ export function Guardians({ address, network, onBack }: Props) {
 
           <Card className="space-y-3">
             <ReviewRow label="Guardians" value={String(review.guardianCount)} />
-            <ReviewRow label="Required to recover" value={`${review.threshold} of ${review.guardianCount}`} />
+            <ReviewRow
+              label="Required to recover"
+              value={`${review.threshold} of ${review.guardianCount}`}
+            />
             <ReviewRow label="Network fee" value={`~${review.fee} XLM`} />
             <ReviewRow label="Network" value={network.label} />
           </Card>
@@ -317,7 +363,12 @@ export function Guardians({ address, network, onBack }: Props) {
               <p className="text-label-sm text-error">
                 To proceed, type <span className="font-mono font-semibold">CONFIRM</span> below.
               </p>
-              <Input mono placeholder="CONFIRM" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} />
+              <Input
+                mono
+                placeholder="CONFIRM"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+              />
             </div>
           )}
 
@@ -329,7 +380,13 @@ export function Guardians({ address, network, onBack }: Props) {
 
           {isHigh && native && !scanning ? (
             <HoldToConfirm
-              label={submitting ? 'Saving…' : editing ? 'Hold to Update Recovery' : 'Hold to Set Up Recovery'}
+              label={
+                submitting
+                  ? 'Saving…'
+                  : editing
+                    ? 'Hold to Update Recovery'
+                    : 'Hold to Set Up Recovery'
+              }
               danger
               onConfirm={confirm}
               disabled={submitting}
@@ -367,14 +424,17 @@ export function Guardians({ address, network, onBack }: Props) {
             </>
           ) : (
             <>
-              Add trusted people as <span className="text-on-surface">guardians</span>. If you ever lose your key, a
-              quorum of them can help you recover this account — without any of them being able to spend your funds.
+              Add trusted people as <span className="text-on-surface">guardians</span>. If you ever
+              lose your key, a quorum of them can help you recover this account — without any of
+              them being able to spend your funds.
             </>
           )}
         </p>
 
         <div className="space-y-2">
-          <label className="block text-label-sm uppercase tracking-wide text-on-surface-variant">Guardians</label>
+          <label className="block text-label-sm uppercase tracking-wide text-on-surface-variant">
+            Guardians
+          </label>
           {guardians.map((g, i) => (
             <div key={i} className="flex items-start gap-2">
               <div className="flex-1">
@@ -410,7 +470,10 @@ export function Guardians({ address, network, onBack }: Props) {
         </div>
 
         <div>
-          <label htmlFor="guardian-threshold" className="mb-2 block text-label-sm uppercase tracking-wide text-on-surface-variant">
+          <label
+            htmlFor="guardian-threshold"
+            className="mb-2 block text-label-sm uppercase tracking-wide text-on-surface-variant"
+          >
             Required to recover
           </label>
           <div className="relative">
@@ -426,7 +489,11 @@ export function Guardians({ address, network, onBack }: Props) {
                 </option>
               ))}
             </select>
-            <Icon name="expand_more" size={20} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant" />
+            <Icon
+              name="expand_more"
+              size={20}
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant"
+            />
           </div>
         </div>
 

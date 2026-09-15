@@ -7,7 +7,7 @@
 // until it is true.
 
 import { getSettings, onSettingsChanged, setSettings } from '@shared/storage';
-import { isNativePlatform } from '@shared/kv';
+import { getKV, isNativePlatform } from '@shared/kv';
 import { createSink, type Sink } from './sink';
 import { clearInstallId, getInstallId } from './install-id';
 import type { TelemetryEvent } from './events';
@@ -16,6 +16,7 @@ export type { TelemetryEvent, Envelope, StampedEvent, EventName } from './events
 export { validateEnvelope, validateEvent } from './validate';
 export { createSink } from './sink';
 export { getInstallId, clearInstallId, INSTALL_ID_KEY } from './install-id';
+export { track } from './emits';
 
 let sink: Sink | null = null;
 let consent = false;
@@ -52,6 +53,34 @@ export async function startTelemetry(opts: StartOptions): Promise<void> {
 
 export function emit(event: TelemetryEvent): void {
   sink?.emit(event);
+}
+
+const FIRST_OPEN_KEY = 'lantern.telemetry.firstOpenSeen';
+
+// The app's own start-up: read the ingest URL from the build env, start the
+// sink, then `app_first_open` exactly once per install and `session_start`
+// every open. Call under `if (__FEATURE_TELEMETRY__)` from an entry point.
+export async function bootTelemetry(opts: {
+  appVersion: string;
+  ingestUrl?: string;
+  session?: boolean;
+}): Promise<void> {
+  const ingestUrl =
+    opts.ingestUrl ??
+    (import.meta.env as Record<string, string | undefined>).VITE_TELEMETRY_INGEST_URL;
+  if (!ingestUrl) return; // no endpoint configured: stay off
+  await startTelemetry({ ingestUrl, appVersion: opts.appVersion });
+  if (opts.session === false) return;
+  // Without consent nothing would be buffered, so the first-open marker is
+  // only written once the event can actually go out — the first *consented*
+  // open is the install's first open, as far as the report can know.
+  if (!consent) return;
+  const kv = await getKV();
+  if (!(await kv.get(FIRST_OPEN_KEY))) {
+    await kv.set(FIRST_OPEN_KEY, '1');
+    emit({ name: 'app_first_open', props: {} });
+  }
+  emit({ name: 'session_start', props: {} });
 }
 
 export async function grantConsent(): Promise<void> {
