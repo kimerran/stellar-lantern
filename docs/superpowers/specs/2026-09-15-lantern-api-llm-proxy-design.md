@@ -1,6 +1,6 @@
 # Lantern API — LLM proxy for the scanner's explainer
 
-**Date:** 2026-09-15 · **Status:** approved design, not yet built · **Owner slice:** the GitHub issue that links here
+**Date:** 2026-09-15 · **Status:** approved design · implemented in #82 (issue #80)
 
 ## Why
 
@@ -99,7 +99,8 @@ instead:
   `chrome-extension://<id>` origin plus the demo site. A speed bump, not a lock
   (headers are forgeable); documented as such.
 - **Per-IP rate limit** — `RATE_LIMIT_PER_MIN` (default 10), sliding window,
-  keyed by `X-Forwarded-For`'s first hop (Railway sets it) else the socket.
+  keyed by `X-Forwarded-For`'s **last** hop — the one the trusted edge
+  (Railway) appends; earlier hops are client-controlled — else the socket.
 - **Service-wide daily cap** — `DAILY_CAP` (default 2000 requests/UTC day): a
   hard stop that does not depend on the provider's own cap.
 - **Input bounds** — 32 KB body, schema, `max_tokens` fixed at 200.
