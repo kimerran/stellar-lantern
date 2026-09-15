@@ -42,6 +42,10 @@ export interface Settings {
   // bookmark, NOT elevated permissions. Lives in Settings so it live-updates
   // across surfaces for free via onSettingsChanged.
   favoriteApps?: string[];
+  // Analytics opt-in (#81). Default false: the telemetry sink is a hard
+  // no-op until this is true. Lives here so the consent toggle live-updates
+  // every surface via onSettingsChanged, like every other setting.
+  analyticsConsent?: boolean;
 }
 
 // A single asset balance for display.

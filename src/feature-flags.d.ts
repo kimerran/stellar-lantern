@@ -12,3 +12,4 @@ declare const __FEATURE_MINIAPPS__: boolean;
 declare const __FEATURE_DEMO_AFFORDANCES__: boolean;
 declare const __FEATURE_PASSKEY__: boolean;
 declare const __FEATURE_SCANNER_AI__: boolean;
+declare const __FEATURE_TELEMETRY__: boolean;
