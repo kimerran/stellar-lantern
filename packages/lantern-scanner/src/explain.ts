@@ -47,6 +47,16 @@ export class ExplainError extends Error {
 
 const short = (a: string): string => (a.length > 8 ? `${a.slice(0, 4)}…${a.slice(-4)}` : a);
 
+// A token's `code` is the deployer-chosen METADATA symbol and a call's name
+// is a contract's own symbol — both unbounded, both attacker-controlled, both
+// an injection channel into the prompt if interpolated verbatim. Only values
+// that look like a classic asset code / a Soroban symbol pass through.
+const CODE_RE = /^[A-Za-z0-9]{1,12}$/;
+const FN_RE = /^[A-Za-z0-9_]{1,32}$/;
+const safeCode = (a: { code: string; contractId?: string }): string =>
+  CODE_RE.test(a.code) ? a.code : a.contractId ? `token ${short(a.contractId)}` : 'an asset';
+const safeFn = (name: string): string => (FN_RE.test(name) ? name : 'an unrecognised function');
+
 // ── Prompt ───────────────────────────────────────────────────────────────────
 
 export const SYSTEM_PROMPT = [
@@ -76,7 +86,7 @@ export function buildPrompt(input: ExplainInput): { system: string; user: string
       const amount =
         d.bound === 'total'
           ? 'the entire balance'
-          : `${d.amount ?? `${d.raw} base units (decimals unknown)`} ${d.asset.code}`;
+          : `${d.amount ?? `${d.raw} base units (decimals unknown)`} ${safeCode(d.asset)}`;
       const qualifier = d.bound === 'max' ? 'up to ' : d.bound === 'min' ? 'at least ' : '';
       lines.push(
         `- ${qualifier}${amount} ${d.direction === 'out' ? 'leaves' : 'arrives at'} ${short(d.address)}`,
@@ -86,11 +96,13 @@ export function buildPrompt(input: ExplainInput): { system: string; user: string
   const approvals = effects.approvals as ReadonlyArray<Approval>;
   for (const a of approvals) {
     lines.push(
-      `- allowance: ${short(a.spender)} may spend ${a.unlimited ? 'an unlimited amount of' : (a.amountScaled ?? `${a.amount} base units of`)} ${a.asset.code} from ${short(a.owner)} until ledger ${a.expirationLedger}`,
+      `- allowance: ${short(a.spender)} may spend ${a.unlimited ? 'an unlimited amount of' : (a.amountScaled ?? `${a.amount} base units of`)} ${safeCode(a.asset)} from ${short(a.owner)} until ledger ${a.expirationLedger}`,
     );
   }
   for (const u of effects.unverified) {
-    lines.push(`- calls "${u.functionName}" on contract ${short(u.contractId)} — ${u.label}`);
+    lines.push(
+      `- calls "${safeFn(u.functionName)}" on contract ${short(u.contractId)} — ${u.label}`,
+    );
   }
   for (const c of effects.closes) {
     lines.push(
@@ -101,7 +113,7 @@ export function buildPrompt(input: ExplainInput): { system: string; user: string
     lines.push('Simulation observed:');
     for (const o of effects.observed) {
       lines.push(
-        `- ${o.amount ?? o.raw} ${o.asset.code} ${o.direction === 'out' ? 'leaves' : 'arrives at'} ${short(o.address)}`,
+        `- ${o.amount ?? o.raw} ${safeCode(o.asset)} ${o.direction === 'out' ? 'leaves' : 'arrives at'} ${short(o.address)}`,
       );
     }
   }
