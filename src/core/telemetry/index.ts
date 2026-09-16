@@ -9,13 +9,14 @@
 import { getSettings, onSettingsChanged, setSettings } from '@shared/storage';
 import { getKV, isNativePlatform } from '@shared/kv';
 import { createSink, type Sink } from './sink';
-import { clearInstallId, getInstallId } from './install-id';
+import { clearInstallId, getInstallId, INSTALL_ID_KEY } from './install-id';
 import type { TelemetryEvent } from './events';
 
 export type { TelemetryEvent, Envelope, StampedEvent, EventName } from './events';
 export { validateEnvelope, validateEvent } from './validate';
 export { createSink } from './sink';
 export { getInstallId, clearInstallId, INSTALL_ID_KEY } from './install-id';
+export { CONSENT_COPY, shouldShowConsentPrompt, markConsentPromptSeen } from './consent';
 export { track } from './emits';
 
 let sink: Sink | null = null;
@@ -102,7 +103,7 @@ export async function bootTelemetry(opts: {
 }
 
 export async function grantConsent(): Promise<void> {
-  await setSettings({ analyticsConsent: true });
+  await setSettings({ analyticsConsent: true, analyticsPromptSeen: true });
   consent = true;
   sink?.emit({ name: 'consent_granted', props: {} });
   await sink?.flush();
@@ -116,9 +117,22 @@ export async function revokeConsentAndDelete(): Promise<void> {
   const had = consent;
   sink?.emit({ name: 'consent_revoked', props: {} });
   await sink?.flush();
-  await setSettings({ analyticsConsent: false });
+  await setSettings({ analyticsConsent: false, analyticsPromptSeen: true });
   consent = false;
   if (had) await sink?.requestDeletion();
+  await clearInstallId();
+}
+
+// "Delete my data", explicitly: keyed on whether this install has an id at
+// all — not on the in-memory consent — so a user whose earlier revoke failed
+// or was interrupted can retry, and a never-opted-in install (no id) makes
+// no request. Always ends with consent off and the id forgotten.
+export async function deleteAnalyticsData(): Promise<void> {
+  const kv = await getKV();
+  const hadId = (await kv.get(INSTALL_ID_KEY)) !== null;
+  await setSettings({ analyticsConsent: false, analyticsPromptSeen: true });
+  consent = false;
+  if (hadId) await sink?.requestDeletion();
   await clearInstallId();
 }
 
