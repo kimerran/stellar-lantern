@@ -396,6 +396,9 @@ const DEFAULT_REGISTRY = 'CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G62
 
 // `--map` file: a flat { "<installId>": "Alice" } object. Labels are trimmed
 // and must be non-empty; anything else is a usage error, not a silent skip.
+// A UUID-shaped label is refused too: a label is copied into the output
+// verbatim, and the report's contract is that no install UUID ever prints.
+const UUID_LABEL_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function readLabelMap(text: string): Record<string, string> {
   const parsed: unknown = JSON.parse(text);
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
@@ -404,6 +407,8 @@ export function readLabelMap(text: string): Record<string, string> {
   for (const [id, label] of Object.entries(parsed as Record<string, unknown>)) {
     if (typeof label !== 'string' || !label.trim())
       throw new Error(`--map: label for ${id} must be a non-empty string`);
+    if (UUID_LABEL_RE.test(label.trim()))
+      throw new Error(`--map: label for ${id} looks like an install id — use a name`);
     out[id] = label.trim();
   }
   return out;

@@ -313,5 +313,7 @@ describe('--map', () => {
     expect(() => readLabelMap('[]')).toThrow(/expected a JSON object/);
     expect(() => readLabelMap(`{"${B}": ""}`)).toThrow(/non-empty/);
     expect(() => readLabelMap(`{"${B}": 3}`)).toThrow(/non-empty/);
+    // A UUID as the label would print an install id — refused.
+    expect(() => readLabelMap(`{"${B}": "${A}"}`)).toThrow(/looks like an install id/);
   });
 });
