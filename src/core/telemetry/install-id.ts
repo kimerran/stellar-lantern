@@ -17,6 +17,13 @@ export async function getInstallId(): Promise<string> {
   return id;
 }
 
+// Read without minting (#98): Settings shows the id only once one exists, so
+// opening the screen never creates an install identity by itself.
+export async function peekInstallId(): Promise<string | null> {
+  const kv = await getKV();
+  return (await kv.get(INSTALL_ID_KEY)) ?? null;
+}
+
 // "Delete my data": forget the id locally. The next event, if consent is ever
 // granted again, starts a fresh, unlinkable trail.
 export async function clearInstallId(): Promise<void> {

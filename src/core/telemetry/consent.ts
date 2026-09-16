@@ -22,6 +22,9 @@ export const CONSENT_COPY = {
     'amounts, asset codes, memos or transaction hashes',
     'the text of any message you check',
   ],
+  idTitle: 'Analytics ID',
+  idHint:
+    'Include this ID in your test report so we can match your feedback to your usage. It is random, not derived from your wallet.',
   deleteTitle: 'Delete my data',
   deleteHint: 'Turns sharing off and asks us to delete everything sent from this install.',
   promptAccept: 'Share anonymous usage data',
