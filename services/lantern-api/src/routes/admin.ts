@@ -1,11 +1,15 @@
 // The analytics page (#104): the activity report, served.
 //
-//   GET  /admin              no session → login form; session → the report
-//                            ?since=YYYY-MM-DD&until=YYYY-MM-DD&account=G…&platform=extension|android
-//   POST /admin/login        form field `token` → timingSafeEqual against TELEMETRY_ADMIN_TOKEN
-//                            → session cookie → 303 /admin
-//   POST /admin/logout       clears the cookie → 303 /admin
-//   GET  /admin/export.csv   the raw rows for the same filters, `account` included
+//   GET  /admin                no session → login form; session → the dashboard (#106)
+//                              ?since=YYYY-MM-DD&until=YYYY-MM-DD&platform=extension|android
+//   GET  /admin/wallets        one row per identity, ?sort=lastSeen|firstSeen|events|sessions|txSigned|highRiskGated
+//   GET  /admin/wallets/:key   drill-down: key = G… address, or the install id of an anonymous install
+//   GET  /admin/report         the full emailed-style report for the window
+//   POST /admin/login          form field `token` → timingSafeEqual against TELEMETRY_ADMIN_TOKEN
+//                              → session cookie → 303 /admin
+//   POST /admin/logout         clears the cookie → 303 /admin
+//   GET  /admin/export.csv     the raw rows for the same filters, `account` included
+//   GET  /admin/export.json    same rows as { rows: [...] }; add &wallet=<key> for one identity
 //
 // The cookie never carries the token: its value is an HMAC of the token under
 // a nonce minted at boot, so a restart invalidates every session and a leaked
@@ -14,9 +18,22 @@
 // page and the emailed file never disagree. No admin token configured → 404,
 // exactly like the export.
 
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { buildReport, renderHtml, esc, CSS, type Row } from '@lantern/telemetry-report';
+import {
+  buildDashboard,
+  dailySeries,
+  renderDashboard,
+  renderNotFound,
+  renderWallet,
+  renderWallets,
+  sortWallets,
+  summarizeWallets,
+  walletTrail,
+  WALLET_SORTS,
+  type WalletSort,
+} from './admin-views';
 import type { TelemetryRow, TelemetryStore } from '../telemetry/store';
 import { EXPORT_PAGE } from './telemetry';
 
@@ -35,6 +52,7 @@ const SESSION_HOURS = 12;
 const DAY_MS = 86_400_000;
 const MAX_ROWS = 50_000; // page cap: alpha volumes are tiny; a runaway range still terminates
 const ACCOUNT_RE = /^G[A-Z2-7]{55}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Session value = `<expiresAtMs>.<hmac(nonce, token + "." + expiresAtMs)>`.
@@ -85,7 +103,7 @@ const toRow = (r: TelemetryRow): Row => ({
 export interface Filters {
   since: string; // YYYY-MM-DD, inclusive
   until: string; // YYYY-MM-DD, exclusive
-  account: string; // '' = all
+  wallet: string; // identity key (G… or install id) for downloads; '' = all
   platform: string; // '' = all
 }
 
@@ -93,9 +111,10 @@ export function parseFilters(q: Record<string, string | undefined>, now: Date): 
   const day = (d: Date) => d.toISOString().slice(0, 10);
   const until = DATE_RE.test(q.until ?? '') ? q.until! : day(new Date(now.getTime() + DAY_MS));
   const since = DATE_RE.test(q.since ?? '') ? q.since! : day(new Date(now.getTime() - 30 * DAY_MS));
-  const account = ACCOUNT_RE.test(q.account ?? '') ? q.account! : '';
+  const w = q.wallet ?? q.account ?? '';
+  const wallet = ACCOUNT_RE.test(w) || UUID_RE.test(w) ? w : '';
   const platform = q.platform === 'extension' || q.platform === 'android' ? q.platform : '';
-  return { since, until, account, platform };
+  return { since, until, wallet, platform };
 }
 
 async function loadRows(store: TelemetryStore, f: Filters): Promise<Row[]> {
@@ -109,7 +128,6 @@ async function loadRows(store: TelemetryStore, f: Filters): Promise<Row[]> {
       limit: EXPORT_PAGE,
     });
     for (const r of page) {
-      if (f.account && r.account !== f.account) continue;
       if (f.platform && r.platform !== f.platform) continue;
       out.push(toRow(r));
     }
@@ -162,22 +180,24 @@ ${error ? `<p class="err">${esc(error)}</p>` : ''}
 </div></main></body></html>`;
 }
 
-function toolbar(f: Filters): string {
-  const opt = (v: string, label: string) =>
-    `<option value="${v}"${f.platform === v ? ' selected' : ''}>${label}</option>`;
-  const qs = new URLSearchParams({
+export function queryString(f: Filters): string {
+  return new URLSearchParams({
     since: f.since,
     until: f.until,
-    ...(f.account ? { account: f.account } : {}),
     ...(f.platform ? { platform: f.platform } : {}),
+    ...(f.wallet ? { wallet: f.wallet } : {}),
   }).toString();
-  return `<form class="bar" method="get" action="/admin">
+}
+const windowText = (f: Filters) => `${f.since} → ${f.until} (UTC)`;
+
+function toolbar(f: Filters, action: string): string {
+  const opt = (v: string, label: string) =>
+    `<option value="${v}"${f.platform === v ? ' selected' : ''}>${label}</option>`;
+  return `<form class="bar" method="get" action="${esc(action)}">
 <label>From (inclusive)<input type="date" name="since" value="${esc(f.since)}"></label>
 <label>To (exclusive)<input type="date" name="until" value="${esc(f.until)}"></label>
-<label>Wallet<input type="text" name="account" value="${esc(f.account)}" placeholder="G… (all)" size="20"></label>
 <label>Platform<select name="platform">${opt('', 'all')}${opt('extension', 'Chrome')}${opt('android', 'Android')}</select></label>
 <button type="submit">Apply</button>
-<a class="btn ghost" href="/admin/export.csv?${esc(qs)}">Download CSV</a>
 <button class="ghost" type="submit" formmethod="post" formaction="/admin/logout">Sign out</button>
 </form>`;
 }
@@ -227,13 +247,84 @@ export function adminRoutes(deps: AdminDeps): Hono {
     return c.redirect('/admin', 303);
   });
 
-  app.get('/admin', async (c) => {
-    if (!token) return c.json({ error: 'not_found' }, 404);
-    if (!hasSession(c.req.header('cookie'))) return c.html(loginPage(), 401);
-    if (!deps.store) return c.html(loginPage('No database is configured on this deployment.'), 503);
+  // Session + store gate shared by every page; returns the rows for the window
+  // (platform-filtered), or the response to send instead.
+  type Gate = { rows: Row[]; f: Filters } | { deny: Response };
+  const gate = async (c: Context, html: boolean): Promise<Gate> => {
+    if (!token) return { deny: c.json({ error: 'not_found' }, 404) };
+    if (!hasSession(c.req.header('cookie'))) return { deny: c.html(loginPage(), 401) };
+    if (!deps.store)
+      return {
+        deny: html
+          ? c.html(loginPage('No database is configured on this deployment.'), 503)
+          : c.json({ error: 'unavailable' }, 503),
+      };
     const f = parseFilters(c.req.query(), now());
-    const rows = await loadRows(deps.store, f);
-    const report = buildReport(rows, {
+    return { rows: await loadRows(deps.store, f), f };
+  };
+  // Rows narrowed to one identity when ?wallet= is set (downloads, drill-down).
+  const narrow = (rows: Row[], f: Filters): Row[] =>
+    f.wallet ? (walletTrail(rows, f.wallet)?.rows ?? []) : rows;
+
+  app.get('/admin', async (c) => {
+    const g = await gate(c, true);
+    if ('deny' in g) return g.deny;
+    const { rows, f } = g;
+    const d = buildDashboard(rows, f.since, f.until);
+    log({ route: 'admin_dashboard', status: 200, rows: rows.length });
+    return c.html(
+      renderDashboard(d, {
+        toolbar: toolbar(f, '/admin'),
+        qs: queryString(f),
+        window: windowText(f),
+      }),
+    );
+  });
+
+  app.get('/admin/wallets', async (c) => {
+    const g = await gate(c, true);
+    if ('deny' in g) return g.deny;
+    const { rows, f } = g;
+    const sortQ = c.req.query('sort') ?? '';
+    const sort: WalletSort = (WALLET_SORTS as string[]).includes(sortQ)
+      ? (sortQ as WalletSort)
+      : 'lastSeen';
+    const ws = sortWallets(summarizeWallets(rows), sort);
+    log({ route: 'admin_wallets', status: 200, rows: rows.length });
+    return c.html(
+      renderWallets(ws, {
+        toolbar: toolbar(f, '/admin/wallets'),
+        qs: queryString(f),
+        window: windowText(f),
+        sort,
+      }),
+    );
+  });
+
+  app.get('/admin/wallets/:key', async (c) => {
+    const g = await gate(c, true);
+    if ('deny' in g) return g.deny;
+    const { rows, f } = g;
+    const key = c.req.param('key');
+    const w = ACCOUNT_RE.test(key) || UUID_RE.test(key) ? walletTrail(rows, key) : null;
+    if (!w) {
+      log({ route: 'admin_wallet', status: 404 });
+      return c.html(renderNotFound(queryString(f)), 404);
+    }
+    log({ route: 'admin_wallet', status: 200, rows: w.rows.length });
+    return c.html(
+      renderWallet(w, dailySeries(w.rows, f.since, f.until), {
+        qs: queryString(f),
+        window: windowText(f),
+      }),
+    );
+  });
+
+  app.get('/admin/report', async (c) => {
+    const g = await gate(c, true);
+    if ('deny' in g) return g.deny;
+    const { rows, f } = g;
+    const report = buildReport(narrow(rows, f), {
       since: `${f.since}T00:00:00.000Z`,
       until: `${f.until}T00:00:00.000Z`,
       registryCount: null,
@@ -241,22 +332,30 @@ export function adminRoutes(deps: AdminDeps): Hono {
       now,
     });
     log({ route: 'admin_report', status: 200, rows: rows.length });
-    return c.html(renderHtml(report, toolbar(f)));
+    const nav = `<nav class="tabs"><a href="/admin?${esc(queryString(f))}">← Dashboard</a><a href="/admin/wallets?${esc(queryString(f))}">Wallets</a></nav>`;
+    return c.html(renderHtml(report, nav + toolbar(f, '/admin/report')));
   });
 
+  const fileStem = (f: Filters) =>
+    `lantern-telemetry-${f.wallet ? f.wallet.slice(0, 8) + '-' : ''}${f.since}_${f.until}`;
+
   app.get('/admin/export.csv', async (c) => {
-    if (!token) return c.json({ error: 'not_found' }, 404);
-    if (!hasSession(c.req.header('cookie'))) return c.html(loginPage(), 401);
-    if (!deps.store) return c.json({ error: 'unavailable' }, 503);
-    const f = parseFilters(c.req.query(), now());
-    const rows = await loadRows(deps.store, f);
+    const g = await gate(c, false);
+    if ('deny' in g) return g.deny;
+    const rows = narrow(g.rows, g.f);
     log({ route: 'admin_csv', status: 200, rows: rows.length });
     c.header('Content-Type', 'text/csv; charset=utf-8');
-    c.header(
-      'Content-Disposition',
-      `attachment; filename="lantern-telemetry-${f.since}_${f.until}.csv"`,
-    );
+    c.header('Content-Disposition', `attachment; filename="${fileStem(g.f)}.csv"`);
     return c.body(toCsv(rows));
+  });
+
+  app.get('/admin/export.json', async (c) => {
+    const g = await gate(c, false);
+    if ('deny' in g) return g.deny;
+    const rows = narrow(g.rows, g.f);
+    log({ route: 'admin_json', status: 200, rows: rows.length });
+    c.header('Content-Disposition', `attachment; filename="${fileStem(g.f)}.json"`);
+    return c.json({ rows });
   });
 
   return app;
