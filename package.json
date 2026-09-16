@@ -1,7 +1,7 @@
 {
   "name": "lantern-stellar-wallet",
   "version": "0.1.0",
-  "description": "Lantern \u2014 a non-custodial Stellar browser-extension wallet (MV3).",
+  "description": "Lantern — a non-custodial Stellar browser-extension wallet (MV3).",
   "private": true,
   "license": "MIT",
   "type": "module",
