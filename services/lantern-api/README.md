@@ -63,6 +63,27 @@ otherwise). Postgres is private-network only on Railway, so the `pgStore`
 integration test (`test/pg-store.test.ts`) runs only when you point
 `DATABASE_URL` at a database of your own; CI uses the in-memory store.
 
+## The analytics page: `/admin` (#104)
+
+The activity report, served. `GET /admin` shows a one-field login (the
+`TELEMETRY_ADMIN_TOKEN`); a right token sets a session cookie
+(`lantern_admin`: HttpOnly, Secure, SameSite=Strict, 12 h, `Path=/admin`)
+whose value is `<expiry>.<HMAC(nonce, token.expiry)>` with the nonce minted at
+boot — the cookie never carries the token, the expiry is enforced server-side
+(a copied header dies after 12 h regardless of the browser), a restart
+invalidates every session, and a leaked cookie cannot be replayed against
+`/v1/telemetry/export`. With a session,
+`/admin?since=YYYY-MM-DD&until=YYYY-MM-DD&account=G…&platform=extension|android`
+renders the same report as `npm run report:activity` (both import
+`src/core/telemetry/report.ts`, aliased here as `@lantern/telemetry-report`),
+default window the last 30 days, and `/admin/export.csv` with the same
+filters downloads the raw rows with the `account` column. Login attempts share
+the telemetry per-IP window; every `/admin*` response is `Cache-Control:
+no-store` + `X-Robots-Tag: noindex`. No `TELEMETRY_ADMIN_TOKEN` → `/admin` is
+404, exactly like the export; no `DATABASE_URL` → 503. The page's Q4 registry
+tile is "n/a" here (the offline report cross-checks Soroban RPC; the server
+does not make that call).
+
 ## Threat model: open, but bounded
 
 An extension cannot hold a client secret, so the proxy is public and bounded
@@ -147,9 +168,15 @@ with `--path-as-root`, and waits for `/healthz`. First-time setup:
    `{ "ok": true, … }`. Give the public URL + `/v1/explain` to the wallet
    (`hostedExplainer({ endpoint })`) and the demo site.
 
-No CI-driven deploy: Railway's GitHub integration redeploys on pushes to
-`main`. `.github/workflows/services.yml` runs typecheck, the offline suite, the
-bundle build and a boot smoke on PRs.
+**Deploy from CI (#104):** `release.yml` has a `deploy-api` job after the
+release build on every push to `main`. It runs the same script with
+`RAILWAY_TOKEN` (a Railway *project token* for the `lantern` project —
+Project → Settings → Tokens; add it as a repository secret named
+`RAILWAY_TOKEN`) and fails the run if `/healthz` does not come back. Without
+the secret the job prints a notice and skips, so a fork or a checkout without
+Railway access still builds. Before this, the API was deployed by hand and
+lagged the clients (#100). `.github/workflows/services.yml` still runs
+typecheck, the offline suite, the bundle build and a boot smoke on PRs.
 
 ## Layout
 

@@ -10,9 +10,9 @@
 #   scripts/deploy-lantern-api.sh            # deploy + wait for /healthz
 #   scripts/deploy-lantern-api.sh --detach   # start the deploy and return
 #
-# Prereqs: `railway login`, and the project linked once
-# (`railway link --project <id> --service lantern-api`). Nothing here reads
-# or prints a secret; variables live in Railway.
+# Prereqs: `railway login` locally, or RAILWAY_TOKEN (a project token) in CI —
+# a project token already pins the project, so the link step is skipped. Nothing
+# here reads or prints a secret; variables live in Railway.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -32,15 +32,26 @@ rm -rf "$CTX/services/lantern-api/node_modules" "$CTX/services/lantern-api/dist"
 
 echo "context: $(du -sh "$CTX" | cut -f1) → service $SERVICE"
 cd "$CTX"
-railway link --project "$PROJECT" --service "$SERVICE" >/dev/null
-railway status | grep -q "Project ID:.*$PROJECT" || { echo "not linked to project $PROJECT" >&2; exit 1; }
+if [[ -z "${RAILWAY_TOKEN:-}" ]]; then
+  railway link --project "$PROJECT" --service "$SERVICE" >/dev/null
+  railway status | grep -q "Project ID:.*$PROJECT" || { echo "not linked to project $PROJECT" >&2; exit 1; }
+fi
 if [[ "${1:-}" == "--detach" ]]; then
   railway up --service "$SERVICE" --detach --path-as-root --no-gitignore "$CTX"
   exit 0
 fi
 railway up --service "$SERVICE" --ci --path-as-root --no-gitignore "$CTX"
 
-URL=$(railway domain --service "$SERVICE" --json 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["domains"][0])')
+# Read-only lookup: bare `railway domain` would CREATE a domain on a service
+# that has none. No domain → fail, rather than probe some unrelated URL.
+URL=${LANTERN_API_URL:-}
+if [[ -z "$URL" ]]; then
+  DOMAIN=$(railway domain list --service "$SERVICE" --json 2>/dev/null | python3 -c 'import json,sys
+d=json.load(sys.stdin).get("domains") or []
+print(next((x["domain"] for x in d if isinstance(x, dict) and x.get("domain")), ""))' 2>/dev/null || true)
+  [[ -n "$DOMAIN" ]] || { echo "no domain found for service $SERVICE — set LANTERN_API_URL" >&2; exit 1; }
+  URL="https://$DOMAIN"
+fi
 echo "waiting for $URL/healthz …"
 for _ in $(seq 1 30); do
   if curl -fsS --max-time 10 "$URL/healthz" 2>/dev/null; then echo; echo "deployed: $URL"; exit 0; fi

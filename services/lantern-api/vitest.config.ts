@@ -10,6 +10,9 @@ export default defineConfig({
       '@lantern/telemetry-validate': fileURLToPath(
         new URL('../../src/core/telemetry/validate.ts', import.meta.url),
       ),
+      '@lantern/telemetry-report': fileURLToPath(
+        new URL('../../src/core/telemetry/report.ts', import.meta.url),
+      ),
     },
   },
   // The scanner package's demo-affordance branch reads this build-time

@@ -15,9 +15,13 @@ export interface Env {
   telemetryAdminToken?: string;
   telemetryDailyCap: number;
   retentionDays: number;
+  // Shown on the /admin report's Q4 tile (#104); the deployed testnet registry.
+  registryId: string;
 }
 
 export const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
+// The deployed testnet blacklist registry (same default as scripts/report-activity.ts).
+export const DEFAULT_REGISTRY = 'CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F';
 
 function int(name: string, raw: string | undefined, dflt: number): number {
   if (raw === undefined || raw === '') return dflt;
@@ -45,5 +49,6 @@ export function readEnv(source: Record<string, string | undefined> = process.env
     ...(source.TELEMETRY_ADMIN_TOKEN ? { telemetryAdminToken: source.TELEMETRY_ADMIN_TOKEN } : {}),
     telemetryDailyCap: int('TELEMETRY_DAILY_CAP', source.TELEMETRY_DAILY_CAP, 50_000),
     retentionDays: int('TELEMETRY_RETENTION_DAYS', source.TELEMETRY_RETENTION_DAYS, 90),
+    registryId: source.BLACKLIST_REGISTRY_ID || DEFAULT_REGISTRY,
   };
 }

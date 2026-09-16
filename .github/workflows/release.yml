@@ -114,3 +114,31 @@ jobs:
           name: app-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+  # The Lantern API deploys with the clients (#104). Before this, the server was
+  # deployed by hand and lagged the clients (#100: the old validator rejected the
+  # new envelopes). Same staged `railway up` as scripts/deploy-lantern-api.sh;
+  # the script waits on /healthz so a broken deploy fails the run. Needs the
+  # RAILWAY_TOKEN repository secret (a Railway project token for the `lantern`
+  # project); without it the job is skipped, not failed.
+  deploy-api:
+    needs: release-build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      - name: Deploy lantern-api
+        if: env.RAILWAY_TOKEN != ''
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: bash scripts/deploy-lantern-api.sh
+      - name: Skipped (no RAILWAY_TOKEN)
+        if: env.RAILWAY_TOKEN == ''
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: echo "RAILWAY_TOKEN secret not set — API not deployed from CI; run scripts/deploy-lantern-api.sh by hand."

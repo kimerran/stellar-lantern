@@ -143,6 +143,10 @@ Railway, under our control; no third party holds the data.
 
 ## The report
 
+The same report is served at `https://<lantern-api>/admin` (#104) behind the
+admin token: sign in once, pick a date range, a wallet or a platform, or
+download the rows as CSV. See `services/lantern-api/README.md`. Offline:
+
 `npm run report:activity` (`scripts/report-activity.ts`) pulls the raw rows
 from `GET /v1/telemetry/export` (`TELEMETRY_ADMIN_TOKEN`, optional
 `--since` / `--until`) and writes **one self-contained file**,
