@@ -13,6 +13,8 @@ export interface TelemetryRow {
   props: Record<string, string | boolean>;
   ts: Date;
   receivedAt: Date;
+  // Alpha identity (#100): the wallet's public address when the build sent one.
+  account?: string | null;
 }
 
 export type NewRow = Omit<TelemetryRow, 'id' | 'receivedAt'>;

@@ -152,6 +152,18 @@ describe('validate', () => {
     expect(validateEnvelope(ok({ platform: 'ios' as never }))).toBe(false);
     expect(validateEnvelope(ok({ events: Array(501).fill(ok().events[0]) }))).toBe(false);
   });
+
+  // Alpha identity (#100): `account` is the one slot a key-shaped string may
+  // occupy, and only a public (G) key — the sweep still catches everything else.
+  it('accepts a public address only as `account`, and rejects any other key there', () => {
+    expect(validateEnvelope(ok({ account: ADDRESS }))).toBe(true);
+    expect(validateEnvelope(ok({ account: SECRET }))).toBe(false);
+    expect(validateEnvelope(ok({ account: 'C' + 'A'.repeat(55) }))).toBe(false);
+    expect(validateEnvelope(ok({ account: 'GABC' }))).toBe(false);
+    expect(validateEnvelope(ok({ account: 42 as never }))).toBe(false);
+    // With an account present, a key smuggled elsewhere is still rejected.
+    expect(validateEnvelope(ok({ account: ADDRESS, appVersion: SECRET }))).toBe(false);
+  });
 });
 
 // ── The sink ─────────────────────────────────────────────────────────────────
@@ -164,6 +176,29 @@ describe('sink', () => {
     expect(sink.size()).toBe(0);
     expect(posts).toHaveLength(0);
     expect(timers).toHaveLength(0);
+  });
+
+  it('attaches the account when a reader is given, and stays anonymous when it yields nothing or throws', async () => {
+    const withAddr = sinkWith({ account: async () => ADDRESS, flushAt: 1 });
+    withAddr.sink.emit({ name: 'session_start', props: {} });
+    await withAddr.sink.flush();
+    expect((withAddr.posts[0]!.body as Envelope).account).toBe(ADDRESS);
+
+    const noWallet = sinkWith({ account: async () => null, flushAt: 1 });
+    noWallet.sink.emit({ name: 'session_start', props: {} });
+    await noWallet.sink.flush();
+    expect('account' in noWallet.posts[0]!.body).toBe(false);
+
+    const broken = sinkWith({
+      account: async () => {
+        throw new Error('storage');
+      },
+      flushAt: 1,
+    });
+    broken.sink.emit({ name: 'session_start', props: {} });
+    await broken.sink.flush();
+    expect(broken.posts).toHaveLength(1);
+    expect('account' in broken.posts[0]!.body).toBe(false);
   });
 
   it('batches: flushes at the size threshold with the envelope shape, and on the timer', async () => {

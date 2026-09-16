@@ -83,6 +83,7 @@ export function telemetryRoutes(deps: TelemetryDeps): Hono {
       event: e.name,
       props: e.props,
       ts: new Date(e.ts),
+      account: raw.account ?? null,
     }));
     try {
       const n = await deps.store.insert(rows, receivedAt);

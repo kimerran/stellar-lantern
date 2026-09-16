@@ -6,18 +6,24 @@
 import type { Settings } from '@shared/types';
 import { setSettings } from '@shared/storage';
 
+// Alpha builds (#100) also send the wallet's public address, and say so; the
+// "anonymous" wording and the addresses line change with the flag.
+const IDENTIFIED = __FEATURE_TELEMETRY_IDENTITY__;
+
 export const CONSENT_COPY = {
-  title: 'Share anonymous usage data',
-  summary:
-    'Helps us see which features are used and whether the scanner’s warnings help. Off by default; you can turn it off and delete your data at any time.',
+  title: IDENTIFIED ? 'Share usage data (alpha)' : 'Share anonymous usage data',
+  summary: IDENTIFIED
+    ? 'Alpha build: helps us see which features you used and whether the scanner’s warnings helped, matched to your test wallet. Off by default; you can turn it off and delete your data at any time.'
+    : 'Helps us see which features are used and whether the scanner’s warnings help. Off by default; you can turn it off and delete your data at any time.',
   collected: [
     'an anonymous install id (a random number, not linked to your wallet)',
+    ...(IDENTIFIED ? ['your public wallet address (alpha builds only)'] : []),
     'which features you use, and how often',
     'whether a scan warned you, and how risky it said the transaction was',
     'which platform you are on (Android or Chrome) and the app version',
   ],
   neverCollected: [
-    'your addresses, public keys or secret keys',
+    IDENTIFIED ? 'your secret keys' : 'your addresses, public keys or secret keys',
     'your recovery phrase or password',
     'amounts, asset codes, memos or transaction hashes',
     'the text of any message you check',

@@ -16,6 +16,9 @@ export interface SinkOptions {
   network: () => Network;
   installId: () => Promise<string>;
   hasConsent: () => boolean;
+  // Alpha identity (#100): the wallet's public address to attach, or null
+  // when there is no wallet yet. Absent in non-alpha builds.
+  account?: () => Promise<string | null>;
   fetchImpl?: typeof fetch;
   now?: () => number;
   setTimer?: (fn: () => void, ms: number) => unknown;
@@ -84,6 +87,7 @@ export function createSink(opts: SinkOptions): Sink {
           platform: opts.platform,
           appVersion: opts.appVersion,
           network: opts.network(),
+          ...(opts.account ? await accountField(opts.account) : {}),
           events,
         };
         if (!validateEnvelope(envelope)) return; // never send what fails the guard
@@ -119,4 +123,13 @@ export function createSink(opts: SinkOptions): Sink {
   }
 
   return { emit, flush, requestDeletion, size: () => buffer.length };
+}
+
+async function accountField(read: () => Promise<string | null>): Promise<{ account?: string }> {
+  try {
+    const account = await read();
+    return account ? { account } : {};
+  } catch {
+    return {}; // no wallet, or storage unavailable: send the envelope anonymous
+  }
 }

@@ -30,6 +30,7 @@ env:
   VITE_FEATURE_PASSKEY: 'false'        # #53 — passkey smart accounts; experimental, testnet-only, off in release
   VITE_FEATURE_SCANNER_AI: 'false'     # #59 — scanner's hosted-LLM explainer; no key ships (D2 epic option 2), off in release
   VITE_FEATURE_TELEMETRY: 'true'       # #81 — opt-in usage analytics (#88); consent-gated in-app, default OFF for the user
+  VITE_FEATURE_TELEMETRY_IDENTITY: 'true' # #100 — ALPHA ONLY: attaches the wallet address to telemetry. Set to 'false' before any store submission.
   # Telemetry ingest (a URL, not a secret): the Lantern API on Railway. Its
   # origin is also in manifest host_permissions. Change both together.
   VITE_TELEMETRY_INGEST_URL: 'https://lantern-api-production-3fad.up.railway.app/v1/telemetry'

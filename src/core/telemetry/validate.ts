@@ -8,6 +8,9 @@
 import { EVENT_SCHEMA, type Envelope, type StampedEvent } from './events';
 
 const STRKEY_RE = /\b[GSCM][A-Z2-7]{55}\b/;
+// Alpha identity (#100): the only key-shaped value allowed, and only as the
+// envelope's `account`, and only a public (G) key.
+const ACCOUNT_RE = /^G[A-Z2-7]{55}$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PLATFORMS = new Set(['extension', 'android']);
 const NETWORKS = new Set(['testnet', 'public']);
@@ -41,11 +44,13 @@ export function validateEvent(e: unknown): e is StampedEvent {
 
 export function validateEnvelope(env: unknown): env is Envelope {
   if (!env || typeof env !== 'object') return false;
-  const { installId, platform, appVersion, network, events, ...rest } = env as Record<
+  const { installId, platform, appVersion, network, events, account, ...rest } = env as Record<
     string,
     unknown
   >;
   if (Object.keys(rest).length > 0) return false;
+  if (account !== undefined && (typeof account !== 'string' || !ACCOUNT_RE.test(account)))
+    return false;
   if (typeof installId !== 'string' || !UUID_RE.test(installId)) return false;
   if (typeof platform !== 'string' || !PLATFORMS.has(platform)) return false;
   if (typeof network !== 'string' || !NETWORKS.has(network)) return false;
@@ -57,6 +62,6 @@ export function validateEnvelope(env: unknown): env is Envelope {
     return false;
   if (!Array.isArray(events) || events.length > 500) return false;
   if (!events.every(validateEvent)) return false;
-  // Nothing anywhere in the serialised envelope may look like a key.
-  return !STRKEY_RE.test(JSON.stringify(env));
+  // Nothing anywhere else in the serialised envelope may look like a key.
+  return !STRKEY_RE.test(JSON.stringify({ ...(env as object), account: undefined }));
 }

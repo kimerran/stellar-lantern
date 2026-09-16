@@ -30,6 +30,11 @@ export const FLAG_DEFS = {
   // Opt-in usage analytics (#81). OFF by default so a build with the flag
   // off carries no telemetry code and no ingest origin at all.
   telemetry: { envVar: 'VITE_FEATURE_TELEMETRY', literal: '__FEATURE_TELEMETRY__', default: false },
+  // ALPHA ONLY (#100): attach the wallet's public address to telemetry so the
+  // activity report is per tester. Reverses the "never collect addresses"
+  // promise for the builds it is on in — OFF by default, and must be off in
+  // any store submission.
+  telemetryIdentity: { envVar: 'VITE_FEATURE_TELEMETRY_IDENTITY', literal: '__FEATURE_TELEMETRY_IDENTITY__', default: false },
 } as const satisfies Record<string, FlagDef>;
 
 export type FlagKey = keyof typeof FLAG_DEFS;

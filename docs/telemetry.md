@@ -43,6 +43,24 @@ contains anything shaped like a Stellar key anywhere in it, and the generated
 report never prints the install UUID — it renders installs as "User 1",
 "User 2", … in first-seen order.
 
+## Alpha builds: the wallet address IS collected (#100)
+
+Builds made with `VITE_FEATURE_TELEMETRY_IDENTITY=true` — the alpha APK and
+extension zip from `release.yml` / `android.yml` — attach the wallet's
+**public address** (`G…`) to every telemetry envelope, so the activity report
+can be read per tester without a manual id hand-off. In those builds the
+consent card and Settings → Privacy say so: the title is *Share usage data
+(alpha)*, "What we collect" lists *your public wallet address (alpha builds
+only)*, and the "never collect" list is reduced to secret keys, recovery
+phrase/password, amounts/memos/hashes and message text. Everything else on
+this page still holds: opt-in, default off, delete on request.
+
+The address is the **only** key-shaped value the validator accepts, only in
+the envelope's `account` field, only as a `G` key; secret keys, contract ids
+and anything key-shaped anywhere else are still rejected. The flag is off by
+default and must be off in any store submission — a non-alpha build carries
+none of this code, and its validator rejects an envelope that has the field.
+
 ### Matching a tester to their trail (#98)
 
 Settings → Privacy shows the install id as **Analytics ID** while sharing is

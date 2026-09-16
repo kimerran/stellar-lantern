@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS telemetry_events (
   ts           TIMESTAMPTZ NOT NULL,
   received_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS account TEXT NULL;
 CREATE INDEX IF NOT EXISTS telemetry_events_install_ts ON telemetry_events (install_id, ts);
 CREATE INDEX IF NOT EXISTS telemetry_events_received   ON telemetry_events (received_at);
 `;
@@ -30,6 +31,7 @@ interface DbRow {
   props: Record<string, string | boolean>;
   ts: Date;
   received_at: Date;
+  account: string | null;
 }
 
 const toRow = (r: DbRow): TelemetryRow => ({
@@ -42,6 +44,7 @@ const toRow = (r: DbRow): TelemetryRow => ({
   props: r.props,
   ts: r.ts,
   receivedAt: r.received_at,
+  account: r.account,
 });
 
 export async function pgStore(
@@ -55,7 +58,7 @@ export async function pgStore(
       // One multi-row INSERT per envelope.
       const values: unknown[] = [];
       const tuples = rows.map((r, i) => {
-        const b = i * 8;
+        const b = i * 9;
         values.push(
           r.installId,
           r.platform,
@@ -65,11 +68,12 @@ export async function pgStore(
           JSON.stringify(r.props),
           r.ts,
           receivedAt,
+          r.account ?? null,
         );
-        return `($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}, $${b + 5}, $${b + 6}::jsonb, $${b + 7}, $${b + 8})`;
+        return `($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}, $${b + 5}, $${b + 6}::jsonb, $${b + 7}, $${b + 8}, $${b + 9})`;
       });
       const res = await pool.query(
-        `INSERT INTO telemetry_events (install_id, platform, app_version, network, event, props, ts, received_at) VALUES ${tuples.join(', ')}`,
+        `INSERT INTO telemetry_events (install_id, platform, app_version, network, event, props, ts, received_at, account) VALUES ${tuples.join(', ')}`,
         values,
       );
       return res.rowCount ?? 0;
@@ -97,7 +101,7 @@ export async function pgStore(
       }
       values.push(q.limit);
       const res = await pool.query<DbRow>(
-        `SELECT id, install_id, platform, app_version, network, event, props, ts, received_at FROM telemetry_events${where.length ? ' WHERE ' + where.join(' AND ') : ''} ORDER BY id ASC LIMIT $${values.length}`,
+        `SELECT id, install_id, platform, app_version, network, event, props, ts, received_at, account FROM telemetry_events${where.length ? ' WHERE ' + where.join(' AND ') : ''} ORDER BY id ASC LIMIT $${values.length}`,
         values,
       );
       return res.rows.map(toRow);

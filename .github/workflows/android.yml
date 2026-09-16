@@ -37,6 +37,7 @@ jobs:
           # Opt-in usage analytics (#81 / #88): on in the testnet debug build
           # too, so the alpha APK reports — consent-gated in-app, default OFF.
           VITE_FEATURE_TELEMETRY: 'true'
+          VITE_FEATURE_TELEMETRY_IDENTITY: 'true' # #100 — ALPHA ONLY; 'false' before any store submission
           VITE_TELEMETRY_INGEST_URL: 'https://lantern-api-production-3fad.up.railway.app/v1/telemetry'
 
       - name: Setup JDK 21

@@ -74,4 +74,8 @@ export interface Envelope {
   appVersion: string;
   network: Network;
   events: StampedEvent[];
+  // ALPHA ONLY (#100): the wallet's public address, attached under
+  // __FEATURE_TELEMETRY_IDENTITY__ so the report is per tester. The one
+  // deliberate exception to "no key-shaped string anywhere in the envelope".
+  account?: string;
 }
