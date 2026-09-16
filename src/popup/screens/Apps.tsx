@@ -48,6 +48,7 @@ type Open =
   | { kind: 'app'; app: MiniApp; src: string; title: string; origin: string }
   | { kind: 'url'; src: string; title: string; origin: string };
 
+
 export function Apps({ address, network }: { address: string; network: NetworkId }) {
   const [open, setOpen] = useState<Open | null>(null);
   const [urlText, setUrlText] = useState('');
@@ -71,12 +72,7 @@ export function Apps({ address, network }: { address: string; network: NetworkId
     // the wallet only through the scan-gated postMessage bridge. Bundled apps are
     // first-party pages. Either way, "favoriting" changes nothing about this.
     if (isRemoteMiniApp(app)) {
-      setOpen({
-        kind: 'url',
-        src: miniAppSrc(app),
-        title: app.name,
-        origin: displayOrigin(app.url!),
-      });
+      setOpen({ kind: 'url', src: miniAppSrc(app), title: app.name, origin: displayOrigin(app.url!) });
       return;
     }
     setOpen({
@@ -95,18 +91,11 @@ export function Apps({ address, network }: { address: string; network: NetworkId
       return;
     }
     setUrlError(false);
-    setOpen({
-      kind: 'url',
-      src: normalized,
-      title: displayOrigin(normalized),
-      origin: displayOrigin(normalized),
-    });
+    setOpen({ kind: 'url', src: normalized, title: displayOrigin(normalized), origin: displayOrigin(normalized) });
   }
 
   if (open) {
-    return (
-      <Browser open={open} address={address} network={network} onClose={() => setOpen(null)} />
-    );
+    return <Browser open={open} address={address} network={network} onClose={() => setOpen(null)} />;
   }
 
   const favoriteApps = orderedFavoriteApps(favorites);
@@ -296,12 +285,7 @@ function Browser({
   // user's review. The dApp sends an *intent* (destination/amount/memo) — Lantern
   // builds, scans, signs and submits, so the secret never leaves and every send
   // goes through the same security review as the wallet's own Send flow.
-  const [signReq, setSignReq] = useState<{
-    intent: PaymentIntent;
-    xdr: string;
-    verdict: ScanVerdict;
-    fee: string;
-  } | null>(null);
+  const [signReq, setSignReq] = useState<{ intent: PaymentIntent; xdr: string; verdict: ScanVerdict; fee: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [signErr, setSignErr] = useState<string | null>(null);
   const [confirmText, setConfirmText] = useState('');
@@ -362,12 +346,7 @@ function Browser({
       const verdict = scan({
         xdr,
         networkPassphrase: cfg.passphrase,
-        context: {
-          network,
-          fromAddress: address,
-          destinationFunded: destFunded,
-          origin: open.title,
-        },
+        context: { network, fromAddress: address, destinationFunded: destFunded, origin: open.title },
       });
       setConfirmText('');
       setSignErr(null);
@@ -383,12 +362,7 @@ function Browser({
   async function approveSignMessage() {
     if (msgReq == null) return;
     const res = await sendMessage({ type: 'SIGN_MESSAGE', message: msgReq });
-    if (res.ok)
-      postToApp({
-        type: 'lantern:messageSigned',
-        signature: res.data.signature,
-        publicKey: address,
-      });
+    if (res.ok) postToApp({ type: 'lantern:messageSigned', signature: res.data.signature, publicKey: address });
     else postToApp({ type: 'lantern:signRejected', error: res.error });
     setMsgReq(null);
   }
@@ -643,11 +617,7 @@ function Browser({
 
         {isRemote && phase === 'loading' && (
           <div className="absolute inset-0 grid place-items-center bg-background">
-            <Icon
-              name="progress_activity"
-              size={28}
-              className="animate-spin text-on-surface-variant"
-            />
+            <Icon name="progress_activity" size={28} className="animate-spin text-on-surface-variant" />
           </div>
         )}
 
@@ -689,11 +659,9 @@ function Browser({
             </span>
           </div>
           <p className="text-label-md text-on-surface-variant">
-            Share your public address (
-            <span className="font-mono">{truncateAddress(address, 4, 4)}</span>) and network (
-            {network === 'PUBLIC' ? 'Mainnet' : 'Testnet'}) so it can read your balance. It cannot
-            move funds — signing always needs a separate prompt, and your secret key never leaves
-            Lantern.
+            Share your public address (<span className="font-mono">{truncateAddress(address, 4, 4)}</span>) and
+            network ({network === 'PUBLIC' ? 'Mainnet' : 'Testnet'}) so it can read your balance. It cannot move
+            funds — signing always needs a separate prompt, and your secret key never leaves Lantern.
           </p>
           <div className="flex gap-2">
             <button
@@ -714,108 +682,97 @@ function Browser({
 
       {/* Sign & submit approval — a mini-app requested a payment; reviewed by the
           same Lantern scan as the wallet's own Send flow before any signing. */}
-      {signReq &&
-        (() => {
-          const isHigh = signReq.verdict.action === 'block_confirm';
-          // Mobile replaces the typed-CONFIRM gate with a press-and-hold button.
-          const native = isNativePlatform();
-          const acknowledged = !isHigh || native || confirmText.trim().toUpperCase() === 'CONFIRM';
-          return (
-            <div
-              ref={signSheetRef}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="sign-sheet-title"
-              tabIndex={-1}
-              className="absolute inset-x-0 bottom-0 z-20 max-h-[80%] space-y-3 overflow-y-auto rounded-t-2xl border-t border-outline-variant/40 bg-surface-container p-4 shadow-layer-1 focus:outline-none"
-            >
-              <div className="flex items-center gap-2">
-                <Icon name="draw" size={18} className="text-primary-container" />
-                <span id="sign-sheet-title" className="text-title-sm text-on-surface">
-                  <span className="font-semibold">{open.title}</span> wants to send
-                </span>
-              </div>
-              <div className="rounded-xl bg-surface-container-high p-3 text-center">
-                <p
-                  className={`text-headline-lg-mobile ${isHigh ? 'text-on-surface-variant' : 'text-primary glow-amber-text'}`}
-                >
-                  {formatAmount(signReq.intent.amount)} {intentAssetCode(signReq.intent)}
-                </p>
-                <p className="mt-1 font-mono text-label-sm text-on-surface-variant">
-                  to {truncateAddress(signReq.intent.destination, 5, 5)}
-                </p>
-              </div>
-
-              {signReq.verdict.action === 'allow' ? (
-                <div className="flex items-center justify-between rounded-xl border border-tertiary-container/20 bg-surface-container-high p-3">
-                  <p className="pr-2 text-label-md text-on-surface">
-                    {signReq.verdict.explanation}
-                  </p>
-                  <ScanBadge risk="low" latencyMs={signReq.verdict.latencyMs} />
-                </div>
-              ) : (
-                <RiskCallout
-                  risk={signReq.verdict.risk}
-                  reasons={signReq.verdict.reasons}
-                  explanation={signReq.verdict.explanation}
-                  whatToDo={
-                    isHigh
-                      ? 'A dApp requested this. If you didn’t expect it, reject — signing can’t be undone.'
-                      : undefined
-                  }
-                />
-              )}
-
-              <div className="flex items-center justify-between text-label-sm text-on-surface-variant">
-                <span>Network fee</span>
-                <span>
-                  ~{signReq.fee} XLM · {network === 'PUBLIC' ? 'Mainnet' : 'Testnet'}
-                </span>
-              </div>
-
-              {isHigh && !native && (
-                <input
-                  value={confirmText}
-                  onChange={(e) => setConfirmText(e.target.value)}
-                  placeholder="Type CONFIRM to allow"
-                  className="w-full rounded-lg border border-outline-variant bg-surface-container-high px-3 py-2 font-mono text-label-md text-on-surface placeholder:text-outline focus:border-primary-container focus:outline-none"
-                />
-              )}
-              {signErr && <p className="text-center text-label-md text-error">{signErr}</p>}
-
-              <div className="flex gap-2">
-                <button
-                  onClick={rejectSign}
-                  disabled={submitting}
-                  className="flex-1 rounded-full border border-outline px-4 py-2.5 text-label-md font-semibold text-on-surface-variant active:scale-95 disabled:opacity-50"
-                >
-                  Reject
-                </button>
-                {isHigh && native ? (
-                  <HoldToConfirm
-                    className="flex-1"
-                    label={submitting ? 'Sending…' : 'Hold to Sign anyway'}
-                    danger
-                    onConfirm={approveSign}
-                    disabled={submitting}
-                  />
-                ) : (
-                  <button
-                    onClick={approveSign}
-                    disabled={submitting || !acknowledged}
-                    className={`flex-1 rounded-full px-4 py-2.5 text-label-md font-semibold active:scale-95 disabled:opacity-50 ${
-                      isHigh
-                        ? 'border border-error/50 text-error'
-                        : 'bg-primary-container text-on-primary-container shadow-primary'
-                    }`}
-                  >
-                    {submitting ? 'Sending…' : isHigh ? 'Sign anyway' : 'Approve & send'}
-                  </button>
-                )}
-              </div>
+      {signReq && (() => {
+        const isHigh = signReq.verdict.action === 'block_confirm';
+        // Mobile replaces the typed-CONFIRM gate with a press-and-hold button.
+        const native = isNativePlatform();
+        const acknowledged = !isHigh || native || confirmText.trim().toUpperCase() === 'CONFIRM';
+        return (
+          <div
+            ref={signSheetRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sign-sheet-title"
+            tabIndex={-1}
+            className="absolute inset-x-0 bottom-0 z-20 max-h-[80%] space-y-3 overflow-y-auto rounded-t-2xl border-t border-outline-variant/40 bg-surface-container p-4 shadow-layer-1 focus:outline-none"
+          >
+            <div className="flex items-center gap-2">
+              <Icon name="draw" size={18} className="text-primary-container" />
+              <span id="sign-sheet-title" className="text-title-sm text-on-surface">
+                <span className="font-semibold">{open.title}</span> wants to send
+              </span>
             </div>
-          );
-        })()}
+            <div className="rounded-xl bg-surface-container-high p-3 text-center">
+              <p className={`text-headline-lg-mobile ${isHigh ? 'text-on-surface-variant' : 'text-primary glow-amber-text'}`}>
+                {formatAmount(signReq.intent.amount)} {intentAssetCode(signReq.intent)}
+              </p>
+              <p className="mt-1 font-mono text-label-sm text-on-surface-variant">
+                to {truncateAddress(signReq.intent.destination, 5, 5)}
+              </p>
+            </div>
+
+            {signReq.verdict.action === 'allow' ? (
+              <div className="flex items-center justify-between rounded-xl border border-tertiary-container/20 bg-surface-container-high p-3">
+                <p className="pr-2 text-label-md text-on-surface">{signReq.verdict.explanation}</p>
+                <ScanBadge risk="low" latencyMs={signReq.verdict.latencyMs} />
+              </div>
+            ) : (
+              <RiskCallout
+                risk={signReq.verdict.risk}
+                reasons={signReq.verdict.reasons}
+                explanation={signReq.verdict.explanation}
+                whatToDo={isHigh ? 'A dApp requested this. If you didn’t expect it, reject — signing can’t be undone.' : undefined}
+              />
+            )}
+
+            <div className="flex items-center justify-between text-label-sm text-on-surface-variant">
+              <span>Network fee</span>
+              <span>~{signReq.fee} XLM · {network === 'PUBLIC' ? 'Mainnet' : 'Testnet'}</span>
+            </div>
+
+            {isHigh && !native && (
+              <input
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder="Type CONFIRM to allow"
+                className="w-full rounded-lg border border-outline-variant bg-surface-container-high px-3 py-2 font-mono text-label-md text-on-surface placeholder:text-outline focus:border-primary-container focus:outline-none"
+              />
+            )}
+            {signErr && <p className="text-center text-label-md text-error">{signErr}</p>}
+
+            <div className="flex gap-2">
+              <button
+                onClick={rejectSign}
+                disabled={submitting}
+                className="flex-1 rounded-full border border-outline px-4 py-2.5 text-label-md font-semibold text-on-surface-variant active:scale-95 disabled:opacity-50"
+              >
+                Reject
+              </button>
+              {isHigh && native ? (
+                <HoldToConfirm
+                  className="flex-1"
+                  label={submitting ? 'Sending…' : 'Hold to Sign anyway'}
+                  danger
+                  onConfirm={approveSign}
+                  disabled={submitting}
+                />
+              ) : (
+                <button
+                  onClick={approveSign}
+                  disabled={submitting || !acknowledged}
+                  className={`flex-1 rounded-full px-4 py-2.5 text-label-md font-semibold active:scale-95 disabled:opacity-50 ${
+                    isHigh
+                      ? 'border border-error/50 text-error'
+                      : 'bg-primary-container text-on-primary-container shadow-primary'
+                  }`}
+                >
+                  {submitting ? 'Sending…' : isHigh ? 'Sign anyway' : 'Approve & send'}
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Sign-message approval — prove ownership; no funds move. */}
       {msgReq !== null && (
@@ -830,9 +787,8 @@ function Browser({
             {msgReq}
           </p>
           <p className="text-label-sm text-on-surface-variant">
-            Signing proves you control{' '}
-            <span className="font-mono">{truncateAddress(address, 4, 4)}</span>. It moves no funds
-            and reveals no secret.
+            Signing proves you control <span className="font-mono">{truncateAddress(address, 4, 4)}</span>. It moves
+            no funds and reveals no secret.
           </p>
           <div className="flex gap-2">
             <button

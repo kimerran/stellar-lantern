@@ -199,7 +199,7 @@ describe('every site emits through the helpers, under the flag', () => {
     [
       'background boot',
       backgroundSrc,
-      /__FEATURE_TELEMETRY__\) void bootTelemetry\(\{ appVersion: APP_VERSION, session: false \}\)/,
+      /bootTelemetry\(\{ appVersion: APP_VERSION, session: false, flushAt: 1 \}\)/,
     ],
   ];
   for (const [name, src, re] of sites) {
@@ -278,6 +278,34 @@ describe('end to end through the sink', () => {
       expect(wire).toContain('message_scanned');
       expect(wire).not.toContain('wallet_created'); // emitted before consent: never buffered
       expect(wire).not.toMatch(/[GSCM][A-Z2-7]{55}/);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
+  it('the service worker boot (session: false, flushAt: 1) sends each event immediately', async () => {
+    const bodies: string[] = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (_u: unknown, init?: RequestInit) => {
+      bodies.push(String(init?.body));
+      return new Response('', { status: 204 });
+    }) as typeof fetch;
+    try {
+      await setSettings({ analyticsConsent: true });
+      await bootTelemetry({
+        appVersion: '0.1.0',
+        ingestUrl: 'https://ingest.lantern.invalid/v1/telemetry',
+        session: false,
+        flushAt: 1,
+      });
+      expect(bodies).toHaveLength(0); // no session_start from the worker
+      track.txSigned('sign_and_submit', true);
+      await new Promise((r) => setTimeout(r, 0)); // let the flush promise settle; no timer advance
+      expect(bodies).toHaveLength(1);
+      const env = JSON.parse(bodies[0]!) as { events: Array<{ name: string; props: unknown }> };
+      expect(env.events).toEqual([
+        { name: 'tx_signed', props: { kind: 'sign_and_submit', ok: true }, ts: expect.any(Number) },
+      ]);
     } finally {
       globalThis.fetch = realFetch;
     }

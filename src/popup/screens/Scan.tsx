@@ -56,8 +56,7 @@ export function Scan({ onBack }: { onBack: () => void }) {
           <div>
             <h3 className="text-title-md text-on-surface">Check a message</h3>
             <p className="text-label-md text-on-surface-variant">
-              Paste a suspicious DM, offer, or “support” message and Lantern will flag scam
-              patterns.
+              Paste a suspicious DM, offer, or “support” message and Lantern will flag scam patterns.
             </p>
           </div>
 
@@ -70,13 +69,7 @@ export function Scan({ onBack }: { onBack: () => void }) {
           />
 
           <div className="flex gap-2">
-            <Button
-              fullWidth
-              onClick={check}
-              loading={checking}
-              disabled={!text.trim()}
-              leadingIcon="security"
-            >
+            <Button fullWidth onClick={check} loading={checking} disabled={!text.trim()} leadingIcon="security">
               Check message
             </Button>
             {(text || result) && (
@@ -139,9 +132,7 @@ function DemoWarnings({ showToast }: { showToast: (message: string, variant?: 'e
         })}
 
         <Card className="space-y-1">
-          <p className="text-label-sm uppercase tracking-wide text-on-surface-variant">
-            Try it live
-          </p>
+          <p className="text-label-sm uppercase tracking-wide text-on-surface-variant">Try it live</p>
           <p className="text-label-md text-on-surface">
             Send any amount to this demo-flagged address to trigger the high-risk block:
           </p>

@@ -119,8 +119,7 @@ export function Send({ address, network, onDone }: Props) {
     const amt = Number(amount);
     if (!amount || !Number.isFinite(amt) || amt <= 0) return 'Enter an amount greater than zero.';
     if (amt > Number(spendable)) return 'Amount exceeds your spendable balance.';
-    if (memo && memoByteLength(memo) > MAX_MEMO_BYTES)
-      return `Memo must be ${MAX_MEMO_BYTES} bytes or fewer.`;
+    if (memo && memoByteLength(memo) > MAX_MEMO_BYTES) return `Memo must be ${MAX_MEMO_BYTES} bytes or fewer.`;
     return null;
   }
 
@@ -230,20 +229,13 @@ export function Send({ address, network, onDone }: Props) {
     return (
       <div className="flex flex-col items-center pt-10 text-center">
         <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-primary-container/15">
-          <Icon
-            name="check_circle"
-            filled
-            size={48}
-            className="text-primary-container drop-shadow-glow-amber"
-          />
+          <Icon name="check_circle" filled size={48} className="text-primary-container drop-shadow-glow-amber" />
         </div>
         <h2 className="text-title-md text-on-surface">Sent!</h2>
         <p className="mt-1 text-label-md text-on-surface-variant">
           {formatAmount(review!.amount)} {review!.assetCode} on its way.
         </p>
-        <p className="mt-4 break-all px-2 font-mono text-label-sm text-on-surface-variant">
-          {txHash}
-        </p>
+        <p className="mt-4 break-all px-2 font-mono text-label-sm text-on-surface-variant">{txHash}</p>
         <div className="mt-6 w-full space-y-3">
           <Button
             fullWidth
@@ -270,54 +262,45 @@ export function Send({ address, network, onDone }: Props) {
 
     return (
       <div className="space-y-4 pt-2">
-        <button
-          onClick={backToForm}
-          className="flex items-center gap-1 text-label-md text-on-surface-variant hover:text-on-surface"
-        >
+        <button onClick={backToForm} className="flex items-center gap-1 text-label-md text-on-surface-variant hover:text-on-surface">
           <Icon name="arrow_back" size={18} /> Edit
         </button>
         <h2 className="text-title-md text-on-surface">Review Transaction</h2>
 
         <div className="rounded-2xl bg-surface-container p-5 text-center shadow-layer-1">
-          <p className="text-label-sm uppercase tracking-wide text-on-surface-variant">
-            You're sending
-          </p>
+          <p className="text-label-sm uppercase tracking-wide text-on-surface-variant">You're sending</p>
           {/* Mute the amber value glow when high-risk so the warning is the focus. */}
-          <p
-            className={`mt-2 text-headline-lg ${isHigh ? 'text-on-surface-variant' : 'text-primary glow-amber-text'}`}
-          >
+          <p className={`mt-2 text-headline-lg ${isHigh ? 'text-on-surface-variant' : 'text-primary glow-amber-text'}`}>
             {formatAmount(review.amount)} {review.assetCode}
           </p>
         </div>
 
         {/* Scan result — announced to screen readers when it resolves. */}
         <div aria-live="polite" aria-atomic="true">
-          {scanning ? (
-            <div className="flex items-center gap-2 rounded-2xl border border-outline-variant/40 bg-surface-container p-3.5">
-              <Icon name="security" size={18} className="animate-pulse text-on-surface-variant" />
-              <span className="text-label-md text-on-surface-variant">
-                Lantern is checking this transaction…
-              </span>
+        {scanning ? (
+          <div className="flex items-center gap-2 rounded-2xl border border-outline-variant/40 bg-surface-container p-3.5">
+            <Icon name="security" size={18} className="animate-pulse text-on-surface-variant" />
+            <span className="text-label-md text-on-surface-variant">Lantern is checking this transaction…</span>
+          </div>
+        ) : verdict ? (
+          verdict.action === 'allow' ? (
+            <div className="flex items-center justify-between rounded-2xl border border-tertiary-container/20 bg-surface-container p-3.5">
+              <p className="pr-2 text-label-md text-on-surface">{verdict.explanation}</p>
+              <ScanBadge risk="low" latencyMs={verdict.latencyMs} />
             </div>
-          ) : verdict ? (
-            verdict.action === 'allow' ? (
-              <div className="flex items-center justify-between rounded-2xl border border-tertiary-container/20 bg-surface-container p-3.5">
-                <p className="pr-2 text-label-md text-on-surface">{verdict.explanation}</p>
-                <ScanBadge risk="low" latencyMs={verdict.latencyMs} />
-              </div>
-            ) : (
-              <RiskCallout
-                risk={verdict.risk}
-                reasons={verdict.reasons}
-                explanation={verdict.explanation}
-                whatToDo={
-                  isHigh
-                    ? 'If you did not expect this, do not continue. Scams cannot be reversed once signed.'
-                    : undefined
-                }
-              />
-            )
-          ) : null}
+          ) : (
+            <RiskCallout
+              risk={verdict.risk}
+              reasons={verdict.reasons}
+              explanation={verdict.explanation}
+              whatToDo={
+                isHigh
+                  ? 'If you did not expect this, do not continue. Scams cannot be reversed once signed.'
+                  : undefined
+              }
+            />
+          )
+        ) : null}
         </div>
 
         <Card className="space-y-3">
@@ -333,8 +316,7 @@ export function Send({ address, network, onDone }: Props) {
         {isHigh && !scanning && !native && (
           <div className="space-y-2">
             <p className="text-label-sm text-error">
-              To proceed anyway, type <span className="font-mono font-semibold">CONFIRM</span>{' '}
-              below.
+              To proceed anyway, type <span className="font-mono font-semibold">CONFIRM</span> below.
             </p>
             <Input
               mono
@@ -346,10 +328,10 @@ export function Send({ address, network, onDone }: Props) {
         )}
 
         {error && (
-          <p role="alert" className="text-center text-label-md text-error">
-            {error}
-          </p>
-        )}
+        <p role="alert" className="text-center text-label-md text-error">
+          {error}
+        </p>
+      )}
 
         {isHigh && native && !scanning ? (
           <HoldToConfirm
@@ -431,10 +413,7 @@ export function Send({ address, network, onDone }: Props) {
 
       {/* Asset selector */}
       <div>
-        <label
-          htmlFor="send-asset"
-          className="mb-2 block text-label-sm uppercase tracking-wide text-on-surface-variant"
-        >
+        <label htmlFor="send-asset" className="mb-2 block text-label-sm uppercase tracking-wide text-on-surface-variant">
           Asset
         </label>
         <div className="relative">
@@ -454,21 +433,14 @@ export function Send({ address, network, onDone }: Props) {
               );
             })}
           </select>
-          <Icon
-            name="expand_more"
-            size={20}
-            className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant"
-          />
+          <Icon name="expand_more" size={20} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant" />
         </div>
       </div>
 
       {/* Amount */}
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <label
-            htmlFor="send-amount"
-            className="text-label-sm uppercase tracking-wide text-on-surface-variant"
-          >
+          <label htmlFor="send-amount" className="text-label-sm uppercase tracking-wide text-on-surface-variant">
             Amount
           </label>
           <span className="text-label-sm text-on-surface-variant">
@@ -519,9 +491,7 @@ function ReviewRow({ label, value, mono }: { label: string; value: string; mono?
   return (
     <div className="flex items-center justify-between gap-3">
       <span className="text-label-md text-on-surface-variant">{label}</span>
-      <span className={`text-right text-label-md text-on-surface ${mono ? 'font-mono' : ''}`}>
-        {value}
-      </span>
+      <span className={`text-right text-label-md text-on-surface ${mono ? 'font-mono' : ''}`}>{value}</span>
     </div>
   );
 }

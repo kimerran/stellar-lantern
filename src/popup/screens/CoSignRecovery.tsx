@@ -53,11 +53,7 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
       return;
     }
     setError(null);
-    const v = scan({
-      xdr: xdr.trim(),
-      networkPassphrase: network.passphrase,
-      context: { network: network.id, fromAddress: address },
-    });
+    const v = scan({ xdr: xdr.trim(), networkPassphrase: network.passphrase, context: { network: network.id, fromAddress: address } });
     if (__FEATURE_TELEMETRY__) track.txScanned(v);
     setVerdict(v);
     setConfirmText('');
@@ -67,11 +63,7 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
   async function coSign() {
     setSigning(true);
     setError(null);
-    const res = await sendMessage({
-      type: 'SIGN_ONLY',
-      xdr: xdr.trim(),
-      networkPassphrase: network.passphrase,
-    });
+    const res = await sendMessage({ type: 'SIGN_ONLY', xdr: xdr.trim(), networkPassphrase: network.passphrase });
     setSigning(false);
     if (res.ok) {
       setSignedXdr(res.data.signedXdr);
@@ -101,12 +93,7 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
         <div className="no-scrollbar flex-1 space-y-4 overflow-y-auto px-4 pb-4">
           <div className="flex flex-col items-center pt-2 text-center">
             <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-primary-container/15">
-              <Icon
-                name="verified_user"
-                filled
-                size={36}
-                className="text-primary-container drop-shadow-glow-amber"
-              />
+              <Icon name="verified_user" filled size={36} className="text-primary-container drop-shadow-glow-amber" />
             </div>
             <p className="text-label-md text-on-surface-variant">
               Send this signed request back to the person recovering their account.
@@ -118,12 +105,7 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
             rows={5}
             className="w-full break-all rounded-lg border border-outline-variant bg-surface-container-high px-3 py-3 font-mono text-label-sm text-on-surface focus:outline-none"
           />
-          <Button
-            fullWidth
-            leadingIcon={copied ? 'check' : 'content_copy'}
-            onClick={copySigned}
-            variant="secondary"
-          >
+          <Button fullWidth leadingIcon={copied ? 'check' : 'content_copy'} onClick={copySigned} variant="secondary">
             {copied ? 'Copied' : 'Copy signed request'}
           </Button>
           <Button fullWidth onClick={onBack}>
@@ -141,26 +123,16 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
     const acknowledged = !isHigh || native || confirmText.trim().toUpperCase() === 'CONFIRM';
     return (
       <div className="flex h-full flex-col bg-background">
-        <Header
-          title="Review Request"
-          onBack={() => {
-            setStep('paste');
-            setVerdict(null);
-            setError(null);
-          }}
-        />
+        <Header title="Review Request" onBack={() => { setStep('paste'); setVerdict(null); setError(null); }} />
         <div className="no-scrollbar flex-1 space-y-4 overflow-y-auto px-4 pb-4">
           <p className="text-label-md text-on-surface-variant">
-            You’re co-signing someone’s account recovery. Only continue if you personally trust them
-            and expected this.
+            You’re co-signing someone’s account recovery. Only continue if you personally trust them and expected this.
           </p>
           <div aria-live="polite" aria-atomic="true">
             {scanning ? (
               <div className="flex items-center gap-2 rounded-2xl border border-outline-variant/40 bg-surface-container p-3.5">
                 <Icon name="security" size={18} className="animate-pulse text-on-surface-variant" />
-                <span className="text-label-md text-on-surface-variant">
-                  Lantern is checking this request…
-                </span>
+                <span className="text-label-md text-on-surface-variant">Lantern is checking this request…</span>
               </div>
             ) : verdict ? (
               <RiskCallout
@@ -177,12 +149,7 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
               <p className="text-label-sm text-error">
                 To co-sign, type <span className="font-mono font-semibold">CONFIRM</span> below.
               </p>
-              <Input
-                mono
-                placeholder="CONFIRM"
-                value={confirmText}
-                onChange={(e) => setConfirmText(e.target.value)}
-              />
+              <Input mono placeholder="CONFIRM" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} />
             </div>
           )}
 
@@ -193,12 +160,7 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
           )}
 
           {isHigh && native && !scanning ? (
-            <HoldToConfirm
-              label={signing ? 'Signing…' : 'Hold to Co-sign'}
-              danger
-              onConfirm={coSign}
-              disabled={signing}
-            />
+            <HoldToConfirm label={signing ? 'Signing…' : 'Hold to Co-sign'} danger onConfirm={coSign} disabled={signing} />
           ) : (
             <Button
               fullWidth
@@ -223,8 +185,8 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
       <Header title="Co-sign a Recovery" onBack={onBack} />
       <div className="no-scrollbar flex-1 space-y-4 overflow-y-auto px-4 pb-4">
         <p className="text-label-md leading-relaxed text-on-surface-variant">
-          Helping someone recover their account? Paste the recovery request they shared. Lantern
-          only co-signs guardian recovery here — it will refuse anything else.
+          Helping someone recover their account? Paste the recovery request they shared. Lantern only co-signs guardian
+          recovery here — it will refuse anything else.
         </p>
         <textarea
           value={xdr}

@@ -58,7 +58,8 @@ export function Onboarding({
     if (res.ok) {
       if (__FEATURE_TELEMETRY__) track.walletCreated('create');
       onDone();
-    } else setError(res.error);
+    }
+    else setError(res.error);
   }
 
   async function finishImport(password: string) {
@@ -69,7 +70,8 @@ export function Onboarding({
     if (res.ok) {
       if (__FEATURE_TELEMETRY__) track.walletCreated('import');
       onDone();
-    } else setError(res.error);
+    }
+    else setError(res.error);
   }
 
   return (
@@ -92,11 +94,7 @@ export function Onboarding({
       )}
 
       {step === 'create-seed' && (
-        <SeedReveal
-          words={words}
-          onBack={() => setStep('welcome')}
-          onNext={() => setStep('create-confirm')}
-        />
+        <SeedReveal words={words} onBack={() => setStep('welcome')} onNext={() => setStep('create-confirm')} />
       )}
 
       {step === 'create-confirm' && (
@@ -108,11 +106,7 @@ export function Onboarding({
       )}
 
       {step === 'create-password' && (
-        <PasswordSetup
-          busy={busy}
-          onBack={() => setStep('create-confirm')}
-          onSubmit={finishCreate}
-        />
+        <PasswordSetup busy={busy} onBack={() => setStep('create-confirm')} onSubmit={finishCreate} />
       )}
 
       {step === 'import-input' && (
@@ -148,12 +142,7 @@ function Welcome({
     <div className="flex h-full flex-col">
       <div className="flex flex-1 flex-col items-center justify-center text-center">
         <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary-container/15">
-          <Icon
-            name="lightbulb"
-            filled
-            size={44}
-            className="animate-subtle-glow text-primary-container"
-          />
+          <Icon name="lightbulb" filled size={44} className="animate-subtle-glow text-primary-container" />
         </div>
         <h1 className="text-headline-lg-mobile text-primary">Lantern</h1>
         <p className="mt-3 max-w-[260px] text-body-md text-on-surface-variant">
@@ -168,13 +157,7 @@ function Welcome({
           Import Wallet
         </Button>
         {onPasskey && (
-          <Button
-            fullWidth
-            variant="secondary"
-            onClick={onPasskey}
-            disabled={busy}
-            trailingIcon="fingerprint"
-          >
+          <Button fullWidth variant="secondary" onClick={onPasskey} disabled={busy} trailingIcon="fingerprint">
             Create with Passkey · Testnet
           </Button>
         )}
@@ -183,21 +166,10 @@ function Welcome({
   );
 }
 
-function StepHeader({
-  title,
-  subtitle,
-  onBack,
-}: {
-  title: string;
-  subtitle?: string;
-  onBack: () => void;
-}) {
+function StepHeader({ title, subtitle, onBack }: { title: string; subtitle?: string; onBack: () => void }) {
   return (
     <div className="mb-5">
-      <button
-        onClick={onBack}
-        className="mb-3 flex items-center gap-1 text-label-md text-on-surface-variant hover:text-on-surface"
-      >
+      <button onClick={onBack} className="mb-3 flex items-center gap-1 text-label-md text-on-surface-variant hover:text-on-surface">
         <Icon name="arrow_back" size={18} /> Back
       </button>
       <h2 className="text-title-md text-on-surface">{title}</h2>
@@ -206,28 +178,14 @@ function StepHeader({
   );
 }
 
-function SeedReveal({
-  words,
-  onBack,
-  onNext,
-}: {
-  words: string[];
-  onBack: () => void;
-  onNext: () => void;
-}) {
+function SeedReveal({ words, onBack, onNext }: { words: string[]; onBack: () => void; onNext: () => void }) {
   const [acknowledged, setAcknowledged] = useState(false);
   return (
     <div className="flex h-full flex-col">
-      <StepHeader
-        title="Your Recovery Phrase"
-        subtitle="Write these 12 words down in order and keep them safe."
-        onBack={onBack}
-      />
+      <StepHeader title="Your Recovery Phrase" subtitle="Write these 12 words down in order and keep them safe." onBack={onBack} />
       <SeedGrid words={words} />
       <div className="mt-4">
-        <WarningCallout>
-          Never share your phrase. Anyone with these words can control your assets.
-        </WarningCallout>
+        <WarningCallout>Never share your phrase. Anyone with these words can control your assets.</WarningCallout>
       </div>
       <label className="mt-4 flex items-center gap-2 text-label-md text-on-surface">
         <input
@@ -248,15 +206,7 @@ function SeedReveal({
 }
 
 // Word-position verification (SPEC §6.1, preferred path).
-function SeedConfirm({
-  words,
-  onBack,
-  onConfirmed,
-}: {
-  words: string[];
-  onBack: () => void;
-  onConfirmed: () => void;
-}) {
+function SeedConfirm({ words, onBack, onConfirmed }: { words: string[]; onBack: () => void; onConfirmed: () => void }) {
   // Deterministic-but-spread positions; avoids needing a RNG in this component.
   const positions = [2, 7];
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -264,11 +214,7 @@ function SeedConfirm({
 
   return (
     <div className="flex h-full flex-col">
-      <StepHeader
-        title="Confirm Your Phrase"
-        subtitle="Enter the requested words to confirm you saved them."
-        onBack={onBack}
-      />
+      <StepHeader title="Confirm Your Phrase" subtitle="Enter the requested words to confirm you saved them." onBack={onBack} />
       <div className="space-y-4">
         {positions.map((p) => (
           <Input
@@ -321,17 +267,10 @@ function ImportInput({
         className="w-full rounded-lg border border-outline-variant bg-surface-container-high px-3 py-3 font-mono text-label-md text-on-surface placeholder:text-outline focus:border-primary-container focus:shadow-focus-amber focus:outline-none"
       />
       <div className="mt-4">
-        <WarningCallout>
-          Never share your phrase. Anyone with these words can control your assets.
-        </WarningCallout>
+        <WarningCallout>Never share your phrase. Anyone with these words can control your assets.</WarningCallout>
       </div>
       <div className="mt-auto pt-5">
-        <Button
-          fullWidth
-          onClick={onNext}
-          disabled={value.trim().length === 0}
-          trailingIcon="arrow_forward"
-        >
+        <Button fullWidth onClick={onNext} disabled={value.trim().length === 0} trailingIcon="arrow_forward">
           Continue
         </Button>
       </div>
@@ -356,11 +295,7 @@ function PasswordSetup({
 
   return (
     <div className="flex h-full flex-col">
-      <StepHeader
-        title="Set a Password"
-        subtitle="This encrypts your wallet on this device. You'll need it to unlock."
-        onBack={onBack}
-      />
+      <StepHeader title="Set a Password" subtitle="This encrypts your wallet on this device. You'll need it to unlock." onBack={onBack} />
       <div className="space-y-4">
         <Input
           label="Password"
@@ -378,13 +313,7 @@ function PasswordSetup({
         />
       </div>
       <div className="mt-auto pt-5">
-        <Button
-          fullWidth
-          onClick={() => onSubmit(password)}
-          disabled={!valid}
-          loading={busy}
-          trailingIcon="check"
-        >
+        <Button fullWidth onClick={() => onSubmit(password)} disabled={!valid} loading={busy} trailingIcon="check">
           Create Wallet
         </Button>
       </div>

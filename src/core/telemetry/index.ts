@@ -24,6 +24,11 @@ let consent = false;
 export interface StartOptions {
   ingestUrl: string;
   appVersion: string;
+  // Sink timing. The popup keeps the defaults (batch 20 / 30 s); the MV3
+  // service worker passes flushAt: 1 because Chrome ends an idle worker
+  // after ~30 s and a pending timer does not keep it alive.
+  flushAt?: number;
+  flushAfterMs?: number;
 }
 
 // Call once at app start, under `if (__FEATURE_TELEMETRY__)`. Safe to call
@@ -43,6 +48,8 @@ export async function startTelemetry(opts: StartOptions): Promise<void> {
     network: () => (network === 'PUBLIC' ? 'public' : 'testnet'),
     installId: getInstallId,
     hasConsent: () => consent,
+    ...(opts.flushAt !== undefined ? { flushAt: opts.flushAt } : {}),
+    ...(opts.flushAfterMs !== undefined ? { flushAfterMs: opts.flushAfterMs } : {}),
   });
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => {
@@ -64,12 +71,19 @@ export async function bootTelemetry(opts: {
   appVersion: string;
   ingestUrl?: string;
   session?: boolean;
+  flushAt?: number;
+  flushAfterMs?: number;
 }): Promise<void> {
   const ingestUrl =
     opts.ingestUrl ??
     (import.meta.env as Record<string, string | undefined>).VITE_TELEMETRY_INGEST_URL;
   if (!ingestUrl) return; // no endpoint configured: stay off
-  await startTelemetry({ ingestUrl, appVersion: opts.appVersion });
+  await startTelemetry({
+    ingestUrl,
+    appVersion: opts.appVersion,
+    ...(opts.flushAt !== undefined ? { flushAt: opts.flushAt } : {}),
+    ...(opts.flushAfterMs !== undefined ? { flushAfterMs: opts.flushAfterMs } : {}),
+  });
   if (opts.session === false) return;
   // Without consent nothing would be buffered, so the first-open marker is
   // only written once the event can actually go out — the first *consented*

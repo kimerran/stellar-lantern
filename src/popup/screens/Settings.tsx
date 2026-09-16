@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { APP_VERSION } from '@shared/version';
 import type { NetworkId } from '@shared/constants';
 import { NETWORKS } from '@shared/constants';
 import type { Settings as SettingsType } from '@shared/types';
@@ -8,7 +9,6 @@ import { Icon } from '../components/Icon';
 import { Input } from '../components/Input';
 import { NetworkBadge } from '../components/NetworkBadge';
 import { useToast } from '../components/Toast';
-import { APP_VERSION } from '@shared/version';
 
 interface Props {
   address: string;
@@ -28,6 +28,7 @@ interface Props {
   setHorizonOverrides: (o: SettingsType['horizonOverrides']) => void;
   setRpcOverrides: (o: SettingsType['rpcOverrides']) => void;
 }
+
 
 // Auto-lock presets (minutes). 0 = never (armAutoLock leaves the timer disarmed).
 const AUTO_LOCK_OPTIONS: { value: number; label: string }[] = [
@@ -62,66 +63,61 @@ export function Settings({
 }: Props) {
   const content = (
     <>
-      <Section title="Account">
-        <button
-          onClick={onCopyAddress}
-          className="flex w-full min-h-[52px] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-variant active:scale-[0.99]"
-        >
-          <Icon name="account_circle" size={22} className="shrink-0 text-on-surface-variant" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-body-md text-on-surface">Your address</span>
-            <span className="block truncate font-mono text-label-md text-on-surface-variant">
-              {truncateAddress(address, 6, 6)}
+        <Section title="Account">
+          <button
+            onClick={onCopyAddress}
+            className="flex w-full min-h-[52px] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-variant active:scale-[0.99]"
+          >
+            <Icon name="account_circle" size={22} className="shrink-0 text-on-surface-variant" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-body-md text-on-surface">Your address</span>
+              <span className="block truncate font-mono text-label-md text-on-surface-variant">
+                {truncateAddress(address, 6, 6)}
+              </span>
             </span>
-          </span>
-          <Icon name="content_copy" size={18} className="shrink-0 text-on-surface-variant" />
-        </button>
-        <Divider />
-        <NavRow icon="qr_code_2" label="Receive" hint="Address & QR code" onClick={onOpenReceive} />
-      </Section>
+            <Icon name="content_copy" size={18} className="shrink-0 text-on-surface-variant" />
+          </button>
+          <Divider />
+          <NavRow icon="qr_code_2" label="Receive" hint="Address & QR code" onClick={onOpenReceive} />
+        </Section>
 
-      <Section title="Security">
-        <NavRow icon="shield_person" label="Guardians & recovery" onClick={onOpenGuardians} />
-        <Divider />
-        <NavRow icon="security" label="Security & scam check" onClick={onOpenScan} />
-        <Divider />
-        <AutoLockRow value={settings.autoLockMinutes} onChange={setAutoLock} />
-      </Section>
+        <Section title="Security">
+          <NavRow icon="shield_person" label="Guardians & recovery" onClick={onOpenGuardians} />
+          <Divider />
+          <NavRow icon="security" label="Security & scam check" onClick={onOpenScan} />
+          <Divider />
+          <AutoLockRow value={settings.autoLockMinutes} onChange={setAutoLock} />
+        </Section>
 
-      <Section title="Cash">
-        <NavRow
-          icon="currency_exchange"
-          label="Cash in / Cash out"
-          hint="Deposit & withdraw via anchors"
-          onClick={onOpenCashInOut}
-        />
-      </Section>
+        <Section title="Cash">
+          <NavRow icon="currency_exchange" label="Cash in / Cash out" hint="Deposit & withdraw via anchors" onClick={onOpenCashInOut} />
+        </Section>
 
-      <Section title="Network">
-        <NetworkRow current={settings.network} onSelect={setNetwork} />
-        <Divider />
-        <AdvancedEndpoints
-          settings={settings}
-          setHorizonOverrides={setHorizonOverrides}
-          setRpcOverrides={setRpcOverrides}
-        />
-      </Section>
+        <Section title="Network">
+          <NetworkRow current={settings.network} onSelect={setNetwork} />
+          <Divider />
+          <AdvancedEndpoints
+            settings={settings}
+            setHorizonOverrides={setHorizonOverrides}
+            setRpcOverrides={setRpcOverrides}
+          />
+        </Section>
 
-      <Section title="About">
-        <div className="flex min-h-[52px] items-center gap-3 px-4 py-3">
-          <Icon name="info" size={22} className="shrink-0 text-on-surface-variant" />
-          <span className="flex-1 text-body-md text-on-surface">Version</span>
-          <span className="font-mono text-label-md text-on-surface-variant">{APP_VERSION}</span>
-        </div>
-        <Divider />
-        <button
-          onClick={onLock}
-          className="flex w-full min-h-[52px] items-center gap-3 px-4 py-3 text-left text-error transition-colors hover:bg-error/10 active:scale-[0.99]"
-        >
-          <Icon name="lock" size={22} className="shrink-0" />
-          <span className="flex-1 text-body-md">Lock wallet</span>
-        </button>
-      </Section>
+        <Section title="About">
+          <div className="flex min-h-[52px] items-center gap-3 px-4 py-3">
+            <Icon name="info" size={22} className="shrink-0 text-on-surface-variant" />
+            <span className="flex-1 text-body-md text-on-surface">Version</span>
+            <span className="font-mono text-label-md text-on-surface-variant">{APP_VERSION}</span>
+          </div>
+          <Divider />
+          <button
+            onClick={onLock}
+            className="flex w-full min-h-[52px] items-center gap-3 px-4 py-3 text-left text-error transition-colors hover:bg-error/10 active:scale-[0.99]"
+          >
+            <Icon name="lock" size={22} className="shrink-0" />
+            <span className="flex-1 text-body-md">Lock wallet</span>
+          </button>
+        </Section>
     </>
   );
 
@@ -147,9 +143,7 @@ export function Settings({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mt-5">
-      <h2 className="mb-2 px-1 text-label-sm uppercase tracking-wide text-on-surface-variant">
-        {title}
-      </h2>
+      <h2 className="mb-2 px-1 text-label-sm uppercase tracking-wide text-on-surface-variant">{title}</h2>
       <div className="overflow-hidden rounded-2xl bg-surface-container">{children}</div>
     </section>
   );
@@ -178,9 +172,7 @@ function NavRow({
       <Icon name={icon} size={22} className="shrink-0 text-on-surface-variant" />
       <span className="min-w-0 flex-1">
         <span className="block text-body-md text-on-surface">{label}</span>
-        {hint && (
-          <span className="block truncate text-label-md text-on-surface-variant">{hint}</span>
-        )}
+        {hint && <span className="block truncate text-label-md text-on-surface-variant">{hint}</span>}
       </span>
       <Icon name="chevron_right" size={20} className="shrink-0 text-on-surface-variant" />
     </button>
@@ -208,13 +200,7 @@ function AutoLockRow({ value, onChange }: { value: number; onChange: (m: number)
   );
 }
 
-function NetworkRow({
-  current,
-  onSelect,
-}: {
-  current: NetworkId;
-  onSelect: (n: NetworkId) => void;
-}) {
+function NetworkRow({ current, onSelect }: { current: NetworkId; onSelect: (n: NetworkId) => void }) {
   const ids: NetworkId[] = ['TESTNET', 'PUBLIC'];
   return (
     <div className="flex min-h-[52px] items-center gap-3 px-4 py-3">
@@ -289,11 +275,7 @@ function AdvancedEndpoints({
       >
         <Icon name="tune" size={22} className="shrink-0 text-on-surface-variant" />
         <span className="flex-1 text-body-md text-on-surface">Advanced</span>
-        <Icon
-          name={open ? 'expand_less' : 'expand_more'}
-          size={20}
-          className="shrink-0 text-on-surface-variant"
-        />
+        <Icon name={open ? 'expand_less' : 'expand_more'} size={20} className="shrink-0 text-on-surface-variant" />
       </button>
 
       {open && (

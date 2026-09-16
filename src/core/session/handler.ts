@@ -78,11 +78,7 @@ function biometricFailure(reason: 'not-enrolled' | 'cancelled' | 'failed'): Resu
     case 'cancelled':
       return { ok: false, error: 'Biometric check was cancelled.', code: 'BIOMETRIC_CANCELLED' };
     case 'failed':
-      return {
-        ok: false,
-        error: 'Biometric unlock failed — use your password.',
-        code: 'BIOMETRIC_FAILED',
-      };
+      return { ok: false, error: 'Biometric unlock failed — use your password.', code: 'BIOMETRIC_FAILED' };
   }
 }
 
@@ -98,8 +94,7 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
         // biometric fully unavailable, so the Unlock screen never offers it —
         // keeping the in-progress (#23 M2a) surface out of store builds.
         biometricEnabled: __FEATURE_BIOMETRIC_UNLOCK__ && (await isBiometricEnabled(await getKV())),
-        biometricAvailable:
-          __FEATURE_BIOMETRIC_UNLOCK__ && (await getBiometricStore().isAvailable()),
+        biometricAvailable: __FEATURE_BIOMETRIC_UNLOCK__ && (await getBiometricStore().isAvailable()),
       });
     }
 
@@ -288,9 +283,7 @@ function toErrorResult(err: unknown): Result<never> {
 
 function extractHorizonError(err: unknown): string | null {
   const e = err as {
-    response?: {
-      data?: { extras?: { result_codes?: { operations?: string[]; transaction?: string } } };
-    };
+    response?: { data?: { extras?: { result_codes?: { operations?: string[]; transaction?: string } } } };
   };
   const codes = e?.response?.data?.extras?.result_codes;
   if (!codes) return null;
