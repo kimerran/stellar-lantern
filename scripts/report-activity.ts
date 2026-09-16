@@ -355,7 +355,11 @@ export function renderHtml(r: Report): string {
         .join('')}</table>`;
   const q3 = empty
     ? ''
-    : `<h2>Q3 — Per-user activity</h2><p class="note">Installs are anonymous: "User N" is assigned in first-seen order and maps to nobody.</p>${r.q3
+    : `<h2>Q3 — Per-user activity</h2><p class="note">${
+        r.q3.some((t) => t.account)
+          ? 'Alpha builds report the wallet\'s public address, shown per trail; other installs are anonymous — "User N" is assigned in first-seen order and maps to nobody.'
+          : 'Installs are anonymous: "User N" is assigned in first-seen order and maps to nobody.'
+      }</p>${r.q3
         .map(
           (t) =>
             `<div class="trail"><h3>${esc(t.label)}</h3><div class="meta">${t.account ? `<code>${esc(t.account)}</code> · ` : ''}${esc(t.platform)} · ${esc(t.network)} · v${esc(t.appVersion)} · first seen ${fmtDate(t.firstSeen)} · last seen ${fmtDate(t.lastSeen)} · ${t.events.length} events</div><ol>${t.events

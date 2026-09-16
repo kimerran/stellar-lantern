@@ -160,6 +160,9 @@ describe('validate', () => {
     expect(validateEnvelope(ok({ account: SECRET }))).toBe(false);
     expect(validateEnvelope(ok({ account: 'C' + 'A'.repeat(55) }))).toBe(false);
     expect(validateEnvelope(ok({ account: 'GABC' }))).toBe(false);
+    // Format-matching but not a real StrKey: bad checksum, and an all-A body.
+    expect(validateEnvelope(ok({ account: ADDRESS.slice(0, -1) + 'A' }))).toBe(false);
+    expect(validateEnvelope(ok({ account: 'G' + 'A'.repeat(55) }))).toBe(false);
     expect(validateEnvelope(ok({ account: 42 as never }))).toBe(false);
     // With an account present, a key smuggled elsewhere is still rejected.
     expect(validateEnvelope(ok({ account: ADDRESS, appVersion: SECRET }))).toBe(false);
@@ -199,6 +202,16 @@ describe('sink', () => {
     await broken.sink.flush();
     expect(broken.posts).toHaveLength(1);
     expect('account' in broken.posts[0]!.body).toBe(false);
+
+    // A malformed or secret-key-shaped value is dropped from the envelope,
+    // not the batch: the events still go out, anonymous.
+    for (const bad of [SECRET, 'GABC', ADDRESS.slice(0, -1) + 'A']) {
+      const s = sinkWith({ account: async () => bad, flushAt: 1 });
+      s.sink.emit({ name: 'session_start', props: {} });
+      await s.sink.flush();
+      expect(s.posts).toHaveLength(1);
+      expect('account' in s.posts[0]!.body).toBe(false);
+    }
   });
 
   it('batches: flushes at the size threshold with the envelope shape, and on the timer', async () => {

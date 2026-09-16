@@ -14,8 +14,8 @@ reviewers at.
 - **Opt-in, default off.** Nothing is collected until the user turns
   analytics on in Settings. The sink is a hard no-op before that: it does not
   even buffer.
-- **Anonymous.** The only identity is a random UUID minted on the device on
-  first run (`crypto.randomUUID()`), stored locally, never derived from a
+- **Anonymous** (non-alpha builds — see *Alpha builds* below). The only
+  identity is a random UUID minted on the device on first run (`crypto.randomUUID()`), stored locally, never derived from a
   Stellar address, a device property or hardware. "Delete my data" forgets it
   locally and asks the server to drop that install's rows; a later opt-in
   starts an unlinkable trail.
@@ -28,7 +28,9 @@ reviewers at.
 
 ## What we never collect
 
-Never leaves the device, under any flag or code path:
+Never leaves the device, under any flag or code path (one exception: the
+wallet's **public** address in alpha builds, see below — nothing else here
+changes there):
 
 - public or secret keys, addresses, or any `G…` / `S…` / `C…` / `M…` string
 - seed phrases, passwords, PBKDF2 parameters, any vault bytes
@@ -46,20 +48,27 @@ report never prints the install UUID — it renders installs as "User 1",
 ## Alpha builds: the wallet address IS collected (#100)
 
 Builds made with `VITE_FEATURE_TELEMETRY_IDENTITY=true` — the alpha APK and
-extension zip from `release.yml` / `android.yml` — attach the wallet's
-**public address** (`G…`) to every telemetry envelope, so the activity report
-can be read per tester without a manual id hand-off. In those builds the
-consent card and Settings → Privacy say so: the title is *Share usage data
-(alpha)*, "What we collect" lists *your public wallet address (alpha builds
-only)*, and the "never collect" list is reduced to secret keys, recovery
-phrase/password, amounts/memos/hashes and message text. Everything else on
+extension zip from `release.yml` / `android.yml` — **attempt to attach** the
+wallet's **public address** (`G…`) to each consented telemetry envelope as
+`account`, so the activity report can be read per tester without a manual id
+hand-off. It is best effort: with no wallet yet, unreadable storage, or a
+value that is not a valid public key, the envelope is still sent, anonymous.
+In those builds the consent card and Settings → Privacy say so: the title is
+*Share usage data (alpha)*, "What we collect" lists *your public wallet
+address (alpha builds only)*, and the "never collect" list drops the
+addresses line — secret keys, seed phrases/passwords/vault bytes, amounts,
+asset codes, memos, transaction hashes, raw message text, geolocation, device
+fingerprints and advertising ids are still never collected. Everything else on
 this page still holds: opt-in, default off, delete on request.
 
 The address is the **only** key-shaped value the validator accepts, only in
-the envelope's `account` field, only as a `G` key; secret keys, contract ids
-and anything key-shaped anywhere else are still rejected. The flag is off by
-default and must be off in any store submission — a non-alpha build carries
-none of this code, and its validator rejects an envelope that has the field.
+the envelope's `account` field, only as a checksum-valid ed25519 public key
+(StrKey `G`); secret keys, contract ids, format-matching strings with a bad
+checksum, and anything key-shaped anywhere else are still rejected. The flag
+is off by default and must be off in any store submission — a non-alpha build
+carries none of this code and its copy is unchanged; the validator (shared
+with the API) accepts the field from any build, so the API keeps working for
+both.
 
 ### Matching a tester to their trail (#98)
 
@@ -98,6 +107,7 @@ Each flush sends one envelope:
   "platform": "extension" | "android",
   "appVersion": "0.1.0",
   "network": "testnet" | "public",
+  "account": "G…",   // alpha builds only (#100); absent otherwise
   "events": [{ "name": "…", "props": { … }, "ts": 1700000000000 }]
 }
 ```

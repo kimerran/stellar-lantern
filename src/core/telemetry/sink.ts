@@ -7,7 +7,7 @@
 //   - Bounded: an offline session cannot grow the buffer without limit.
 
 import type { Envelope, Network, Platform, StampedEvent, TelemetryEvent } from './events';
-import { validateEnvelope, validateEvent } from './validate';
+import { isPublicAccount, validateEnvelope, validateEvent } from './validate';
 
 export interface SinkOptions {
   ingestUrl: string;
@@ -125,11 +125,13 @@ export function createSink(opts: SinkOptions): Sink {
   return { emit, flush, requestDeletion, size: () => buffer.length };
 }
 
+// Best effort (#100): no wallet, unreadable storage, or a value that is not a
+// valid public key → the envelope goes out anonymous rather than not at all.
 async function accountField(read: () => Promise<string | null>): Promise<{ account?: string }> {
   try {
     const account = await read();
-    return account ? { account } : {};
+    return isPublicAccount(account) ? { account } : {};
   } catch {
-    return {}; // no wallet, or storage unavailable: send the envelope anonymous
+    return {};
   }
 }
