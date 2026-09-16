@@ -30,5 +30,13 @@
       "@lantern/scanner": ["packages/lantern-scanner/src/index.ts"]
     }
   },
-  "include": ["src", "packages", "tests", "vite.config.ts", "tailwind.config.ts", "manifest.config.ts"]
+  "include": [
+    "src",
+    "packages",
+    "tests",
+    "scripts/report-activity.ts",
+    "vite.config.ts",
+    "tailwind.config.ts",
+    "manifest.config.ts"
+  ]
 }

@@ -77,8 +77,18 @@ Each flush sends one envelope:
 
 - Consent is the `analyticsConsent` field of the wallet's existing Settings
   record (`src/shared/storage.ts`) — no parallel store. Default `false`.
-- The prompt appears **once**, after onboarding completes — never before,
-  never blocking.
+- **Settings → Privacy** holds the toggle ("Share anonymous usage data"), the
+  what-we-collect / what-we-never-collect lists (the same text as this
+  document, asserted by test), and **Delete my data**.
+- The prompt appears **once**, after onboarding has produced a wallet — never
+  before, and never blocking: it is a card above the bottom nav with no
+  backdrop and no modal semantics, so every wallet control stays reachable
+  while it is up. "Not now" answers it for good (`analyticsPromptSeen`), and
+  it is never shown again after either answer.
+- **Delete my data** is its own action, not the toggle: it sends the deletion
+  request whenever this install has an id — even if consent is already off,
+  so a revoke that never reached the server can be retried — and always ends
+  with consent off and the id forgotten.
 - Granting emits `consent_granted` and starts the sink. Revoking emits
   `consent_revoked`, stops emission, sends a deletion request for the install
   id, and forgets the id locally.
@@ -91,6 +101,23 @@ Each flush sends one envelope:
 Raw per-install events for **90 days**, then deleted — enforced by the Lantern
 API's retention job (`services/lantern-api`, #85). Rows live in Postgres on
 Railway, under our control; no third party holds the data.
+
+## The report
+
+`npm run report:activity` (`scripts/report-activity.ts`) pulls the raw rows
+from `GET /v1/telemetry/export` (`TELEMETRY_ADMIN_TOKEN`, optional
+`--since` / `--until`) and writes **one self-contained file**,
+`dist-report/index.html`: inline CSS in the Lantern palette, no script, no
+external stylesheet, font, image or fetch — it opens from `file://` and
+survives being emailed. Sections: summary (window, distinct installs, by
+platform, by network), Q1 onboarded by mode, Q2 event × count × distinct
+installs, Q3 per-install trails as "User 1", "User 2", … in first-seen order
+(the UUID never appears — asserted), Q4 transaction and scan counts by
+platform with the registry's on-chain `Count` (distinct reported subjects)
+read fee-free as a cross-check. `--format=json` emits the same numbers for
+diffing between periods; `--input export.jsonl` renders a saved export
+offline. Zero events renders a clean empty state. `dist-report/` is
+git-ignored: it contains real user activity.
 
 ## Build plumbing
 
