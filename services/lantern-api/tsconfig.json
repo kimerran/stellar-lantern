@@ -17,7 +17,8 @@
     "baseUrl": ".",
     "paths": {
       "@lantern/scanner": ["../../packages/lantern-scanner/src/index.ts"],
-      "@lantern/telemetry-validate": ["../../src/core/telemetry/validate.ts"]
+      "@lantern/telemetry-validate": ["../../src/core/telemetry/validate.ts"],
+      "@lantern/telemetry-report": ["../../src/core/telemetry/report.ts"]
     }
   },
   "include": ["src", "test", "vitest.config.ts"]

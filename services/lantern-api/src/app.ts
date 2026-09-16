@@ -7,6 +7,7 @@ import { bodyLimit } from './middleware/body-limit';
 import { explainRoute } from './routes/explain';
 import { healthRoute } from './routes/health';
 import { telemetryRoutes } from './routes/telemetry';
+import { adminRoutes } from './routes/admin';
 import type { TelemetryStore } from './telemetry/store';
 
 export interface AppOptions {
@@ -14,6 +15,8 @@ export interface AppOptions {
   // Telemetry store (#85); null when no DATABASE_URL is configured.
   store?: TelemetryStore | null;
   nowDate?: () => Date;
+  // /admin session nonce (#104); tests inject one, production mints at boot.
+  adminSessionNonce?: string;
   fetchImpl?: typeof fetch; // upstream, injectable for tests
   upstreamEndpoint?: string;
   now?: () => number;
@@ -69,6 +72,20 @@ export function createApp(opts: AppOptions): Hono {
       ...(env.telemetryAdminToken ? { adminToken: env.telemetryAdminToken } : {}),
       ...(opts.nowDate ? { now: opts.nowDate } : {}),
       retentionDays: env.retentionDays,
+      log,
+    }),
+  );
+  // The analytics page (#104): cookie session, same report code as the CLI.
+  // Login attempts share the telemetry limiter's per-IP window.
+  app.use('/admin/login', telemetryLimiter.middleware);
+  app.route(
+    '/',
+    adminRoutes({
+      store,
+      ...(env.telemetryAdminToken ? { adminToken: env.telemetryAdminToken } : {}),
+      registryId: env.registryId,
+      ...(opts.nowDate ? { now: opts.nowDate } : {}),
+      ...(opts.adminSessionNonce ? { sessionNonce: opts.adminSessionNonce } : {}),
       log,
     }),
   );
