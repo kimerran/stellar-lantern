@@ -43,6 +43,17 @@ contains anything shaped like a Stellar key anywhere in it, and the generated
 report never prints the install UUID — it renders installs as "User 1",
 "User 2", … in first-seen order.
 
+### Matching a tester to their trail (#98)
+
+Settings → Privacy shows the install id as **Analytics ID** while sharing is
+on, with a copy button. A tester may share it with us *voluntarily* — the alpha
+guide asks for it in the results zip — and the operator keeps the mapping in a
+local, git-ignored file passed to `npm run report:activity -- --map
+reports/alpha.map.json`. Mapped installs are labelled by that name in the
+report; everyone else stays "User N". The id is still a random UUID: nothing
+about it, or about the mapping, links to a wallet address, and "Delete my
+data" discards it as before.
+
 ## Events
 
 | event | props | answers |

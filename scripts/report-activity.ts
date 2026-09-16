@@ -5,13 +5,17 @@
 //   npm run report:activity -- --since 2026-09-01 --until 2026-10-01
 //   npm run report:activity -- --format=json > numbers.json
 //   npm run report:activity -- --input export.jsonl   # offline, from a saved export
+//   npm run report:activity -- --map reports/alpha.map.json   # label testers (#98)
 //
 // Env: LANTERN_API_URL (default the Railway deployment), TELEMETRY_ADMIN_TOKEN
 // (required unless --input), SOROBAN_RPC_URL (default testnet), and
 // BLACKLIST_REGISTRY_ID (default the deployed testnet registry).
 //
 // Privacy: installs are rendered as "User 1", "User 2", … in first-seen order.
-// The install UUID never appears in the output — asserted by test. The HTML
+// The install UUID never appears in the output — asserted by test. `--map`
+// takes a local `{ "<installId>": "Alice" }` file (a tester shares their ID
+// from Settings → Privacy, #98) and renders that label instead; the file stays
+// on the operator's machine and is git-ignored under reports/. The HTML
 // has no script, no external stylesheet, font, image or fetch: it opens from
 // file:// and survives being emailed.
 
@@ -169,15 +173,22 @@ export function buildReport(
     registryCount: number | null;
     registryId: string;
     now?: () => Date;
+    /** installId → tester label (#98); unmapped installs stay "User N". */
+    map?: Record<string, string>;
   },
 ): Report {
   const now = opts.now ?? (() => new Date());
   const sorted = [...rows].sort((a, b) => a.ts.localeCompare(b.ts) || a.id - b.id);
 
   // First-seen order decides "User N"; the UUID goes no further than this map.
+  // A mapped install takes its tester label and does not consume a number.
   const label = new Map<string, string>();
-  for (const r of sorted)
-    if (!label.has(r.installId)) label.set(r.installId, `User ${label.size + 1}`);
+  let anon = 0;
+  for (const r of sorted) {
+    if (label.has(r.installId)) continue;
+    const mapped = opts.map?.[r.installId];
+    label.set(r.installId, mapped ? mapped : `User ${++anon}`);
+  }
 
   const count = (f: (r: Row) => string | undefined): Record<string, number> => {
     const out: Record<string, number> = {};
@@ -383,12 +394,33 @@ const DEFAULT_API = 'https://lantern-api-production-3fad.up.railway.app';
 const DEFAULT_RPC = 'https://soroban-testnet.stellar.org';
 const DEFAULT_REGISTRY = 'CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F';
 
+// `--map` file: a flat { "<installId>": "Alice" } object. Labels are trimmed
+// and must be non-empty; anything else is a usage error, not a silent skip.
+// A UUID-shaped label is refused too: a label is copied into the output
+// verbatim, and the report's contract is that no install UUID ever prints.
+const UUID_LABEL_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function readLabelMap(text: string): Record<string, string> {
+  const parsed: unknown = JSON.parse(text);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+    throw new Error('--map: expected a JSON object of { "<installId>": "label" }');
+  const out: Record<string, string> = {};
+  for (const [id, label] of Object.entries(parsed as Record<string, unknown>)) {
+    if (typeof label !== 'string' || !label.trim())
+      throw new Error(`--map: label for ${id} must be a non-empty string`);
+    if (UUID_LABEL_RE.test(label.trim()))
+      throw new Error(`--map: label for ${id} looks like an install id — use a name`);
+    out[id] = label.trim();
+  }
+  return out;
+}
+
 export function parseArgs(argv: string[]): {
   format: 'html' | 'json';
   since?: string;
   until?: string;
   input?: string;
   out?: string;
+  map?: string;
 } {
   const out: ReturnType<typeof parseArgs> = { format: 'html' };
   for (let i = 0; i < argv.length; i += 1) {
@@ -400,6 +432,7 @@ export function parseArgs(argv: string[]): {
     else if (k === 'until') out.until = val();
     else if (k === 'input') out.input = val();
     else if (k === 'out') out.out = val();
+    else if (k === 'map') out.map = val();
   }
   return out;
 }
@@ -428,9 +461,11 @@ async function main(): Promise<void> {
     process.env.SOROBAN_RPC_URL ?? DEFAULT_RPC,
     registryId,
   );
+  const map = args.map ? readLabelMap(readFileSync(args.map, 'utf8')) : undefined;
   const report = buildReport(rows, {
     ...(args.since ? { since: args.since } : {}),
     ...(args.until ? { until: args.until } : {}),
+    ...(map ? { map } : {}),
     registryCount,
     registryId,
   });

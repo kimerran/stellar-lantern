@@ -15,7 +15,7 @@ import type { TelemetryEvent } from './events';
 export type { TelemetryEvent, Envelope, StampedEvent, EventName } from './events';
 export { validateEnvelope, validateEvent } from './validate';
 export { createSink } from './sink';
-export { getInstallId, clearInstallId, INSTALL_ID_KEY } from './install-id';
+export { getInstallId, peekInstallId, clearInstallId, INSTALL_ID_KEY } from './install-id';
 export { CONSENT_COPY, shouldShowConsentPrompt, markConsentPromptSeen } from './consent';
 export { track } from './emits';
 

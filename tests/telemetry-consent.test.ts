@@ -177,5 +177,11 @@ describe('consent copy', () => {
     for (const line of CONSENT_COPY.collected) {
       expect(line).not.toMatch(/address|key|phrase|amount|memo|message text/i);
     }
+    // The Analytics ID row (#98): the doc names the row and the UI says the id
+    // is random and not wallet-derived, matching the doc's promise.
+    expect(doc).toContain('analytics id');
+    expect(CONSENT_COPY.idTitle).toBe('Analytics ID');
+    expect(CONSENT_COPY.idHint).toMatch(/random/i);
+    expect(CONSENT_COPY.idHint).toMatch(/not derived from your wallet/i);
   });
 });

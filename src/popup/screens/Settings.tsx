@@ -31,8 +31,9 @@ interface Props {
   // Analytics consent (#86); rendered only under __FEATURE_TELEMETRY__.
   setAnalyticsConsent?: (on: boolean) => Promise<void>;
   deleteAnalytics?: () => Promise<void>;
+  // The analytics install id to show for copying (#98); null = none minted.
+  installId?: string | null;
 }
-
 
 // Auto-lock presets (minutes). 0 = never (armAutoLock leaves the timer disarmed).
 const AUTO_LOCK_OPTIONS: { value: number; label: string }[] = [
@@ -66,6 +67,7 @@ export function Settings({
   setRpcOverrides,
   setAnalyticsConsent,
   deleteAnalytics,
+  installId = null,
 }: Props) {
   const toast = useToast();
   const content = (
@@ -109,6 +111,7 @@ export function Settings({
         <Section title="Privacy">
           <PrivacyRows
             consent={settings.analyticsConsent === true}
+            installId={installId}
             setAnalyticsConsent={setAnalyticsConsent}
             deleteAnalytics={deleteAnalytics}
             toast={toast}
@@ -167,11 +170,13 @@ export function Settings({
 // core/telemetry/consent.ts so it can be asserted against docs/telemetry.md.
 function PrivacyRows({
   consent,
+  installId,
   setAnalyticsConsent,
   deleteAnalytics,
   toast,
 }: {
   consent: boolean;
+  installId: string | null;
   setAnalyticsConsent: (on: boolean) => Promise<void>;
   deleteAnalytics: () => Promise<void>;
   toast: (msg: string) => void;
@@ -232,6 +237,31 @@ function PrivacyRows({
           ))}
         </ul>
       </div>
+      {consent && installId && (
+        <>
+          <Divider />
+          <button
+            onClick={() =>
+              void navigator.clipboard.writeText(installId).then(
+                () => toast('Analytics ID copied.'),
+                () => toast('Could not copy — long-press to select it.'),
+              )
+            }
+            className="flex w-full min-h-[52px] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-variant active:scale-[0.99]"
+          >
+            <Icon name="content_copy" size={22} className="shrink-0 text-on-surface-variant" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-body-md text-on-surface">{CONSENT_COPY.idTitle}</span>
+              <span className="block select-all break-all font-mono text-label-md text-on-surface-variant">
+                {installId}
+              </span>
+              <span className="mt-1 block text-label-md text-on-surface-variant">
+                {CONSENT_COPY.idHint}
+              </span>
+            </span>
+          </button>
+        </>
+      )}
       <Divider />
       {confirmDelete ? (
         <div className="flex min-h-[52px] items-center gap-2 px-4 py-3">

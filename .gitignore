@@ -29,3 +29,6 @@ instawards/
 
 # Soroban contract build output
 contracts/blacklist-registry/target/
+
+# Tester label maps for `report:activity --map` hold install IDs — never committed (#98).
+reports/

@@ -7,6 +7,7 @@ import {
   registryInstanceKey,
   registryCountFromEntry,
   parseArgs,
+  readLabelMap,
   type Row,
 } from '../scripts/report-activity';
 import registryFixture from '../packages/lantern-scanner/fixtures/registry-hot-read.json';
@@ -276,13 +277,43 @@ describe('parseArgs', () => {
         '--until=2026-10-01',
         '--input',
         'x.jsonl',
+        '--map=reports/alpha.map.json',
       ]),
     ).toEqual({
       format: 'json',
       since: '2026-09-01',
       until: '2026-10-01',
       input: 'x.jsonl',
+      map: 'reports/alpha.map.json',
     });
     expect(parseArgs([])).toEqual({ format: 'html' });
+  });
+});
+
+// Tester labels (#98): a local installId → name map relabels a trail; the
+// UUID still never reaches the output, mapped or not.
+describe('--map', () => {
+  const map = { [B]: 'Alice' };
+
+  it('labels a mapped install by name and keeps User N for the rest', () => {
+    const r = buildReport(ROWS, { ...opts, map });
+    const labels = r.q3.map((t) => t.label);
+    expect(labels).toContain('Alice');
+    // A (first seen after B) and C take the numbers; B does not consume one.
+    expect(labels.filter((l) => /^User \d+$/.test(l)).sort()).toEqual(['User 1', 'User 2']);
+    expect(labels).toHaveLength(3);
+    const text = JSON.stringify(r);
+    for (const u of [A, B, C]) expect(text).not.toContain(u);
+    expect(renderHtml(r)).toContain('Alice');
+    expect(renderHtml(r)).not.toContain(B);
+  });
+
+  it('readLabelMap accepts a flat object and rejects anything else', () => {
+    expect(readLabelMap(`{"${B}": "  Alice "}`)).toEqual({ [B]: 'Alice' });
+    expect(() => readLabelMap('[]')).toThrow(/expected a JSON object/);
+    expect(() => readLabelMap(`{"${B}": ""}`)).toThrow(/non-empty/);
+    expect(() => readLabelMap(`{"${B}": 3}`)).toThrow(/non-empty/);
+    // A UUID as the label would print an install id — refused.
+    expect(() => readLabelMap(`{"${B}": "${A}"}`)).toThrow(/looks like an install id/);
   });
 });

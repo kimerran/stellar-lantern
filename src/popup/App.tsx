@@ -63,6 +63,7 @@ export function App() {
     setAnalyticsConsent,
     deleteAnalytics,
     dismissAnalyticsPrompt,
+    installId,
   } = useSettings();
   const { passkeyAccount, refresh: refreshPasskey } = usePasskeyAccount();
   const [tab, setTab] = useState<Tab>('assets');
@@ -223,6 +224,7 @@ export function App() {
                 setRpcOverrides={setRpcOverrides}
                 setAnalyticsConsent={setAnalyticsConsent}
                 deleteAnalytics={deleteAnalytics}
+                installId={installId}
               />
             )}
           </div>

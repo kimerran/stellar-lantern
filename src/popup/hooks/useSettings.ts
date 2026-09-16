@@ -7,6 +7,7 @@ import {
   revokeConsentAndDelete,
   markConsentPromptSeen,
   deleteAnalyticsData,
+  peekInstallId,
 } from '@core/telemetry';
 
 export function useSettings() {
@@ -58,6 +59,23 @@ export function useSettings() {
     setLocal(await getSettings());
   }, []);
 
+  // The analytics install id, for the tester to copy (#98). Re-read whenever
+  // consent changes: granting mints it, "delete my data" clears it.
+  const [installId, setInstallId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!__FEATURE_TELEMETRY__ || settings?.analyticsConsent !== true) {
+      setInstallId(null);
+      return;
+    }
+    let live = true;
+    void peekInstallId().then((id) => {
+      if (live) setInstallId(id);
+    });
+    return () => {
+      live = false;
+    };
+  }, [settings?.analyticsConsent]);
+
   const dismissAnalyticsPrompt = useCallback(async () => {
     if (!__FEATURE_TELEMETRY__) return;
     await markConsentPromptSeen();
@@ -74,5 +92,6 @@ export function useSettings() {
     setAnalyticsConsent,
     deleteAnalytics,
     dismissAnalyticsPrompt,
+    installId,
   };
 }

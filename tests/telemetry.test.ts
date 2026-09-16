@@ -6,6 +6,7 @@ import {
   validateEnvelope,
   validateEvent,
   getInstallId,
+  peekInstallId,
   clearInstallId,
   INSTALL_ID_KEY,
   startTelemetry,
@@ -287,6 +288,15 @@ describe('install id', () => {
     await clearInstallId();
     const b = await getInstallId();
     expect(b).not.toBe(a);
+  });
+
+  it('peekInstallId reads without minting (#98)', async () => {
+    expect(await peekInstallId()).toBeNull();
+    expect(await peekInstallId()).toBeNull(); // still nothing: peeking never creates one
+    const a = await getInstallId();
+    expect(await peekInstallId()).toBe(a);
+    await clearInstallId();
+    expect(await peekInstallId()).toBeNull();
   });
 
   it('is never derived from an address or the vault', async () => {
