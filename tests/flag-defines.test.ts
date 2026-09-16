@@ -11,7 +11,19 @@ describe('flagDefines (Vite define map)', () => {
     expect(d.__FEATURE_SWAP__).toBe('false'); // env turns a default-on flag off
     expect(d.__FEATURE_EARN_BLEND__).toBe('true'); // untouched default (on)
     expect(d.__FEATURE_DEMO_AFFORDANCES__).toBe('false'); // untouched default (off)
-    expect(Object.keys(d)).toHaveLength(FLAG_COUNT); // one literal per flag
+    // One literal per flag, plus the ingest-URL pin (telemetry defaults off).
+    expect(Object.keys(d)).toHaveLength(FLAG_COUNT + 1);
+  });
+
+  it('pins import.meta.env.VITE_TELEMETRY_INGEST_URL to "" only when telemetry is off', () => {
+    // Off: the URL must not survive into Vite's inlined import.meta.env object,
+    // even if the CI job exports it (release.yml does) — see #96.
+    const off = flagDefines({ VITE_FEATURE_TELEMETRY: 'false' });
+    expect(off['import.meta.env.VITE_TELEMETRY_INGEST_URL']).toBe('""');
+    // On: no pin, so the real env value reaches the bundle.
+    const on = flagDefines({ VITE_FEATURE_TELEMETRY: 'true' });
+    expect(on['import.meta.env.VITE_TELEMETRY_INGEST_URL']).toBeUndefined();
+    expect(Object.keys(on)).toHaveLength(FLAG_COUNT);
   });
 
   it('allFlagDefinesOn sets every literal to true (used by the test runner)', () => {
