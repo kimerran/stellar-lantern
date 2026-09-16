@@ -225,6 +225,7 @@ describe('GET /v1/telemetry/export', () => {
     expect((await h.exp('?since=not-a-date')).status).toBe(400);
     // The row shape is the columns and nothing else.
     expect(Object.keys((all.rows as object[])[0]!).sort()).toEqual([
+      'account',
       'appVersion',
       'event',
       'id',
@@ -235,6 +236,32 @@ describe('GET /v1/telemetry/export', () => {
       'receivedAt',
       'ts',
     ]);
+  });
+
+  // Alpha identity (#100): an envelope may carry the wallet's public address;
+  // it is stored and exported per row, null when the build did not send one.
+  it('stores and exports the account when the envelope carries one', async () => {
+    const G = 'GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ'; // a real StrKey
+    const h = harness();
+    await h.post({ ...envelope(UUID_A), account: G });
+    await h.post(envelope(UUID_B));
+    const out = await json(await h.exp());
+    expect((out.rows as Array<{ account: string | null }>).map((r) => r.account)).toEqual([
+      G,
+      null,
+    ]);
+    // Only a public key in that one slot: a secret key, a contract id or junk is 400.
+    // …and a G key with a bad checksum, or a format-only string, is not an account.
+    for (const bad of [
+      'S' + 'A'.repeat(55),
+      'C' + 'A'.repeat(55),
+      'GABC',
+      42,
+      G.slice(0, -1) + 'A',
+      'G' + 'A'.repeat(55),
+    ]) {
+      expect((await h.post({ ...envelope(UUID_A), account: bad })).status).toBe(400);
+    }
   });
 
   it('signals a next page at the page size', async () => {

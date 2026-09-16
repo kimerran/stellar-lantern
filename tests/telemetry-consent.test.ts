@@ -15,6 +15,7 @@ import {
 } from '@core/telemetry';
 import promptSrc from '../src/popup/screens/AnalyticsPrompt.tsx?raw';
 import telemetryDoc from '../docs/telemetry.md?raw';
+import consentSource from '../src/core/telemetry/consent.ts?raw';
 
 // The consent surface (#86): the once-only prompt rule, the transitions
 // through the real Settings record, and the copy against docs/telemetry.md.
@@ -154,8 +155,11 @@ describe('consent copy', () => {
     const doc = telemetryDoc.toLowerCase();
     const neverSection = doc.split('## what we never collect')[1]?.split('\n## ')[0] ?? '';
     expect(neverSection.length).toBeGreaterThan(50);
+    // The test runner builds with every flag on (allFlagDefinesOn), so this is
+    // the ALPHA copy (#100): addresses are collected and said so; secret keys
+    // are still never collected. The non-alpha wording is asserted below.
     for (const [uiLine, docKeyword] of [
-      ['addresses, public keys or secret keys', 'secret keys'],
+      ['your secret keys', 'secret keys'],
       ['recovery phrase or password', 'seed phrases, passwords'],
       [
         'amounts, asset codes, memos or transaction hashes',
@@ -173,8 +177,10 @@ describe('consent copy', () => {
     expect(CONSENT_COPY.collected.join(' ')).toMatch(/anonymous install id/);
     expect(doc).toMatch(/opt-in, default off/);
     expect(CONSENT_COPY.summary).toMatch(/off by default/i);
-    // No UI line mentions anything the doc forbids collecting as if it were collected.
+    // No UI line mentions anything the doc forbids collecting as if it were
+    // collected — except the alpha-only address line (#100), which is the point.
     for (const line of CONSENT_COPY.collected) {
+      if (/alpha builds only/.test(line)) continue;
       expect(line).not.toMatch(/address|key|phrase|amount|memo|message text/i);
     }
     // The Analytics ID row (#98): the doc names the row and the UI says the id
@@ -183,5 +189,18 @@ describe('consent copy', () => {
     expect(CONSENT_COPY.idTitle).toBe('Analytics ID');
     expect(CONSENT_COPY.idHint).toMatch(/random/i);
     expect(CONSENT_COPY.idHint).toMatch(/not derived from your wallet/i);
+  });
+
+  it('alpha builds say the address is collected, and the doc has the alpha section (#100)', () => {
+    expect(__FEATURE_TELEMETRY_IDENTITY__).toBe(true); // the runner's flag state
+    expect(CONSENT_COPY.title).toMatch(/alpha/i);
+    expect(CONSENT_COPY.collected.some((l) => /public wallet address/.test(l))).toBe(true);
+    expect(CONSENT_COPY.neverCollected.some((l) => /addresses/.test(l))).toBe(false);
+    const doc = telemetryDoc.toLowerCase();
+    expect(doc).toContain('## alpha builds');
+    expect(doc).toContain('vite_feature_telemetry_identity');
+    // The non-alpha branch keeps the original promise verbatim.
+    expect(consentSource).toContain("'your addresses, public keys or secret keys'");
+    expect(consentSource).toContain("'Share anonymous usage data'");
   });
 });

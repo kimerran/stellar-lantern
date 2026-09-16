@@ -6,7 +6,7 @@
 // default false) — there is no parallel store. The sink is a hard no-op
 // until it is true.
 
-import { getSettings, onSettingsChanged, setSettings } from '@shared/storage';
+import { getSettings, getVault, onSettingsChanged, setSettings } from '@shared/storage';
 import { getKV, isNativePlatform } from '@shared/kv';
 import { createSink, type Sink } from './sink';
 import { clearInstallId, getInstallId, INSTALL_ID_KEY } from './install-id';
@@ -49,6 +49,10 @@ export async function startTelemetry(opts: StartOptions): Promise<void> {
     network: () => (network === 'PUBLIC' ? 'public' : 'testnet'),
     installId: getInstallId,
     hasConsent: () => consent,
+    // Alpha only (#100): the vault's public address rides with every envelope.
+    ...(__FEATURE_TELEMETRY_IDENTITY__
+      ? { account: async () => (await getVault())?.address ?? null }
+      : {}),
     ...(opts.flushAt !== undefined ? { flushAt: opts.flushAt } : {}),
     ...(opts.flushAfterMs !== undefined ? { flushAfterMs: opts.flushAfterMs } : {}),
   });

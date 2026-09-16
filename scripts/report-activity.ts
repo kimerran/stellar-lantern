@@ -33,6 +33,8 @@ export interface Row {
   props: Record<string, string | boolean>;
   ts: string; // ISO
   receivedAt: string; // ISO
+  // Alpha builds (#100) attach the wallet's public address; absent otherwise.
+  account?: string | null;
 }
 
 export interface ExportPage {
@@ -127,8 +129,13 @@ export async function fetchRegistryCount(
 
 // ── The model (pure) ─────────────────────────────────────────────────────────
 
+// GBK4…X9V2 — the wallet's own middle-truncation (shared/format.ts), redone
+// here because the report bundle stays free of app imports.
+const truncate = (a: string): string => `${a.slice(0, 4)}…${a.slice(-4)}`;
+
 export interface UserTrail {
-  label: string; // "User 3"
+  label: string; // "User 3", a --map name, or the truncated address
+  account: string | null; // the full address, alpha builds only (#100)
   platform: string;
   network: string;
   appVersion: string;
@@ -181,13 +188,19 @@ export function buildReport(
   const sorted = [...rows].sort((a, b) => a.ts.localeCompare(b.ts) || a.id - b.id);
 
   // First-seen order decides "User N"; the UUID goes no further than this map.
-  // A mapped install takes its tester label and does not consume a number.
+  // A mapped install takes its tester label and does not consume a number;
+  // failing that, an alpha install that sent its address (#100) is labelled
+  // by the truncated address — the first row carrying one wins.
+  const account = new Map<string, string>();
+  for (const r of sorted)
+    if (r.account && !account.has(r.installId)) account.set(r.installId, r.account);
   const label = new Map<string, string>();
   let anon = 0;
   for (const r of sorted) {
     if (label.has(r.installId)) continue;
     const mapped = opts.map?.[r.installId];
-    label.set(r.installId, mapped ? mapped : `User ${++anon}`);
+    const acct = account.get(r.installId);
+    label.set(r.installId, mapped ? mapped : acct ? truncate(acct) : `User ${++anon}`);
   }
 
   const count = (f: (r: Row) => string | undefined): Record<string, number> => {
@@ -218,6 +231,7 @@ export function buildReport(
     if (!t) {
       t = {
         label: label.get(r.installId)!,
+        account: account.get(r.installId) ?? null,
         platform: r.platform,
         network: r.network,
         appVersion: r.appVersion,
@@ -341,10 +355,14 @@ export function renderHtml(r: Report): string {
         .join('')}</table>`;
   const q3 = empty
     ? ''
-    : `<h2>Q3 — Per-user activity</h2><p class="note">Installs are anonymous: "User N" is assigned in first-seen order and maps to nobody.</p>${r.q3
+    : `<h2>Q3 — Per-user activity</h2><p class="note">${
+        r.q3.some((t) => t.account)
+          ? 'Alpha builds report the wallet\'s public address, shown per trail; other installs are anonymous — "User N" is assigned in first-seen order and maps to nobody.'
+          : 'Installs are anonymous: "User N" is assigned in first-seen order and maps to nobody.'
+      }</p>${r.q3
         .map(
           (t) =>
-            `<div class="trail"><h3>${esc(t.label)}</h3><div class="meta">${esc(t.platform)} · ${esc(t.network)} · v${esc(t.appVersion)} · first seen ${fmtDate(t.firstSeen)} · last seen ${fmtDate(t.lastSeen)} · ${t.events.length} events</div><ol>${t.events
+            `<div class="trail"><h3>${esc(t.label)}</h3><div class="meta">${t.account ? `<code>${esc(t.account)}</code> · ` : ''}${esc(t.platform)} · ${esc(t.network)} · v${esc(t.appVersion)} · first seen ${fmtDate(t.firstSeen)} · last seen ${fmtDate(t.lastSeen)} · ${t.events.length} events</div><ol>${t.events
               .map(
                 (e) =>
                   `<li>${fmtDate(e.at)} — <code>${esc(e.event)}</code>${Object.keys(e.props).length ? ` (${esc(propsText(e.props))})` : ''}</li>`,

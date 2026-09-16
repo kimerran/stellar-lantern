@@ -47,13 +47,16 @@ function build(demoOn) {
 // it — the install-id storage key only exists in that module.
 const TELEMETRY_MARKER = 'lantern.telemetry.installId';
 const TELEMETRY_INGEST = 'https://ingest.lantern.invalid/v1/telemetry';
-function buildTelemetry(on) {
+// Alpha identity (#100): the consent copy only an identity build carries.
+const IDENTITY_MARKER = 'your public wallet address (alpha builds only)';
+function buildTelemetry(on, identity = false) {
   execSync('npx vite build', {
     stdio: 'ignore',
     env: {
       ...process.env,
       VITE_FEATURE_DEMO_AFFORDANCES: 'false',
       VITE_FEATURE_TELEMETRY: on ? 'true' : 'false',
+      VITE_FEATURE_TELEMETRY_IDENTITY: identity ? 'true' : 'false',
       ...(on ? { VITE_TELEMETRY_INGEST_URL: TELEMETRY_INGEST } : {}),
     },
   });
@@ -70,9 +73,14 @@ console.log('Building with VITE_FEATURE_DEMO_AFFORDANCES=true …');
 build(true);
 const onHas = bundleHasMarker();
 
-console.log('Building with VITE_FEATURE_TELEMETRY=true …');
+console.log('Building with VITE_FEATURE_TELEMETRY=true, TELEMETRY_IDENTITY=false …');
 buildTelemetry(true);
 const telemetryOnHas = bundleHas(TELEMETRY_MARKER) && bundleHas(TELEMETRY_INGEST);
+const identityOffHas = bundleHas(IDENTITY_MARKER);
+
+console.log('Building with VITE_FEATURE_TELEMETRY=true, TELEMETRY_IDENTITY=true …');
+buildTelemetry(true, true);
+const identityOnHas = bundleHas(IDENTITY_MARKER);
 
 console.log('Building with VITE_FEATURE_TELEMETRY=false …');
 buildTelemetry(false);
@@ -93,6 +101,20 @@ if (!telemetryOnHas) {
   failed = true;
 } else {
   console.log('✓ telemetry present with TELEMETRY=true (sanity check).');
+}
+if (identityOffHas) {
+  console.error('✗ FAIL: alpha-identity copy is in the bundle with TELEMETRY_IDENTITY=false.');
+  failed = true;
+} else {
+  console.log('✓ alpha-identity copy ABSENT with TELEMETRY_IDENTITY=false (non-alpha build).');
+}
+if (!identityOnHas) {
+  console.error(
+    '✗ FAIL: alpha-identity copy absent with TELEMETRY_IDENTITY=true — the marker or gate is wrong.',
+  );
+  failed = true;
+} else {
+  console.log('✓ alpha-identity copy present with TELEMETRY_IDENTITY=true (sanity check).');
 }
 if (offHas) {
   console.error(

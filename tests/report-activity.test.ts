@@ -308,6 +308,25 @@ describe('--map', () => {
     expect(renderHtml(r)).not.toContain(B);
   });
 
+  // Alpha identity (#100): a trail whose rows carry the wallet address is
+  // labelled by the truncated address and shows the full one in its meta;
+  // a --map name still wins; installs without one keep "User N".
+  it('labels an alpha install by its address, unless --map names it', () => {
+    const G = 'GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ';
+    const rows = ROWS.map((r) => (r.installId === A ? { ...r, account: G } : r));
+    const r = buildReport(rows, opts);
+    const a = r.q3.find((t) => t.account === G)!;
+    expect(a.label).toBe('GA7Q…VSGZ');
+    expect(r.q3.filter((t) => /^User \d+$/.test(t.label))).toHaveLength(2);
+    const html = renderHtml(r);
+    expect(html).toContain('GA7Q…VSGZ');
+    expect(html).toContain(G);
+    expect(html).not.toContain(A); // the install UUID still never prints
+    // --map beats the address.
+    const named = buildReport(rows, { ...opts, map: { [A]: 'Alice' } });
+    expect(named.q3.find((t) => t.account === G)!.label).toBe('Alice');
+  });
+
   it('readLabelMap accepts a flat object and rejects anything else', () => {
     expect(readLabelMap(`{"${B}": "  Alice "}`)).toEqual({ [B]: 'Alice' });
     expect(() => readLabelMap('[]')).toThrow(/expected a JSON object/);

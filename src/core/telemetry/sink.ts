@@ -7,7 +7,7 @@
 //   - Bounded: an offline session cannot grow the buffer without limit.
 
 import type { Envelope, Network, Platform, StampedEvent, TelemetryEvent } from './events';
-import { validateEnvelope, validateEvent } from './validate';
+import { isPublicAccount, validateEnvelope, validateEvent } from './validate';
 
 export interface SinkOptions {
   ingestUrl: string;
@@ -16,6 +16,9 @@ export interface SinkOptions {
   network: () => Network;
   installId: () => Promise<string>;
   hasConsent: () => boolean;
+  // Alpha identity (#100): the wallet's public address to attach, or null
+  // when there is no wallet yet. Absent in non-alpha builds.
+  account?: () => Promise<string | null>;
   fetchImpl?: typeof fetch;
   now?: () => number;
   setTimer?: (fn: () => void, ms: number) => unknown;
@@ -84,6 +87,7 @@ export function createSink(opts: SinkOptions): Sink {
           platform: opts.platform,
           appVersion: opts.appVersion,
           network: opts.network(),
+          ...(opts.account ? await accountField(opts.account) : {}),
           events,
         };
         if (!validateEnvelope(envelope)) return; // never send what fails the guard
@@ -119,4 +123,15 @@ export function createSink(opts: SinkOptions): Sink {
   }
 
   return { emit, flush, requestDeletion, size: () => buffer.length };
+}
+
+// Best effort (#100): no wallet, unreadable storage, or a value that is not a
+// valid public key → the envelope goes out anonymous rather than not at all.
+async function accountField(read: () => Promise<string | null>): Promise<{ account?: string }> {
+  try {
+    const account = await read();
+    return isPublicAccount(account) ? { account } : {};
+  } catch {
+    return {};
+  }
 }
