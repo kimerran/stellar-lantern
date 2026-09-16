@@ -33,6 +33,7 @@ import {
   walletTrail,
   WALLET_SORTS,
   type WalletSort,
+  identityKey,
 } from './admin-views';
 import type { TelemetryRow, TelemetryStore } from '../telemetry/store';
 import { EXPORT_PAGE } from './telemetry';
@@ -107,10 +108,24 @@ export interface Filters {
   platform: string; // '' = all
 }
 
+// A real calendar day: the string must round-trip through Date, so 2026-99-99
+// (which DATE_RE alone accepts) is rejected.
+const calendarDay = (v: string | undefined): string | null => {
+  if (!v || !DATE_RE.test(v)) return null;
+  const t = Date.parse(`${v}T00:00:00Z`);
+  return Number.isFinite(t) && new Date(t).toISOString().slice(0, 10) === v ? v : null;
+};
+
 export function parseFilters(q: Record<string, string | undefined>, now: Date): Filters {
   const day = (d: Date) => d.toISOString().slice(0, 10);
-  const until = DATE_RE.test(q.until ?? '') ? q.until! : day(new Date(now.getTime() + DAY_MS));
-  const since = DATE_RE.test(q.since ?? '') ? q.since! : day(new Date(now.getTime() - 30 * DAY_MS));
+  let until = calendarDay(q.until) ?? day(new Date(now.getTime() + DAY_MS));
+  let since = calendarDay(q.since) ?? day(new Date(now.getTime() - 30 * DAY_MS));
+  // An inverted or empty window falls back to the default rather than
+  // querying the store for nothing (or for an invalid Date).
+  if (since >= until) {
+    until = day(new Date(now.getTime() + DAY_MS));
+    since = day(new Date(now.getTime() - 30 * DAY_MS));
+  }
   const w = q.wallet ?? q.account ?? '';
   const wallet = ACCOUNT_RE.test(w) || UUID_RE.test(w) ? w : '';
   const platform = q.platform === 'extension' || q.platform === 'android' ? q.platform : '';
@@ -129,6 +144,9 @@ async function loadRows(store: TelemetryStore, f: Filters): Promise<Row[]> {
     });
     for (const r of page) {
       if (f.platform && r.platform !== f.platform) continue;
+      // The wallet filter is applied here, before the row cap, so a busy
+      // window cannot push one identity's rows past MAX_ROWS.
+      if (f.wallet && identityKey(r) !== f.wallet) continue;
       out.push(toRow(r));
     }
     if (page.length < EXPORT_PAGE || out.length >= MAX_ROWS) return out;
@@ -262,9 +280,6 @@ export function adminRoutes(deps: AdminDeps): Hono {
     const f = parseFilters(c.req.query(), now());
     return { rows: await loadRows(deps.store, f), f };
   };
-  // Rows narrowed to one identity when ?wallet= is set (downloads, drill-down).
-  const narrow = (rows: Row[], f: Filters): Row[] =>
-    f.wallet ? (walletTrail(rows, f.wallet)?.rows ?? []) : rows;
 
   app.get('/admin', async (c) => {
     const g = await gate(c, true);
@@ -324,7 +339,7 @@ export function adminRoutes(deps: AdminDeps): Hono {
     const g = await gate(c, true);
     if ('deny' in g) return g.deny;
     const { rows, f } = g;
-    const report = buildReport(narrow(rows, f), {
+    const report = buildReport(rows, {
       since: `${f.since}T00:00:00.000Z`,
       until: `${f.until}T00:00:00.000Z`,
       registryCount: null,
@@ -342,7 +357,8 @@ export function adminRoutes(deps: AdminDeps): Hono {
   app.get('/admin/export.csv', async (c) => {
     const g = await gate(c, false);
     if ('deny' in g) return g.deny;
-    const rows = narrow(g.rows, g.f);
+    const rows = g.rows;
+    if (g.f.wallet && rows.length === 0) return c.json({ error: 'not_found' }, 404);
     log({ route: 'admin_csv', status: 200, rows: rows.length });
     c.header('Content-Type', 'text/csv; charset=utf-8');
     c.header('Content-Disposition', `attachment; filename="${fileStem(g.f)}.csv"`);
@@ -352,7 +368,8 @@ export function adminRoutes(deps: AdminDeps): Hono {
   app.get('/admin/export.json', async (c) => {
     const g = await gate(c, false);
     if ('deny' in g) return g.deny;
-    const rows = narrow(g.rows, g.f);
+    const rows = g.rows;
+    if (g.f.wallet && rows.length === 0) return c.json({ error: 'not_found' }, 404);
     log({ route: 'admin_json', status: 200, rows: rows.length });
     c.header('Content-Disposition', `attachment; filename="${fileStem(g.f)}.json"`);
     return c.json({ rows });

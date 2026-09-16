@@ -241,6 +241,67 @@ describe('/admin pages', () => {
     expect((await h.get('/admin/wallets/not-a-key', cookie)).status).toBe(404);
   });
 
+  it('an install that switches wallets is two identities; its pre-wallet rows stay anonymous', async () => {
+    const h = harness();
+    const B2 = 'GDVEU3DD4KOFECV66VIHWEZOYX4ZKR3WV27L464SIIPOU2IUI3JCZA57';
+    const at = (d: string) => new Date(d);
+    await h.store.insert(
+      [
+        {
+          installId: UUID_A,
+          platform: 'extension',
+          appVersion: '0.1.0',
+          network: 'testnet',
+          event: 'session_start',
+          props: {},
+          ts: at('2026-09-10T10:00:00Z'),
+          account: null,
+        },
+        {
+          installId: UUID_A,
+          platform: 'extension',
+          appVersion: '0.1.0',
+          network: 'testnet',
+          event: 'session_start',
+          props: {},
+          ts: at('2026-09-11T10:00:00Z'),
+          account: ADDRESS,
+        },
+        {
+          installId: UUID_A,
+          platform: 'extension',
+          appVersion: '0.1.0',
+          network: 'testnet',
+          event: 'tx_signed',
+          props: { kind: 'sign_only', ok: true },
+          ts: at('2026-09-12T10:00:00Z'),
+          account: B2,
+        },
+      ],
+      at('2026-09-12T10:00:00Z'),
+    );
+    const cookie = h.cookieFrom(await h.login(TOKEN));
+    const list = await (await h.get('/admin/wallets', cookie)).text();
+    expect(list).toContain('3 wallets');
+    expect((await h.get(`/admin/wallets/${B2}`, cookie)).status).toBe(200);
+    const b2 = (await (await h.get(`/admin/export.json?wallet=${B2}`, cookie)).json()) as {
+      rows: Array<{ event: string }>;
+    };
+    expect(b2.rows.map((r) => r.event)).toEqual(['tx_signed']);
+    const a1 = (await (await h.get(`/admin/export.json?wallet=${ADDRESS}`, cookie)).json()) as {
+      rows: unknown[];
+    };
+    expect(a1.rows).toHaveLength(1);
+    const anon = (await (await h.get(`/admin/export.json?wallet=${UUID_A}`, cookie)).json()) as {
+      rows: unknown[];
+    };
+    expect(anon.rows).toHaveLength(1);
+    // Unknown wallet on a download is a 404, never an empty file.
+    expect((await h.get(`/admin/export.csv?wallet=${'G' + 'B'.repeat(55)}`, cookie)).status).toBe(
+      404,
+    );
+  });
+
   it('full report: still the emailed-style page, with the address label', async () => {
     const h = harness();
     await h.seed();
@@ -318,6 +379,23 @@ describe('helpers', () => {
       until: '2026-09-21',
       wallet: '',
       platform: '',
+    });
+    // Not a calendar day, or an inverted window → the default window.
+    expect(parseFilters({ since: '2026-99-99', until: '2026-02-30' }, now)).toMatchObject({
+      since: '2026-08-21',
+      until: '2026-09-21',
+    });
+    expect(parseFilters({ since: '2026-09-10', until: '2026-09-01' }, now)).toMatchObject({
+      since: '2026-08-21',
+      until: '2026-09-21',
+    });
+    expect(parseFilters({ since: '2026-09-10', until: '2026-09-10' }, now)).toMatchObject({
+      since: '2026-08-21',
+      until: '2026-09-21',
+    });
+    expect(parseFilters({ since: '2024-02-29', until: '2024-03-01' }, now)).toMatchObject({
+      since: '2024-02-29',
+      until: '2024-03-01',
     });
     expect(parseFilters({ wallet: ADDRESS, platform: 'android' }, now).wallet).toBe(ADDRESS);
     expect(parseFilters({ wallet: UUID_B }, now).wallet).toBe(UUID_B);

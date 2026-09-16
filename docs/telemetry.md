@@ -143,9 +143,14 @@ Railway, under our control; no third party holds the data.
 
 ## The report
 
-The same report is served at `https://<lantern-api>/admin` (#104) behind the
-admin token: sign in once, pick a date range, a wallet or a platform, or
-download the rows as CSV. See `services/lantern-api/README.md`. Offline:
+The Lantern API serves an analytics UI at `https://<lantern-api>/admin`
+(#104, #106) behind the admin token: a **dashboard** (tiles, events-per-day
+chart, event and verdict tables), a **wallets** table (one row per identity,
+sortable) with a **drill-down** per wallet (`/admin/wallets/<address>`), the
+full report at `/admin/report`, and raw downloads at `/admin/export.csv` and
+`/admin/export.json` — all sharing `?since&until&platform`, the downloads
+also `&wallet=<key>`. Route details in `services/lantern-api/README.md`.
+Offline:
 
 `npm run report:activity` (`scripts/report-activity.ts`) pulls the raw rows
 from `GET /v1/telemetry/export` (`TELEMETRY_ADMIN_TOKEN`, optional

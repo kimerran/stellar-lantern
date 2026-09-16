@@ -8,9 +8,13 @@ import { esc, CSS, type Row, type UserTrail } from '@lantern/telemetry-report';
 
 // ── Model ────────────────────────────────────────────────────────────────────
 
-// One identity: the wallet address when any of its rows carry one (alpha
-// builds, #100), else the install id. The label is what the pages print — an
-// install id is never a label, only the anonymous drill-down key.
+// One identity per ROW: the row's wallet address when it carries one (alpha
+// builds, #100), else its install id. Row-local on purpose: an install that
+// switches wallets shows up as two identities, and an install's rows sent
+// before it had a wallet stay with "User N" — nothing is re-attributed. The
+// label is what the pages print; an install id is never a label, only the
+// anonymous drill-down key. `identityKey` is the single definition, shared
+// with the row filter in admin.ts so a drill-down and its download agree.
 export interface WalletSummary {
   key: string; // address or installId — the URL segment
   label: string; // "GA7Q…VSGZ" or "User N"
@@ -52,34 +56,30 @@ export interface Dashboard {
 const truncate = (a: string): string => `${a.slice(0, 4)}…${a.slice(-4)}`;
 const DAY_MS = 86_400_000;
 
-// installId → identity key, in first-seen order so "User N" is stable.
-function identities(rows: Row[]): { keyOf: Map<string, string>; labelOf: Map<string, string> } {
+export const identityKey = (r: Pick<Row, 'account' | 'installId'>): string =>
+  r.account ?? r.installId;
+
+// key → label, "User N" numbered in first-seen order so it is stable.
+function labels(rows: Row[]): Map<string, string> {
   const sorted = [...rows].sort((a, b) => a.ts.localeCompare(b.ts) || a.id - b.id);
-  const account = new Map<string, string>();
-  for (const r of sorted)
-    if (r.account && !account.has(r.installId)) account.set(r.installId, r.account);
-  const keyOf = new Map<string, string>();
   const labelOf = new Map<string, string>();
   let anon = 0;
   for (const r of sorted) {
-    if (keyOf.has(r.installId)) continue;
-    const acct = account.get(r.installId);
-    const key = acct ?? r.installId;
-    keyOf.set(r.installId, key);
-    if (!labelOf.has(key)) labelOf.set(key, acct ? truncate(acct) : `User ${++anon}`);
+    const key = identityKey(r);
+    if (!labelOf.has(key)) labelOf.set(key, r.account ? truncate(r.account) : `User ${++anon}`);
   }
-  return { keyOf, labelOf };
+  return labelOf;
 }
 
 export function summarizeWallets(rows: Row[]): WalletSummary[] {
-  const { keyOf, labelOf } = identities(rows);
+  const labelOf = labels(rows);
   const out = new Map<
     string,
     WalletSummary & { installSet: Set<string>; platformSet: Set<string>; latest: string }
   >();
   const sorted = [...rows].sort((a, b) => a.ts.localeCompare(b.ts) || a.id - b.id);
   for (const r of sorted) {
-    const key = keyOf.get(r.installId)!;
+    const key = identityKey(r);
     let w = out.get(key);
     if (!w) {
       w = {
@@ -104,7 +104,6 @@ export function summarizeWallets(rows: Row[]): WalletSummary[] {
       };
       out.set(key, w);
     }
-    if (r.account && !w.account) w.account = r.account;
     w.installSet.add(r.installId);
     w.platformSet.add(r.platform);
     if (r.ts >= w.latest) {
@@ -153,7 +152,6 @@ export function sortWallets(ws: WalletSummary[], by: WalletSort): WalletSummary[
 }
 
 export function dailySeries(rows: Row[], since: string, until: string): Daily[] {
-  const { keyOf } = identities(rows);
   const byDay = new Map<string, { events: number; sessions: number; wallets: Set<string> }>();
   const start = Date.parse(`${since}T00:00:00Z`);
   const end = Date.parse(`${until}T00:00:00Z`);
@@ -169,7 +167,7 @@ export function dailySeries(rows: Row[], since: string, until: string): Daily[] 
     if (!d) continue; // outside the window (rows are filtered by receivedAt; ts may straddle)
     d.events += 1;
     if (r.event === 'session_start') d.sessions += 1;
-    d.wallets.add(keyOf.get(r.installId)!);
+    d.wallets.add(identityKey(r));
   }
   return [...byDay.entries()].map(([day, d]) => ({
     day,
@@ -183,13 +181,12 @@ export function buildDashboard(rows: Row[], since: string, until: string): Dashb
   const ws = summarizeWallets(rows);
   const byPlatform: Record<string, number> = {};
   for (const w of ws) for (const p of w.platforms) byPlatform[p] = (byPlatform[p] ?? 0) + 1;
-  const { keyOf } = identities(rows);
   const ev = new Map<string, { count: number; wallets: Set<string> }>();
   const verdicts: Record<string, number> = {};
   for (const r of rows) {
     const e = ev.get(r.event) ?? { count: 0, wallets: new Set<string>() };
     e.count += 1;
-    e.wallets.add(keyOf.get(r.installId)!);
+    e.wallets.add(identityKey(r));
     ev.set(r.event, e);
     if (r.event === 'tx_scanned') {
       const risk = String(r.props.risk ?? 'unknown');
@@ -219,9 +216,8 @@ export function walletTrail(
 ): { summary: WalletSummary; trail: UserTrail; rows: Row[] } | null {
   const w = summarizeWallets(rows).find((x) => x.key === key);
   if (!w) return null;
-  const { keyOf } = identities(rows);
   const mine = rows
-    .filter((r) => keyOf.get(r.installId) === key)
+    .filter((r) => identityKey(r) === key)
     .sort((a, b) => a.ts.localeCompare(b.ts) || a.id - b.id);
   const trail: UserTrail = {
     label: w.label,
