@@ -1,7 +1,10 @@
 import { defineManifest } from '@crxjs/vite-plugin';
 
-// MV3 manifest. Minimal permissions per SPEC §8 / AGENT §5:
-// only `storage`, and host access limited to the Horizon + friendbot endpoints.
+// MV3 manifest. Minimal permissions per SPEC §8 / AGENT §5: only `storage`,
+// and host access limited to the Stellar endpoints (Horizon + friendbot) plus
+// ONE origin of our own — the Lantern API on Railway, which the opt-in
+// telemetry sink posts to (#81 / #88) and which will also serve the scanner's
+// explainer proxy (#84). Nothing else.
 export default defineManifest({
   manifest_version: 3,
   name: 'Lantern — Stellar Wallet',
@@ -32,6 +35,10 @@ export default defineManifest({
     'https://horizon-testnet.stellar.org/*',
     'https://horizon.stellar.org/*',
     'https://friendbot.stellar.org/*',
+    // The Lantern API (services/lantern-api): telemetry ingest (#88), and
+    // the explainer proxy once #84 lands. Keep in sync with
+    // VITE_TELEMETRY_INGEST_URL in release.yml / android.yml.
+    'https://lantern-api-production-3fad.up.railway.app/*',
   ],
   content_security_policy: {
     // frame-src 'self' allows the bundled mini-apps (Apps tab); `https:` is a

@@ -42,3 +42,9 @@ jobs:
 
       - name: Test
         run: npm test
+
+      # Flag dead-code-elimination proof (#81 / #88): builds with the demo
+      # and telemetry flags on and off and asserts the telemetry module and
+      # the ingest origin are ABSENT from a flag-off bundle.
+      - name: Prove flag-off bundles carry no telemetry
+        run: npm run verify:flags
