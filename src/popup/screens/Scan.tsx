@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { track } from '@core/telemetry';
 import { analyzeMessage, sampleVerdict, DEMO_FLAGGED_ADDRESSES } from '@core/scan';
 import type { MessageVerdict, RiskLevel } from '@core/scan';
 import { Button } from '../components/Button';
@@ -20,6 +21,7 @@ export function Scan({ onBack }: { onBack: () => void }) {
   function check() {
     setChecking(true);
     const verdict = analyzeMessage(text);
+    if (__FEATURE_TELEMETRY__) track.messageScanned(verdict);
     // brief delay so it reads as an on-device check
     setTimeout(() => {
       setResult(verdict);

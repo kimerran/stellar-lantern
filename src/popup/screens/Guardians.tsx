@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { track } from '@core/telemetry';
 import { BASE_FEE } from '@stellar/stellar-sdk';
 import type { NetworkConfig } from '@shared/constants';
 import { sendMessage } from '@shared/messages';
@@ -170,6 +171,7 @@ export function Guardians({ address, network, onBack }: Props) {
         networkPassphrase: network.passphrase,
         context: { network: network.id, fromAddress: address },
       });
+      if (__FEATURE_TELEMETRY__) track.txScanned(scanVerdict);
 
       setReview({
         xdr,
@@ -202,6 +204,18 @@ export function Guardians({ address, network, onBack }: Props) {
     });
     setSubmitting(false);
     if (res.ok) {
+      // A first-time setup adds every guardian; an edit adds only the diff.
+      if (
+        __FEATURE_TELEMETRY__ &&
+        (!editing ||
+          !current ||
+          guardianDiff(
+            current.guardians.map((g) => g.key),
+            filled,
+          ).added.length > 0)
+      ) {
+        track.guardianAdded();
+      }
       setTxHash(res.data.hash);
       setStep('success');
     } else if (res.code === 'LOCKED') {

@@ -41,6 +41,27 @@ function build(demoOn) {
   });
 }
 
+// Telemetry (#87): the whole subsystem must leave the bundle with the flag
+// off. The callers import @core/telemetry statically, so this is the proof
+// that the `__FEATURE_TELEMETRY__` guards plus tree-shaking actually strip
+// it — the install-id storage key only exists in that module.
+const TELEMETRY_MARKER = 'lantern.telemetry.installId';
+const TELEMETRY_INGEST = 'https://ingest.lantern.invalid/v1/telemetry';
+function buildTelemetry(on) {
+  execSync('npx vite build', {
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      VITE_FEATURE_DEMO_AFFORDANCES: 'false',
+      VITE_FEATURE_TELEMETRY: on ? 'true' : 'false',
+      ...(on ? { VITE_TELEMETRY_INGEST_URL: TELEMETRY_INGEST } : {}),
+    },
+  });
+}
+function bundleHas(text) {
+  return jsFiles(DIST).some((f) => readFileSync(f, 'utf8').includes(text));
+}
+
 console.log('Building with VITE_FEATURE_DEMO_AFFORDANCES=false …');
 build(false);
 const offHas = bundleHasMarker();
@@ -49,21 +70,49 @@ console.log('Building with VITE_FEATURE_DEMO_AFFORDANCES=true …');
 build(true);
 const onHas = bundleHasMarker();
 
+console.log('Building with VITE_FEATURE_TELEMETRY=true …');
+buildTelemetry(true);
+const telemetryOnHas = bundleHas(TELEMETRY_MARKER) && bundleHas(TELEMETRY_INGEST);
+
+console.log('Building with VITE_FEATURE_TELEMETRY=false …');
+buildTelemetry(false);
+const telemetryOffHas = bundleHas(TELEMETRY_MARKER) || bundleHas('/v1/telemetry');
+
 // Leave dist/ in the default (flag-off) state.
 build(false);
 
 let failed = false;
-if (offHas) {
-  console.error('✗ FAIL: demo forced-verdict/sample-gallery code is in the bundle with the flag OFF — no dead-code elimination.');
+if (telemetryOffHas) {
+  console.error('✗ FAIL: telemetry code or the ingest URL is in the bundle with TELEMETRY=false.');
   failed = true;
 } else {
-  console.log('✓ demo forced-verdict/sample-gallery code ABSENT with DEMO_AFFORDANCES=false (dead-code-eliminated).');
+  console.log('✓ telemetry ABSENT with TELEMETRY=false (dead-code-eliminated).');
+}
+if (!telemetryOnHas) {
+  console.error('✗ FAIL: telemetry absent with TELEMETRY=true — the marker or gate is wrong.');
+  failed = true;
+} else {
+  console.log('✓ telemetry present with TELEMETRY=true (sanity check).');
+}
+if (offHas) {
+  console.error(
+    '✗ FAIL: demo forced-verdict/sample-gallery code is in the bundle with the flag OFF — no dead-code elimination.',
+  );
+  failed = true;
+} else {
+  console.log(
+    '✓ demo forced-verdict/sample-gallery code ABSENT with DEMO_AFFORDANCES=false (dead-code-eliminated).',
+  );
 }
 if (!onHas) {
-  console.error('✗ FAIL: demo forced-verdict/sample-gallery code absent with the flag ON — the marker or gate is wrong.');
+  console.error(
+    '✗ FAIL: demo forced-verdict/sample-gallery code absent with the flag ON — the marker or gate is wrong.',
+  );
   failed = true;
 } else {
-  console.log('✓ demo forced-verdict/sample-gallery code present with DEMO_AFFORDANCES=true (sanity check).');
+  console.log(
+    '✓ demo forced-verdict/sample-gallery code present with DEMO_AFFORDANCES=true (sanity check).',
+  );
 }
 
 process.exit(failed ? 1 : 0);

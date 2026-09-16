@@ -17,6 +17,7 @@ export { validateEnvelope, validateEvent } from './validate';
 export { createSink } from './sink';
 export { getInstallId, clearInstallId, INSTALL_ID_KEY } from './install-id';
 export { CONSENT_COPY, shouldShowConsentPrompt, markConsentPromptSeen } from './consent';
+export { track } from './emits';
 
 let sink: Sink | null = null;
 let consent = false;
@@ -24,6 +25,11 @@ let consent = false;
 export interface StartOptions {
   ingestUrl: string;
   appVersion: string;
+  // Sink timing. The popup keeps the defaults (batch 20 / 30 s); the MV3
+  // service worker passes flushAt: 1 because Chrome ends an idle worker
+  // after ~30 s and a pending timer does not keep it alive.
+  flushAt?: number;
+  flushAfterMs?: number;
 }
 
 // Call once at app start, under `if (__FEATURE_TELEMETRY__)`. Safe to call
@@ -43,6 +49,8 @@ export async function startTelemetry(opts: StartOptions): Promise<void> {
     network: () => (network === 'PUBLIC' ? 'public' : 'testnet'),
     installId: getInstallId,
     hasConsent: () => consent,
+    ...(opts.flushAt !== undefined ? { flushAt: opts.flushAt } : {}),
+    ...(opts.flushAfterMs !== undefined ? { flushAfterMs: opts.flushAfterMs } : {}),
   });
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => {
@@ -53,6 +61,45 @@ export async function startTelemetry(opts: StartOptions): Promise<void> {
 
 export function emit(event: TelemetryEvent): void {
   sink?.emit(event);
+}
+
+const FIRST_OPEN_KEY = 'lantern.telemetry.firstOpenSeen';
+
+// The app's own start-up: read the ingest URL from the build env, start the
+// sink, then `app_first_open` exactly once per install and `session_start`
+// every open. Call under `if (__FEATURE_TELEMETRY__)` from an entry point.
+export async function bootTelemetry(opts: {
+  appVersion: string;
+  ingestUrl?: string;
+  session?: boolean;
+  flushAt?: number;
+  flushAfterMs?: number;
+}): Promise<void> {
+  const ingestUrl =
+    opts.ingestUrl ??
+    (import.meta.env as Record<string, string | undefined>).VITE_TELEMETRY_INGEST_URL;
+  if (!ingestUrl) return; // no endpoint configured: stay off
+  await startTelemetry({
+    ingestUrl,
+    appVersion: opts.appVersion,
+    ...(opts.flushAt !== undefined ? { flushAt: opts.flushAt } : {}),
+    ...(opts.flushAfterMs !== undefined ? { flushAfterMs: opts.flushAfterMs } : {}),
+  });
+  if (opts.session === false) return;
+  // Without consent nothing would be buffered, so the first-open marker is
+  // only written once the event can actually go out — the first *consented*
+  // open is the install's first open, as far as the report can know.
+  if (!consent) return;
+  const kv = await getKV();
+  if (!(await kv.get(FIRST_OPEN_KEY))) {
+    // Consent may have been revoked while the KV reads awaited; the marker
+    // is written only after the event has actually been accepted, so a
+    // later consented boot still sends the first open.
+    if (!consent) return;
+    emit({ name: 'app_first_open', props: {} });
+    await kv.set(FIRST_OPEN_KEY, '1');
+  }
+  if (consent) emit({ name: 'session_start', props: {} });
 }
 
 export async function grantConsent(): Promise<void> {

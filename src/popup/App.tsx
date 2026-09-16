@@ -1,4 +1,6 @@
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { bootTelemetry } from '@core/telemetry';
+import { APP_VERSION } from '@shared/version';
 import { useWallet } from './hooks/useWallet';
 import { useSettings } from './hooks/useSettings';
 import { resolveNetworkConfig } from '@shared/network';
@@ -47,6 +49,11 @@ function Splash() {
 
 export function App() {
   const { status, refresh, lock } = useWallet();
+  // Telemetry (#87): start the consent-gated sink once per popup/app open.
+  // A hard no-op until the user opts in (Settings → Privacy).
+  useEffect(() => {
+    if (__FEATURE_TELEMETRY__) void bootTelemetry({ appVersion: APP_VERSION });
+  }, []);
   const {
     settings,
     setNetwork,

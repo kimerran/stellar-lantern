@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { track } from '@core/telemetry';
 import type { NetworkConfig } from '@shared/constants';
 import { sendMessage } from '@shared/messages';
 import { getServer } from '@core/stellar/client';
@@ -211,6 +212,7 @@ export function Earn({ address, network, onBack, embedded }: Props) {
         networkPassphrase: network.passphrase,
         context: { network: network.id, fromAddress: address },
       });
+      if (__FEATURE_TELEMETRY__) track.txScanned(verdict);
       setReview({ xdr: prepared.xdr, verdict });
       setConfirmText('');
       setStep('review');
@@ -233,6 +235,7 @@ export function Earn({ address, network, onBack, embedded }: Props) {
     });
     setSubmitting(false);
     if (res.ok) {
+      if (__FEATURE_TELEMETRY__ && sel) track.earnAction(sel.action);
       setTxHash(res.data.hash);
       setStep('success');
     } else if (res.code === 'LOCKED') {
