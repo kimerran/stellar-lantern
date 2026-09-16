@@ -128,7 +128,7 @@ describe('/admin login', () => {
 
     const page = await h.get('/admin', h.cookieFrom(ok));
     expect(page.status).toBe(200);
-    expect(await page.text()).toContain('activity report');
+    expect(await page.text()).toContain('Lantern</span> analytics');
   });
 
   it('rejects a forged, foreign, tampered or expired cookie, and logout clears the session', async () => {
@@ -162,45 +162,169 @@ describe('/admin login', () => {
   });
 });
 
-describe('/admin report', () => {
-  it('renders the report for the default window with the address label, and honours filters', async () => {
+describe('/admin pages', () => {
+  it('dashboard: tiles, daily chart, event + verdict tables, honours the window and platform', async () => {
     const h = harness();
     await h.seed();
     const cookie = h.cookieFrom(await h.login(TOKEN));
     const page = await (await h.get('/admin', cookie)).text();
-    expect(page).toContain('GA7Q…VSGZ'); // alpha install labelled by address
-    expect(page).toContain(ADDRESS);
-    expect(page).toContain('User 1'); // the anonymous android install
-    expect(page).not.toContain(UUID_A);
-    expect(page).not.toContain(UUID_B);
+    expect(page).not.toContain('<script');
     expect(page).toContain('<form class="bar"'); // the toolbar
     expect(page).toContain('value="2026-08-21"'); // default since = now − 30 d
-    expect(page).not.toContain('v0.0.9'); // the July row is outside the window
-
-    const wallet = await (await h.get(`/admin?account=${ADDRESS}`, cookie)).text();
-    expect(wallet).toContain('GA7Q…VSGZ');
-    expect(wallet).not.toContain('User 1');
+    expect(page).toContain('<b>2</b><span>wallets</span>');
+    expect(page).toContain('<b>2</b><span>sessions</span>');
+    expect(page).toContain('<b>1</b><span>transactions signed</span>');
+    expect(page).toContain('<svg class="chart"'); // daily activity
+    expect(page).toContain('2026-09-10: 2 events, 1 sessions, 1 wallets'); // bar tooltip
+    expect(page).toContain(
+      '<code>session_start</code></td><td class="n">2</td><td class="n">2</td>',
+    );
+    expect(page).toContain('no transaction scans yet');
+    expect(page).not.toContain(UUID_A);
+    expect(page).not.toContain(UUID_B);
 
     const android = await (await h.get('/admin?platform=android', cookie)).text();
-    expect(android).toContain('User 1');
-    expect(android).not.toContain('GA7Q…VSGZ');
-
-    const wide = await (await h.get('/admin?since=2026-06-01&until=2026-10-01', cookie)).text();
-    expect(wide).toContain('v0.0.9');
+    expect(android).toContain('<b>1</b><span>wallets</span>');
+    expect(android).toContain('<b>0</b><span>transactions signed</span>');
 
     const none = await (await h.get('/admin?since=2027-01-01&until=2027-02-01', cookie)).text();
     expect(none).toContain('No activity in this window');
+    expect(none).toContain('<svg class="chart"'); // an empty chart still renders
+  });
+
+  it('wallets: one row per identity, links to the drill-down, sortable', async () => {
+    const h = harness();
+    await h.seed();
+    const cookie = h.cookieFrom(await h.login(TOKEN));
+    const page = await (await h.get('/admin/wallets', cookie)).text();
+    expect(page).not.toContain('<script');
+    expect(page).toContain(`href="/admin/wallets/${ADDRESS}?`);
+    expect(page).toContain(`href="/admin/wallets/${UUID_B}?`); // the anonymous key is a link target…
+    expect(page).toContain('>User 1</a> <span class="pill">anonymous</span>'); // …never a label
+    expect(page).toContain('>GA7Q…VSGZ</a>');
+    expect(page).toContain('2 wallets');
+    // Default sort is last seen (desc): the android install (09-11) comes first.
+    expect(page.indexOf('User 1')).toBeLessThan(page.indexOf('GA7Q…VSGZ'));
+    const byEvents = await (await h.get('/admin/wallets?sort=events', cookie)).text();
+    expect(byEvents.indexOf('GA7Q…VSGZ')).toBeLessThan(byEvents.indexOf('User 1'));
+    expect(byEvents).toContain('class="on">events</a>');
+    const junk = await (await h.get('/admin/wallets?sort=drop%20table', cookie)).text();
+    expect(junk).toContain('class="on">last seen</a>');
+  });
+
+  it('drill-down: an address, an anonymous install, and an unknown key', async () => {
+    const h = harness();
+    await h.seed();
+    const cookie = h.cookieFrom(await h.login(TOKEN));
+    const a = await h.get(`/admin/wallets/${ADDRESS}`, cookie);
+    expect(a.status).toBe(200);
+    const at = await a.text();
+    expect(at).toContain(ADDRESS);
+    expect(at).toContain('<b>1</b><span>sessions</span>');
+    expect(at).toContain('<b>1</b><span>tx signed</span>');
+    expect(at).toContain('<code>tx_signed</code> (kind=sign_and_submit, ok=true)');
+    expect(at).toContain(
+      `/admin/export.csv?since=2026-08-21&amp;until=2026-09-21&amp;wallet=${ADDRESS}`,
+    );
+    expect(at).not.toContain(UUID_A);
+
+    const b = await h.get(`/admin/wallets/${UUID_B}`, cookie);
+    expect(b.status).toBe(200);
+    const bt = await b.text();
+    expect(bt).toContain('User 1');
+    expect(bt).toContain('anonymous install');
+    expect(bt).toContain('<code>session_start</code>');
+
+    const missing = await h.get(`/admin/wallets/${'G' + 'A'.repeat(55)}`, cookie);
+    expect(missing.status).toBe(404);
+    expect(await missing.text()).toContain('No wallet with that key');
+    expect((await h.get('/admin/wallets/not-a-key', cookie)).status).toBe(404);
+  });
+
+  it('an install that switches wallets is two identities; its pre-wallet rows stay anonymous', async () => {
+    const h = harness();
+    const B2 = 'GDVEU3DD4KOFECV66VIHWEZOYX4ZKR3WV27L464SIIPOU2IUI3JCZA57';
+    const at = (d: string) => new Date(d);
+    await h.store.insert(
+      [
+        {
+          installId: UUID_A,
+          platform: 'extension',
+          appVersion: '0.1.0',
+          network: 'testnet',
+          event: 'session_start',
+          props: {},
+          ts: at('2026-09-10T10:00:00Z'),
+          account: null,
+        },
+        {
+          installId: UUID_A,
+          platform: 'extension',
+          appVersion: '0.1.0',
+          network: 'testnet',
+          event: 'session_start',
+          props: {},
+          ts: at('2026-09-11T10:00:00Z'),
+          account: ADDRESS,
+        },
+        {
+          installId: UUID_A,
+          platform: 'extension',
+          appVersion: '0.1.0',
+          network: 'testnet',
+          event: 'tx_signed',
+          props: { kind: 'sign_only', ok: true },
+          ts: at('2026-09-12T10:00:00Z'),
+          account: B2,
+        },
+      ],
+      at('2026-09-12T10:00:00Z'),
+    );
+    const cookie = h.cookieFrom(await h.login(TOKEN));
+    const list = await (await h.get('/admin/wallets', cookie)).text();
+    expect(list).toContain('3 wallets');
+    expect((await h.get(`/admin/wallets/${B2}`, cookie)).status).toBe(200);
+    const b2 = (await (await h.get(`/admin/export.json?wallet=${B2}`, cookie)).json()) as {
+      rows: Array<{ event: string }>;
+    };
+    expect(b2.rows.map((r) => r.event)).toEqual(['tx_signed']);
+    const a1 = (await (await h.get(`/admin/export.json?wallet=${ADDRESS}`, cookie)).json()) as {
+      rows: unknown[];
+    };
+    expect(a1.rows).toHaveLength(1);
+    const anon = (await (await h.get(`/admin/export.json?wallet=${UUID_A}`, cookie)).json()) as {
+      rows: unknown[];
+    };
+    expect(anon.rows).toHaveLength(1);
+    // Unknown wallet on a download is a 404, never an empty file.
+    expect((await h.get(`/admin/export.csv?wallet=${'G' + 'B'.repeat(55)}`, cookie)).status).toBe(
+      404,
+    );
+  });
+
+  it('full report: still the emailed-style page, with the address label', async () => {
+    const h = harness();
+    await h.seed();
+    const cookie = h.cookieFrom(await h.login(TOKEN));
+    const page = await (await h.get('/admin/report', cookie)).text();
+    expect(page).toContain('activity report');
+    expect(page).toContain('GA7Q…VSGZ');
+    expect(page).toContain('User 1');
+    expect(page).not.toContain(UUID_A);
+    const one = await (await h.get(`/admin/report?wallet=${ADDRESS}`, cookie)).text();
+    expect(one).toContain('GA7Q…VSGZ');
+    expect(one).not.toContain('User 1');
   });
 
   it('serves the same rows as CSV with the account column', async () => {
     const h = harness();
     await h.seed();
     const cookie = h.cookieFrom(await h.login(TOKEN));
-    const res = await h.get(`/admin/export.csv?account=${ADDRESS}`, cookie);
+    const res = await h.get(`/admin/export.csv?wallet=${ADDRESS}`, cookie);
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/csv');
     expect(res.headers.get('content-disposition')).toContain(
-      'lantern-telemetry-2026-08-21_2026-09-21.csv',
+      'lantern-telemetry-GA7QYNF7-2026-08-21_2026-09-21.csv',
     );
     const lines = (await res.text()).trim().split('\n');
     expect(lines[0]).toBe(
@@ -210,6 +334,24 @@ describe('/admin report', () => {
     expect(lines[1]).toContain(ADDRESS);
     expect(lines[2]).toContain('"{""kind"":""sign_and_submit"",""ok"":true}"');
     expect((await h.get('/admin/export.csv')).status).toBe(401);
+  });
+
+  it('serves the same rows as JSON, whole window or one wallet (by address or install id)', async () => {
+    const h = harness();
+    await h.seed();
+    const cookie = h.cookieFrom(await h.login(TOKEN));
+    const all = (await (await h.get('/admin/export.json', cookie)).json()) as {
+      rows: Array<{ account: string | null; installId: string }>;
+    };
+    expect(all.rows).toHaveLength(3);
+    expect(all.rows.filter((r) => r.account === ADDRESS)).toHaveLength(2);
+    const one = (await (await h.get(`/admin/export.json?wallet=${UUID_B}`, cookie)).json()) as {
+      rows: unknown[];
+    };
+    expect(one.rows).toHaveLength(1);
+    const res = await h.get(`/admin/export.json?wallet=${ADDRESS}`, cookie);
+    expect(res.headers.get('content-disposition')).toContain('.json');
+    expect((await h.get('/admin/export.json')).status).toBe(401);
   });
 
   it('answers 503 with the login page when no database is configured', async () => {
@@ -227,18 +369,37 @@ describe('helpers', () => {
     expect(parseFilters({}, now)).toEqual({
       since: '2026-08-21',
       until: '2026-09-21',
-      account: '',
+      wallet: '',
       platform: '',
     });
     expect(
-      parseFilters({ since: '2026-01-01', until: 'nope', account: 'GABC', platform: 'ios' }, now),
+      parseFilters({ since: '2026-01-01', until: 'nope', wallet: 'GABC', platform: 'ios' }, now),
     ).toEqual({
       since: '2026-01-01',
       until: '2026-09-21',
-      account: '',
+      wallet: '',
       platform: '',
     });
-    expect(parseFilters({ account: ADDRESS, platform: 'android' }, now).account).toBe(ADDRESS);
+    // Not a calendar day, or an inverted window → the default window.
+    expect(parseFilters({ since: '2026-99-99', until: '2026-02-30' }, now)).toMatchObject({
+      since: '2026-08-21',
+      until: '2026-09-21',
+    });
+    expect(parseFilters({ since: '2026-09-10', until: '2026-09-01' }, now)).toMatchObject({
+      since: '2026-08-21',
+      until: '2026-09-21',
+    });
+    expect(parseFilters({ since: '2026-09-10', until: '2026-09-10' }, now)).toMatchObject({
+      since: '2026-08-21',
+      until: '2026-09-21',
+    });
+    expect(parseFilters({ since: '2024-02-29', until: '2024-03-01' }, now)).toMatchObject({
+      since: '2024-02-29',
+      until: '2024-03-01',
+    });
+    expect(parseFilters({ wallet: ADDRESS, platform: 'android' }, now).wallet).toBe(ADDRESS);
+    expect(parseFilters({ wallet: UUID_B }, now).wallet).toBe(UUID_B);
+    expect(parseFilters({ account: ADDRESS }, now).wallet).toBe(ADDRESS); // legacy name
   });
 
   it('toCsv escapes quotes, commas and newlines', () => {
