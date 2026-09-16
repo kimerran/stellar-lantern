@@ -2,7 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Settings } from '@shared/types';
 import type { NetworkId } from '@shared/constants';
 import { getSettings, setSettings, onSettingsChanged } from '@shared/storage';
-import { grantConsent, revokeConsentAndDelete, markConsentPromptSeen } from '@core/telemetry';
+import {
+  grantConsent,
+  revokeConsentAndDelete,
+  markConsentPromptSeen,
+  deleteAnalyticsData,
+} from '@core/telemetry';
 
 export function useSettings() {
   const [settings, setLocal] = useState<Settings | null>(null);
@@ -46,6 +51,13 @@ export function useSettings() {
     setLocal(await getSettings());
   }, []);
 
+  // Explicit "delete my data": independent of the current consent state.
+  const deleteAnalytics = useCallback(async () => {
+    if (!__FEATURE_TELEMETRY__) return;
+    await deleteAnalyticsData();
+    setLocal(await getSettings());
+  }, []);
+
   const dismissAnalyticsPrompt = useCallback(async () => {
     if (!__FEATURE_TELEMETRY__) return;
     await markConsentPromptSeen();
@@ -60,6 +72,7 @@ export function useSettings() {
     setHorizonOverrides,
     setRpcOverrides,
     setAnalyticsConsent,
+    deleteAnalytics,
     dismissAnalyticsPrompt,
   };
 }

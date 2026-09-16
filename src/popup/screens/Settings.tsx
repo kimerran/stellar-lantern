@@ -29,6 +29,7 @@ interface Props {
   setRpcOverrides: (o: SettingsType['rpcOverrides']) => void;
   // Analytics consent (#86); rendered only under __FEATURE_TELEMETRY__.
   setAnalyticsConsent?: (on: boolean) => Promise<void>;
+  deleteAnalytics?: () => Promise<void>;
 }
 
 const APP_VERSION = '0.1.0'; // package.json — Lantern is pre-1.0.
@@ -64,6 +65,7 @@ export function Settings({
   setHorizonOverrides,
   setRpcOverrides,
   setAnalyticsConsent,
+  deleteAnalytics,
 }: Props) {
   const toast = useToast();
   const content = (
@@ -103,11 +105,12 @@ export function Settings({
         />
       </Section>
 
-      {__FEATURE_TELEMETRY__ && setAnalyticsConsent && (
+      {__FEATURE_TELEMETRY__ && setAnalyticsConsent && deleteAnalytics && (
         <Section title="Privacy">
           <PrivacyRows
             consent={settings.analyticsConsent === true}
             setAnalyticsConsent={setAnalyticsConsent}
+            deleteAnalytics={deleteAnalytics}
             toast={toast}
           />
         </Section>
@@ -165,18 +168,20 @@ export function Settings({
 function PrivacyRows({
   consent,
   setAnalyticsConsent,
+  deleteAnalytics,
   toast,
 }: {
   consent: boolean;
   setAnalyticsConsent: (on: boolean) => Promise<void>;
+  deleteAnalytics: () => Promise<void>;
   toast: (msg: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  async function run(on: boolean, done: string) {
+  async function run(action: () => Promise<void>, done: string) {
     setBusy(true);
     try {
-      await setAnalyticsConsent(on);
+      await action();
       toast(done);
     } finally {
       setBusy(false);
@@ -191,7 +196,7 @@ function PrivacyRows({
         disabled={busy}
         onClick={() =>
           void run(
-            !consent,
+            () => setAnalyticsConsent(!consent),
             consent ? 'Usage data sharing is off.' : 'Thanks — sharing anonymous usage data.',
           )
         }
@@ -237,7 +242,7 @@ function PrivacyRows({
             Keep
           </Button>
           <Button
-            onClick={() => void run(false, 'Deletion requested. Sharing is off.')}
+            onClick={() => void run(deleteAnalytics, 'Deletion requested. Sharing is off.')}
             loading={busy}
           >
             Delete

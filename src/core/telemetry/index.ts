@@ -7,9 +7,9 @@
 // until it is true.
 
 import { getSettings, onSettingsChanged, setSettings } from '@shared/storage';
-import { isNativePlatform } from '@shared/kv';
+import { getKV, isNativePlatform } from '@shared/kv';
 import { createSink, type Sink } from './sink';
-import { clearInstallId, getInstallId } from './install-id';
+import { clearInstallId, getInstallId, INSTALL_ID_KEY } from './install-id';
 import type { TelemetryEvent } from './events';
 
 export type { TelemetryEvent, Envelope, StampedEvent, EventName } from './events';
@@ -73,6 +73,19 @@ export async function revokeConsentAndDelete(): Promise<void> {
   await setSettings({ analyticsConsent: false, analyticsPromptSeen: true });
   consent = false;
   if (had) await sink?.requestDeletion();
+  await clearInstallId();
+}
+
+// "Delete my data", explicitly: keyed on whether this install has an id at
+// all — not on the in-memory consent — so a user whose earlier revoke failed
+// or was interrupted can retry, and a never-opted-in install (no id) makes
+// no request. Always ends with consent off and the id forgotten.
+export async function deleteAnalyticsData(): Promise<void> {
+  const kv = await getKV();
+  const hadId = (await kv.get(INSTALL_ID_KEY)) !== null;
+  await setSettings({ analyticsConsent: false, analyticsPromptSeen: true });
+  consent = false;
+  if (hadId) await sink?.requestDeletion();
   await clearInstallId();
 }
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { __setKV, type KV } from '@shared/kv';
-import { getSettings } from '@shared/storage';
+import { getSettings, setSettings } from '@shared/storage';
 import {
   CONSENT_COPY,
   shouldShowConsentPrompt,
@@ -8,16 +8,21 @@ import {
   startTelemetry,
   grantConsent,
   revokeConsentAndDelete,
+  deleteAnalyticsData,
+  getInstallId,
+  INSTALL_ID_KEY,
   __resetTelemetry,
 } from '@core/telemetry';
+import promptSrc from '../src/popup/screens/AnalyticsPrompt.tsx?raw';
 import telemetryDoc from '../docs/telemetry.md?raw';
 
 // The consent surface (#86): the once-only prompt rule, the transitions
 // through the real Settings record, and the copy against docs/telemetry.md.
 
-function memKV(): KV {
+function memKV(): KV & { store: Map<string, string> } {
   const store = new Map<string, string>();
   return {
+    store,
     get: async (k) => store.get(k) ?? null,
     set: async (k, v) => void store.set(k, v),
     remove: async (k) => void store.delete(k),
@@ -69,6 +74,77 @@ describe('shouldShowConsentPrompt', () => {
     } finally {
       globalThis.fetch = realFetch;
     }
+  });
+});
+
+describe('deleteAnalyticsData (explicit "Delete my data")', () => {
+  function stubFetch() {
+    const calls: Array<{ method: string; body: string }> = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (_u: unknown, init?: RequestInit) => {
+      calls.push({ method: init?.method ?? 'GET', body: String(init?.body) });
+      return new Response('', { status: 204 });
+    }) as typeof fetch;
+    return { calls, restore: () => void (globalThis.fetch = realFetch) };
+  }
+
+  it('sends the deletion request whenever an install id exists — even with consent already off', async () => {
+    const kv = memKV();
+    __setKV(kv);
+    const { calls, restore } = stubFetch();
+    try {
+      await startTelemetry({
+        ingestUrl: 'https://ingest.lantern.invalid/v1/telemetry',
+        appVersion: '0.1.0',
+      });
+      await grantConsent();
+      const id = await getInstallId();
+      // A revoke that never reached the server: consent is off, the id remains.
+      await setSettings({ analyticsConsent: false });
+      kv.store.set(INSTALL_ID_KEY, id);
+      __resetTelemetry();
+      await startTelemetry({
+        ingestUrl: 'https://ingest.lantern.invalid/v1/telemetry',
+        appVersion: '0.1.0',
+      });
+      const before = calls.length;
+      await deleteAnalyticsData();
+      const del = calls.slice(before).find((c) => c.method === 'DELETE');
+      expect(del).toBeDefined();
+      expect(del?.body).toContain(id);
+      expect(kv.store.has(INSTALL_ID_KEY)).toBe(false);
+      expect((await getSettings()).analyticsConsent).toBe(false);
+    } finally {
+      restore();
+    }
+  });
+
+  it('makes no request for an install that never had an id', async () => {
+    const kv = memKV();
+    __setKV(kv);
+    const { calls, restore } = stubFetch();
+    try {
+      await startTelemetry({
+        ingestUrl: 'https://ingest.lantern.invalid/v1/telemetry',
+        appVersion: '0.1.0',
+      });
+      await deleteAnalyticsData();
+      expect(calls).toHaveLength(0);
+      expect(kv.store.has(INSTALL_ID_KEY)).toBe(false);
+    } finally {
+      restore();
+    }
+  });
+});
+
+describe('the prompt is non-blocking', () => {
+  it('has no backdrop and no modal semantics; wallet controls stay reachable', () => {
+    expect(promptSrc).not.toMatch(/inset-0/);
+    expect(promptSrc).not.toMatch(/aria-modal/);
+    expect(promptSrc).not.toMatch(/role="dialog"/);
+    expect(promptSrc).not.toMatch(/bg-scrim/);
+    expect(promptSrc).toMatch(/pointer-events-none/); // the wrapper lets clicks through
+    expect(promptSrc).toMatch(/pointer-events-auto/); // only the card itself is interactive
   });
 });
 

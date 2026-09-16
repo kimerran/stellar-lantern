@@ -54,6 +54,7 @@ export function App() {
     setHorizonOverrides,
     setRpcOverrides,
     setAnalyticsConsent,
+    deleteAnalytics,
     dismissAnalyticsPrompt,
   } = useSettings();
   const { passkeyAccount, refresh: refreshPasskey } = usePasskeyAccount();
@@ -214,6 +215,7 @@ export function App() {
                 setHorizonOverrides={setHorizonOverrides}
                 setRpcOverrides={setRpcOverrides}
                 setAnalyticsConsent={setAnalyticsConsent}
+                deleteAnalytics={deleteAnalytics}
               />
             )}
           </div>
