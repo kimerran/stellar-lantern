@@ -68,6 +68,7 @@ export function createApp(opts: AppOptions): Hono {
       store,
       ...(env.telemetryAdminToken ? { adminToken: env.telemetryAdminToken } : {}),
       ...(opts.nowDate ? { now: opts.nowDate } : {}),
+      retentionDays: env.retentionDays,
       log,
     }),
   );

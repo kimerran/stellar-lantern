@@ -26,9 +26,7 @@ const env = (over: Record<string, string> = {}) =>
 const json = async (r: Response) => (await r.json()) as Record<string, unknown>;
 const envelope = (
   installId = UUID_A,
-  events: unknown[] = [
-    { name: 'wallet_created', props: { mode: 'create' }, ts: 1_700_000_000_000 },
-  ],
+  events: unknown[] = [{ name: 'wallet_created', props: { mode: 'create' }, ts: Date.now() }],
 ) => ({
   installId,
   platform: 'extension',
@@ -67,10 +65,11 @@ function harness(over: Record<string, string> = {}, nowDate?: () => Date) {
 describe('POST /v1/telemetry', () => {
   it('inserts one row per event from a valid envelope and returns 204', async () => {
     const h = harness();
+    const T1 = Date.now() + 1000;
     const res = await h.post(
       envelope(UUID_A, [
-        { name: 'wallet_created', props: { mode: 'create' }, ts: 1_700_000_000_000 },
-        { name: 'tx_scanned', props: { risk: 'low', action: 'allow' }, ts: 1_700_000_001_000 },
+        { name: 'wallet_created', props: { mode: 'create' }, ts: Date.now() },
+        { name: 'tx_scanned', props: { risk: 'low', action: 'allow' }, ts: T1 },
       ]),
     );
     expect(res.status).toBe(204);
@@ -83,7 +82,7 @@ describe('POST /v1/telemetry', () => {
       event: 'tx_scanned',
       props: { risk: 'low', action: 'allow' },
     });
-    expect(h.store.rows[1]?.ts.getTime()).toBe(1_700_000_001_000);
+    expect(h.store.rows[1]?.ts.getTime()).toBe(T1);
   });
 
   it('rejects with 400 and inserts nothing: address, amount, raw text, unknown event, extra field, bad id', async () => {
@@ -108,6 +107,28 @@ describe('POST /v1/telemetry', () => {
       expect(res.status, JSON.stringify(b).slice(0, 60)).toBe(400);
     }
     expect(h.store.rows).toHaveLength(0);
+  });
+
+  it('rejects an out-of-range timestamp with 400, inserting nothing — never a 503', async () => {
+    const h = harness({}, () => new Date(Date.UTC(2026, 8, 16)));
+    for (const ts of [1e300, -1e300, Date.UTC(2026, 8, 16) + 10 * 60_000, Date.UTC(2025, 0, 1)]) {
+      const res = await h.post(envelope(UUID_A, [{ name: 'session_start', props: {}, ts }]));
+      expect(res.status, String(ts)).toBe(400);
+      expect(await json(res), String(ts)).toMatchObject({
+        error: 'bad_input',
+        field: 'events.ts: out of range',
+      });
+    }
+    expect(h.store.rows).toHaveLength(0);
+    // Within the window (89 days old, 1 minute ahead) is fine.
+    const ok = await h.post(
+      envelope(UUID_A, [
+        { name: 'session_start', props: {}, ts: Date.UTC(2026, 8, 16) - 89 * 86_400_000 },
+        { name: 'session_start', props: {}, ts: Date.UTC(2026, 8, 16) + 60_000 },
+      ]),
+    );
+    expect(ok.status).toBe(204);
+    expect(h.store.rows).toHaveLength(2);
   });
 
   it('answers 503 when no store is configured, and on a store failure', async () => {
@@ -171,6 +192,9 @@ describe('GET /v1/telemetry/export', () => {
     const h = harness();
     expect((await h.exp('', null)).status).toBe(401);
     expect((await h.exp('', 'wrong')).status).toBe(401);
+    expect((await h.exp('', TOKEN.slice(0, -1))).status).toBe(401); // length mismatch
+    expect((await h.exp('', TOKEN + 'x')).status).toBe(401);
+    expect((await h.exp('', TOKEN)).status).toBe(200);
     const noToken = createApp({
       env: env({ TELEMETRY_ADMIN_TOKEN: '' }),
       store: memoryStore(),
@@ -218,7 +242,7 @@ describe('GET /v1/telemetry/export', () => {
     const events = Array.from({ length: EXPORT_PAGE + 1 }, (_, i) => ({
       name: 'session_start',
       props: {},
-      ts: 1_700_000_000_000 + i,
+      ts: Date.now() + i,
     }));
     // Envelopes are capped at 500 events; send three.
     await h.post(envelope(UUID_A, events.slice(0, 500)));

@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { timingSafeEqual } from 'node:crypto';
 import { validateEnvelope } from '@lantern/telemetry-validate';
 import type { NewRow, TelemetryStore } from '../telemetry/store';
 
@@ -16,7 +17,22 @@ export interface TelemetryDeps {
   store: TelemetryStore | null; // null = no DATABASE_URL → 503
   adminToken?: string;
   now?: () => Date;
+  // Events older than this (relative to receipt) are rejected, not stored:
+  // a timestamp the retention job would delete on its next run is not worth
+  // a row, and an absurd one (1e300) would be an Invalid Date at the driver.
+  retentionDays?: number;
   log: (line: Record<string, string | number>) => void;
+}
+
+const DAY_MS = 86_400_000;
+const FUTURE_SKEW_MS = 5 * 60_000;
+const DEFAULT_RETENTION_DAYS = 90;
+
+// Constant-time: a byte-by-byte early exit would let the token be probed.
+function tokenMatches(auth: string, adminToken: string): boolean {
+  const expected = Buffer.from(`Bearer ${adminToken}`);
+  const given = Buffer.from(auth);
+  return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -51,6 +67,14 @@ export function telemetryRoutes(deps: TelemetryDeps): Hono {
       return c.json({ error: 'bad_input' }, 400);
     }
     const receivedAt = now();
+    // The shared validator only requires a finite ts; bound it here so a
+    // malformed timestamp is a 400, not a driver error dressed as a 503.
+    const oldest = receivedAt.getTime() - (deps.retentionDays ?? DEFAULT_RETENTION_DAYS) * DAY_MS;
+    const newest = receivedAt.getTime() + FUTURE_SKEW_MS;
+    if (raw.events.some((e) => e.ts < oldest || e.ts > newest)) {
+      log('telemetry', 400, 'bad_input', started);
+      return c.json({ error: 'bad_input', field: 'events.ts: out of range' }, 400);
+    }
     const rows: NewRow[] = raw.events.map((e) => ({
       installId: raw.installId,
       platform: raw.platform,
@@ -100,7 +124,7 @@ export function telemetryRoutes(deps: TelemetryDeps): Hono {
   app.get('/v1/telemetry/export', async (c) => {
     const started = Date.now();
     const auth = c.req.header('authorization') ?? '';
-    if (!deps.adminToken || auth !== `Bearer ${deps.adminToken}`) {
+    if (!deps.adminToken || !tokenMatches(auth, deps.adminToken)) {
       log('telemetry_export', 401, 'unauthorized', started);
       return c.json({ error: 'unauthorized' }, 401);
     }
