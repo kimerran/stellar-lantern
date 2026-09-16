@@ -91,10 +91,14 @@ export async function bootTelemetry(opts: {
   if (!consent) return;
   const kv = await getKV();
   if (!(await kv.get(FIRST_OPEN_KEY))) {
-    await kv.set(FIRST_OPEN_KEY, '1');
+    // Consent may have been revoked while the KV reads awaited; the marker
+    // is written only after the event has actually been accepted, so a
+    // later consented boot still sends the first open.
+    if (!consent) return;
     emit({ name: 'app_first_open', props: {} });
+    await kv.set(FIRST_OPEN_KEY, '1');
   }
-  emit({ name: 'session_start', props: {} });
+  if (consent) emit({ name: 'session_start', props: {} });
 }
 
 export async function grantConsent(): Promise<void> {

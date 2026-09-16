@@ -40,12 +40,14 @@ export function anchorFlowEvent(
 ): TelemetryEvent {
   return { name: 'anchor_flow', props: { kind, stage } };
 }
-export function miniAppOpenedEvent(appId: string): TelemetryEvent {
-  return {
-    name: 'miniapp_opened',
-    props: { appId: MINI_APP_IDS.has(appId as MiniAppId) ? (appId as MiniAppId) : 'other' },
-  };
+// Only a BUNDLED app reports its id; a remote app — even one whose id is in
+// the directory — is 'other', because its id names a URL we do not control.
+export function miniAppOpenedEvent(appId: string, remote = false): TelemetryEvent {
+  const appIdOut: MiniAppId =
+    !remote && MINI_APP_IDS.has(appId as MiniAppId) ? (appId as MiniAppId) : 'other';
+  return { name: 'miniapp_opened', props: { appId: appIdOut } };
 }
+
 export function txSignedEvent(
   kind: 'sign_and_submit' | 'sign_only' | 'submit_only',
   ok: boolean,
@@ -63,7 +65,7 @@ export const track = {
   earnAction: (kind: 'supply' | 'withdraw') => emit(earnActionEvent(kind)),
   anchorFlow: (kind: 'deposit' | 'withdraw', stage: 'started' | 'completed' | 'failed') =>
     emit(anchorFlowEvent(kind, stage)),
-  miniAppOpened: (appId: string) => emit(miniAppOpenedEvent(appId)),
+  miniAppOpened: (appId: string, remote = false) => emit(miniAppOpenedEvent(appId, remote)),
   txSigned: (kind: 'sign_and_submit' | 'sign_only' | 'submit_only', ok: boolean) =>
     emit(txSignedEvent(kind, ok)),
   guardianAdded: () => emit({ name: 'guardian_added', props: {} }),

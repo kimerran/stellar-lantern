@@ -1,9 +1,11 @@
 # Telemetry — what Lantern collects, and what it never does
 
-**Status:** the event core (#83), the emit points (#87) and, in flight, the
-ingest backend (#85) and consent UI (#86) are implemented. The build flag
-(#88) is the last slice; until it lands the `telemetry` flag is **OFF** in
-every build and nothing here is active.
+**Status:** implemented and **default-off**. The event core (#83), the ingest
+backend (#85), the consent UI (#86) and the emit points (#87) are in place;
+telemetry is active only in a build made with `VITE_FEATURE_TELEMETRY=true`
+*and* after the user opts in. Every current release and Android build sets the
+flag `false`, so nothing here is active in them (#88 is the build slice that
+turns it on).
 
 This document is what we point the Chrome Web Store reviewer and grant
 reviewers at.

@@ -173,6 +173,7 @@ export function CashInOut({ address, network, onBack }: Props) {
       });
       setTransfer({ asset, direction, phase: 'interactive', url, id });
     } catch (e) {
+      if (__FEATURE_TELEMETRY__) track.anchorFlow(direction, 'failed');
       setTransfer({
         asset,
         direction,

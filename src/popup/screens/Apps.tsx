@@ -67,7 +67,7 @@ export function Apps({ address, network }: { address: string; network: NetworkId
   }
 
   function launchApp(app: MiniApp) {
-    if (__FEATURE_TELEMETRY__) track.miniAppOpened(app.id);
+    if (__FEATURE_TELEMETRY__) track.miniAppOpened(app.id, isRemoteMiniApp(app));
     // Remote apps load in the opaque-origin sandbox (like the URL bar), reaching
     // the wallet only through the scan-gated postMessage bridge. Bundled apps are
     // first-party pages. Either way, "favoriting" changes nothing about this.

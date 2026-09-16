@@ -20,6 +20,7 @@ import {
   txSignedEvent,
 } from '@core/telemetry/emits';
 import { analyzeMessage } from '@core/scan';
+import ts from 'typescript';
 // The screens, as text, for the source-level assertions.
 import sendSrc from '../src/popup/screens/Send.tsx?raw';
 import appsSrc from '../src/popup/screens/Apps.tsx?raw';
@@ -89,7 +90,8 @@ describe('emit helpers build exactly the specified events', () => {
       name: 'miniapp_opened',
       props: { appId: 'lumen-notes' },
     });
-    // A remote app, or anything not bundled, is 'other' — never a URL or a free id.
+    // Anything not bundled is 'other' — never a URL or a free id — and so is a
+    // REMOTE app even when its id is in the directory (lantern-demo is remote).
     expect(miniAppOpenedEvent('https://evil.example/app')).toEqual({
       name: 'miniapp_opened',
       props: { appId: 'other' },
@@ -98,6 +100,15 @@ describe('emit helpers build exactly the specified events', () => {
       name: 'miniapp_opened',
       props: { appId: 'other' },
     });
+    expect(miniAppOpenedEvent('lantern-demo', true)).toEqual({
+      name: 'miniapp_opened',
+      props: { appId: 'other' },
+    });
+    expect(miniAppOpenedEvent('lumen-notes', false)).toEqual({
+      name: 'miniapp_opened',
+      props: { appId: 'lumen-notes' },
+    });
+    expect(appsSrc).toMatch(/track\.miniAppOpened\(app\.id, isRemoteMiniApp\(app\)\)/);
   });
 
   it('Q4 activity', () => {
@@ -182,7 +193,11 @@ describe('every site emits through the helpers, under the flag', () => {
       cashSrc,
       /track\.anchorFlow\(transfer\.direction, final\.info\.kind === 'done' \? 'completed' : 'failed'\)/,
     ],
-    ['Apps', appsSrc, /__FEATURE_TELEMETRY__\) track\.miniAppOpened\(app\.id\)/],
+    [
+      'Apps',
+      appsSrc,
+      /__FEATURE_TELEMETRY__\) track\.miniAppOpened\(app\.id, isRemoteMiniApp\(app\)\)/,
+    ],
     ['Send scan', sendSrc, /__FEATURE_TELEMETRY__\) track\.txScanned\(scanVerdict\)/],
     ['Apps scan', appsSrc, /__FEATURE_TELEMETRY__\) track\.txScanned\(verdict\)/],
     ['Swap scan', swapSrc, /__FEATURE_TELEMETRY__\) track\.txScanned\(verdict\)/],
@@ -196,17 +211,73 @@ describe('every site emits through the helpers, under the flag', () => {
     ['handler submit_only ok', handlerSrc, /track\.txSigned\('submit_only', true\)/],
     ['handler submit_only fail', handlerSrc, /track\.txSigned\('submit_only', false\)/],
     ['App boot', appSrc, /__FEATURE_TELEMETRY__\) void bootTelemetry\(/],
-    [
-      'background boot',
-      backgroundSrc,
-      /bootTelemetry\(\{ appVersion: APP_VERSION, session: false, flushAt: 1 \}\)/,
-    ],
+    ['background boot', backgroundSrc, /telemetryReady\.then\(\(\) => handle\(req\)\)/],
   ];
   for (const [name, src, re] of sites) {
     it(name, () => {
       expect(src).toMatch(re);
     });
   }
+
+  it('every track.* call has an enclosing __FEATURE_TELEMETRY__ condition (TypeScript AST)', () => {
+    const sources: Array<[string, string]> = [
+      ['Send', sendSrc],
+      ['Apps', appsSrc],
+      ['Swap', swapSrc],
+      ['Earn', earnSrc],
+      ['Guardians', guardiansSrc],
+      ['CashInOut', cashSrc],
+      ['Scan', scanSrc],
+      ['Onboarding', onboardingSrc],
+      ['PasskeyOnboarding', passkeySrc],
+      ['SmartAccount', smartSrc],
+      ['CoSignRecovery', cosignSrc],
+      ['handler', handlerSrc],
+    ];
+    let total = 0;
+    for (const [name, src] of sources) {
+      const sf = ts.createSourceFile(
+        `${name}.tsx`,
+        src,
+        ts.ScriptTarget.ES2022,
+        true,
+        ts.ScriptKind.TSX,
+      );
+      const visit = (node: ts.Node): void => {
+        if (
+          ts.isCallExpression(node) &&
+          ts.isPropertyAccessExpression(node.expression) &&
+          ts.isIdentifier(node.expression.expression) &&
+          node.expression.expression.text === 'track'
+        ) {
+          total += 1;
+          let guarded = false;
+          for (let p: ts.Node | undefined = node.parent; p; p = p.parent) {
+            const cond = ts.isIfStatement(p)
+              ? p.expression
+              : ts.isConditionalExpression(p)
+                ? p.condition
+                : null;
+            if (
+              cond &&
+              /\b__FEATURE_TELEMETRY__\b/.test(cond.getText(sf)) &&
+              !/!\s*__FEATURE_TELEMETRY__/.test(cond.getText(sf))
+            ) {
+              guarded = true;
+              break;
+            }
+          }
+          expect(
+            guarded,
+            `${name}: ${node.getText(sf)} at line ${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1}`,
+          ).toBe(true);
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(sf);
+    }
+    expect(total).toBeGreaterThanOrEqual(23);
+  });
 
   it('no screen calls emit() directly, and every track.* call sits under the flag literal', () => {
     for (const [name, src] of [
@@ -306,6 +377,70 @@ describe('end to end through the sink', () => {
       expect(env.events).toEqual([
         { name: 'tx_signed', props: { kind: 'sign_and_submit', ok: true }, ts: expect.any(Number) },
       ]);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
+  it('the worker awaits the boot before handling: an event emitted right after boot starts is not lost', async () => {
+    const bodies: string[] = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (_u: unknown, init?: RequestInit) => {
+      bodies.push(String(init?.body));
+      return new Response('', { status: 204 });
+    }) as typeof fetch;
+    try {
+      await setSettings({ analyticsConsent: true });
+      const ready = bootTelemetry({
+        appVersion: '0.1.0',
+        ingestUrl: 'https://ingest.lantern.invalid/v1/telemetry',
+        session: false,
+        flushAt: 1,
+      }).catch(() => undefined);
+      // What the worker does: gate the request on the boot promise.
+      await ready.then(() => track.txSigned('sign_only', true));
+      await new Promise((r) => setTimeout(r, 0));
+      expect(bodies).toHaveLength(1);
+      expect(bodies[0]).toContain('sign_only');
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
+  it('the first-open marker is written only after the event is accepted', async () => {
+    const kv = memKV();
+    __setKV(kv);
+    // A chrome.storage stub that actually delivers onChanged, so the sink's
+    // consent follows the Settings record the way it does in the extension.
+    const listeners: Array<(changes: Record<string, { newValue: string }>, area: string) => void> =
+      [];
+    (globalThis as unknown as { chrome: unknown }).chrome = {
+      storage: {
+        onChanged: {
+          addListener: (cb: (typeof listeners)[number]) => listeners.push(cb),
+          removeListener: () => {},
+        },
+      },
+    };
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response('', { status: 204 })) as typeof fetch;
+    try {
+      await setSettings({ analyticsConsent: true });
+      const origGet = kv.get;
+      kv.get = async (k) => {
+        if (k === 'lantern.telemetry.firstOpenSeen') {
+          // Consent is revoked while the boot awaits this read.
+          await setSettings({ analyticsConsent: false });
+          const raw = await origGet('lantern.settings');
+          for (const l of listeners) l({ 'lantern.settings': { newValue: raw! } }, 'local');
+        }
+        return origGet(k);
+      };
+      await bootTelemetry({
+        appVersion: '0.1.0',
+        ingestUrl: 'https://ingest.lantern.invalid/v1/telemetry',
+      });
+      expect(await origGet('lantern.telemetry.firstOpenSeen')).toBeNull(); // not marked: nothing was sent
     } finally {
       globalThis.fetch = realFetch;
     }
