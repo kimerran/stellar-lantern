@@ -9,8 +9,9 @@ export type Network = 'testnet' | 'public';
 export type RiskLevel = 'low' | 'medium' | 'high';
 export type ScanAction = 'allow' | 'warn' | 'block_confirm';
 
-// Bundled mini-app ids only (src/core/miniapps directory) — never a URL.
-export type MiniAppId = 'blockhub' | 'stellar-expert' | 'soroswap' | 'blend' | 'other';
+// Bundled mini-app ids only (src/core/miniapps/directory.ts) — never a URL.
+// Anything not in this list is reported as 'other'.
+export type MiniAppId = 'stardust-faucet' | 'lumen-notes' | 'lantern-demo' | 'other';
 
 export type TelemetryEvent =
   // Q1 — onboarding
@@ -51,7 +52,7 @@ export const EVENT_SCHEMA: Record<EventName, Record<string, readonly string[] | 
   earn_action: { kind: ['supply', 'withdraw'] },
   guardian_added: {},
   anchor_flow: { kind: ['deposit', 'withdraw'], stage: ['started', 'completed', 'failed'] },
-  miniapp_opened: { appId: ['blockhub', 'stellar-expert', 'soroswap', 'blend', 'other'] },
+  miniapp_opened: { appId: ['stardust-faucet', 'lumen-notes', 'lantern-demo', 'other'] },
   tx_signed: { kind: ['sign_and_submit', 'sign_only', 'submit_only'], ok: 'boolean' },
   tx_scanned: { risk: ['low', 'medium', 'high'], action: ['allow', 'warn', 'block_confirm'] },
   high_risk_gated: { risk: ['low', 'medium', 'high'] },

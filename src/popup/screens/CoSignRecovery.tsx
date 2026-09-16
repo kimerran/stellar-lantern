@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { track } from '@core/telemetry';
 import type { NetworkConfig } from '@shared/constants';
 import { sendMessage } from '@shared/messages';
 import { scan } from '@core/scan';
@@ -52,7 +53,9 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
       return;
     }
     setError(null);
-    setVerdict(scan({ xdr: xdr.trim(), networkPassphrase: network.passphrase, context: { network: network.id, fromAddress: address } }));
+    const v = scan({ xdr: xdr.trim(), networkPassphrase: network.passphrase, context: { network: network.id, fromAddress: address } });
+    if (__FEATURE_TELEMETRY__) track.txScanned(v);
+    setVerdict(v);
     setConfirmText('');
     setStep('review');
   }

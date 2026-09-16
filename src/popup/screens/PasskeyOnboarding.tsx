@@ -3,6 +3,7 @@
 // device passkey IS the signer, and the on-chain smart account verifies its
 // WebAuthn assertions. Testnet-only (friendbot pays the deploy fees).
 import { useState } from 'react';
+import { track } from '@core/telemetry';
 import { NETWORKS } from '@shared/constants';
 import { sendMessage } from '@shared/messages';
 import { setPasskeyAccount } from '@shared/storage';
@@ -54,6 +55,7 @@ export function PasskeyOnboarding({ onBack, onDone }: Props) {
     }
     await setPasskeyAccount(res.record);
     setProgress('done');
+    if (__FEATURE_TELEMETRY__) track.walletCreated('passkey');
     onDone();
   }
 

@@ -1,9 +1,11 @@
 # Telemetry — what Lantern collects, and what it never does
 
-**Status:** the event core, consent gate and privacy guarantees (#83) and the
-ingest backend (#85) are implemented. The Settings toggle (#86), the emit
-points (#87) and the build flag (#88) are follow-up slices; until they land
-the `telemetry` flag is **OFF** in every build and nothing here is active.
+**Status:** implemented and **default-off**. The event core (#83), the ingest
+backend (#85), the consent UI (#86) and the emit points (#87) are in place;
+telemetry is active only in a build made with `VITE_FEATURE_TELEMETRY=true`
+*and* after the user opts in. Every current release and Android build sets the
+flag `false`, so nothing here is active in them (#88 is the build slice that
+turns it on).
 
 This document is what we point the Chrome Web Store reviewer and grant
 reviewers at.
@@ -46,7 +48,7 @@ report never prints the install UUID — it renders installs as "User 1",
 
 | event | props | answers |
 |---|---|---|
-| `app_first_open` | — | Q1 onboarding |
+| `app_first_open` | — (once per install, on the first consented open) | Q1 onboarding |
 | `session_start` | — | Q2 usage |
 | `wallet_created` | `mode: create \| import \| passkey` | Q1 |
 | `message_scanned` | `risk: low \| medium \| high` | Q2 |
@@ -54,7 +56,7 @@ report never prints the install UUID — it renders installs as "User 1",
 | `earn_action` | `kind: supply \| withdraw` | Q2 |
 | `guardian_added` | — | Q2 |
 | `anchor_flow` | `kind: deposit \| withdraw`, `stage: started \| completed \| failed` | Q2 |
-| `miniapp_opened` | `appId: blockhub \| stellar-expert \| soroswap \| blend \| other` (bundled ids only, never a URL) | Q2 |
+| `miniapp_opened` | `appId: stardust-faucet \| lumen-notes \| lantern-demo \| other` (bundled ids only; anything else — including any remote app — is `other`, never a URL) | Q2 |
 | `tx_signed` | `kind: sign_and_submit \| sign_only \| submit_only`, `ok: boolean` | Q4 |
 | `tx_scanned` | `risk`, `action: allow \| warn \| block_confirm` | Q4 |
 | `high_risk_gated` | `risk` | Q4 |

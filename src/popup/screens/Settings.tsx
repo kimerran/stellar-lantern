@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { APP_VERSION } from '@shared/version';
 import type { NetworkId } from '@shared/constants';
 import { NETWORKS } from '@shared/constants';
 import type { Settings as SettingsType } from '@shared/types';
@@ -28,7 +29,6 @@ interface Props {
   setRpcOverrides: (o: SettingsType['rpcOverrides']) => void;
 }
 
-const APP_VERSION = '0.1.0'; // package.json — Lantern is pre-1.0.
 
 // Auto-lock presets (minutes). 0 = never (armAutoLock leaves the timer disarmed).
 const AUTO_LOCK_OPTIONS: { value: number; label: string }[] = [

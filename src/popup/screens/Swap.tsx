@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { track } from '@core/telemetry';
 import { BASE_FEE } from '@stellar/stellar-sdk';
 import type { NetworkConfig } from '@shared/constants';
 import type { AssetBalance } from '@shared/types';
@@ -218,6 +219,7 @@ export function Swap({ address, network, onBack }: Props) {
           spendableXlm: sendBal.isNative ? spendable : undefined,
         },
       });
+      if (__FEATURE_TELEMETRY__) track.txScanned(verdict);
 
       setReview({
         xdr,
@@ -251,6 +253,7 @@ export function Swap({ address, network, onBack }: Props) {
     });
     setSubmitting(false);
     if (res.ok) {
+      if (__FEATURE_TELEMETRY__) track.swapExecuted(review.engine);
       setTxHash(res.data.hash);
       setStep('success');
     } else if (res.code === 'LOCKED') {

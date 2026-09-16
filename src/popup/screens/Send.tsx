@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { track } from '@core/telemetry';
 import { BASE_FEE } from '@stellar/stellar-sdk';
 import type { NetworkConfig } from '@shared/constants';
 import type { AssetBalance } from '@shared/types';
@@ -191,6 +192,7 @@ export function Send({ address, network, onDone }: Props) {
         memo: memo.trim(),
         fee: formatAmount(String(Number(baseFee) / 1e7)),
       });
+      if (__FEATURE_TELEMETRY__) track.txScanned(scanVerdict);
       setVerdict(scanVerdict);
       setConfirmText('');
       setStep('review');
