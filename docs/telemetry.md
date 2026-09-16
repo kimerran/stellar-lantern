@@ -103,6 +103,23 @@ Raw per-install events for **90 days**, then deleted — enforced by the Lantern
 API's retention job (`services/lantern-api`, #85). Rows live in Postgres on
 Railway, under our control; no third party holds the data.
 
+## The report
+
+`npm run report:activity` (`scripts/report-activity.ts`) pulls the raw rows
+from `GET /v1/telemetry/export` (`TELEMETRY_ADMIN_TOKEN`, optional
+`--since` / `--until`) and writes **one self-contained file**,
+`dist-report/index.html`: inline CSS in the Lantern palette, no script, no
+external stylesheet, font, image or fetch — it opens from `file://` and
+survives being emailed. Sections: summary (window, distinct installs, by
+platform, by network), Q1 onboarded by mode, Q2 event × count × distinct
+installs, Q3 per-install trails as "User 1", "User 2", … in first-seen order
+(the UUID never appears — asserted), Q4 transaction and scan counts by
+platform with the registry's on-chain `Count` (distinct reported subjects)
+read fee-free as a cross-check. `--format=json` emits the same numbers for
+diffing between periods; `--input export.jsonl` renders a saved export
+offline. Zero events renders a clean empty state. `dist-report/` is
+git-ignored: it contains real user activity.
+
 ## Build plumbing
 
 - `VITE_FEATURE_TELEMETRY` (`__FEATURE_TELEMETRY__`), default `false`;
