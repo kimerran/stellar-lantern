@@ -68,9 +68,11 @@ integration test (`test/pg-store.test.ts`) runs only when you point
 The activity report, served. `GET /admin` shows a one-field login (the
 `TELEMETRY_ADMIN_TOKEN`); a right token sets a session cookie
 (`lantern_admin`: HttpOnly, Secure, SameSite=Strict, 12 h, `Path=/admin`)
-whose value is an HMAC of the token under a nonce minted at boot — the cookie
-never carries the token, a restart invalidates every session, and a leaked
-cookie cannot be replayed against `/v1/telemetry/export`. With a session,
+whose value is `<expiry>.<HMAC(nonce, token.expiry)>` with the nonce minted at
+boot — the cookie never carries the token, the expiry is enforced server-side
+(a copied header dies after 12 h regardless of the browser), a restart
+invalidates every session, and a leaked cookie cannot be replayed against
+`/v1/telemetry/export`. With a session,
 `/admin?since=YYYY-MM-DD&until=YYYY-MM-DD&account=G…&platform=extension|android`
 renders the same report as `npm run report:activity` (both import
 `src/core/telemetry/report.ts`, aliased here as `@lantern/telemetry-report`),

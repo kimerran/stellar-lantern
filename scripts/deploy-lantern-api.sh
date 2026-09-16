@@ -42,7 +42,16 @@ if [[ "${1:-}" == "--detach" ]]; then
 fi
 railway up --service "$SERVICE" --ci --path-as-root --no-gitignore "$CTX"
 
-URL=${LANTERN_API_URL:-$(railway domain --service "$SERVICE" --json 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["domains"][0])' 2>/dev/null || echo https://lantern-api-production-3fad.up.railway.app)}
+# Read-only lookup: bare `railway domain` would CREATE a domain on a service
+# that has none. No domain → fail, rather than probe some unrelated URL.
+URL=${LANTERN_API_URL:-}
+if [[ -z "$URL" ]]; then
+  DOMAIN=$(railway domain list --service "$SERVICE" --json 2>/dev/null | python3 -c 'import json,sys
+d=json.load(sys.stdin).get("domains") or []
+print(next((x["domain"] for x in d if isinstance(x, dict) and x.get("domain")), ""))' 2>/dev/null || true)
+  [[ -n "$DOMAIN" ]] || { echo "no domain found for service $SERVICE — set LANTERN_API_URL" >&2; exit 1; }
+  URL="https://$DOMAIN"
+fi
 echo "waiting for $URL/healthz …"
 for _ in $(seq 1 30); do
   if curl -fsS --max-time 10 "$URL/healthz" 2>/dev/null; then echo; echo "deployed: $URL"; exit 0; fi

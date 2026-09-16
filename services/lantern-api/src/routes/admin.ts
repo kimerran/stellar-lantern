@@ -37,8 +37,19 @@ const MAX_ROWS = 50_000; // page cap: alpha volumes are tiny; a runaway range st
 const ACCOUNT_RE = /^G[A-Z2-7]{55}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-function sessionValue(token: string, nonce: string): string {
-  return createHmac('sha256', nonce).update(token).digest('hex');
+// Session value = `<expiresAtMs>.<hmac(nonce, token + "." + expiresAtMs)>`.
+// The expiry is signed in and enforced server-side: Max-Age only tells a
+// well-behaved browser to drop the cookie; a copied header must die too.
+function sessionValue(token: string, nonce: string, expiresAt: number): string {
+  const mac = createHmac('sha256', nonce).update(`${token}.${expiresAt}`).digest('hex');
+  return `${expiresAt}.${mac}`;
+}
+function sessionValid(given: string, token: string, nonce: string, nowMs: number): boolean {
+  const dot = given.indexOf('.');
+  if (dot <= 0) return false;
+  const expiresAt = Number(given.slice(0, dot));
+  if (!Number.isSafeInteger(expiresAt) || expiresAt <= nowMs) return false;
+  return same(given, sessionValue(token, nonce, expiresAt));
 }
 function same(a: string, b: string): boolean {
   const x = Buffer.from(a);
@@ -176,12 +187,12 @@ export function adminRoutes(deps: AdminDeps): Hono {
   const now = deps.now ?? (() => new Date());
   const nonce = deps.sessionNonce ?? randomBytes(32).toString('hex');
   const log = deps.log;
-  const session = deps.adminToken ? sessionValue(deps.adminToken, nonce) : null;
+  const token = deps.adminToken ?? null;
 
   const hasSession = (cookieHeader: string | undefined): boolean => {
-    if (!session) return false;
+    if (!token) return false;
     const given = cookieOf(cookieHeader);
-    return given !== null && same(given, session);
+    return given !== null && sessionValid(given, token, nonce, now().getTime());
   };
 
   app.use('/admin/*', async (c, next) => {
@@ -196,27 +207,28 @@ export function adminRoutes(deps: AdminDeps): Hono {
   });
 
   app.post('/admin/login', async (c) => {
-    if (!deps.adminToken || !session) return c.json({ error: 'not_found' }, 404);
+    if (!token) return c.json({ error: 'not_found' }, 404);
     const started = Date.now();
     const body = await c.req.parseBody();
-    const token = typeof body.token === 'string' ? body.token : '';
-    if (!token || !same(token, deps.adminToken)) {
+    const given = typeof body.token === 'string' ? body.token : '';
+    if (!given || !same(given, token)) {
       log({ route: 'admin_login', status: 401, outcome: 'unauthorized', ms: Date.now() - started });
       return c.html(loginPage('That token is not right.'), 401);
     }
-    c.header('Set-Cookie', setCookie(session, SESSION_HOURS * 3600));
+    const expiresAt = now().getTime() + SESSION_HOURS * 3600_000;
+    c.header('Set-Cookie', setCookie(sessionValue(token, nonce, expiresAt), SESSION_HOURS * 3600));
     log({ route: 'admin_login', status: 303, outcome: 'ok', ms: Date.now() - started });
     return c.redirect('/admin', 303);
   });
 
   app.post('/admin/logout', (c) => {
-    if (!session) return c.json({ error: 'not_found' }, 404);
+    if (!token) return c.json({ error: 'not_found' }, 404);
     c.header('Set-Cookie', setCookie('', 0));
     return c.redirect('/admin', 303);
   });
 
   app.get('/admin', async (c) => {
-    if (!session) return c.json({ error: 'not_found' }, 404);
+    if (!token) return c.json({ error: 'not_found' }, 404);
     if (!hasSession(c.req.header('cookie'))) return c.html(loginPage(), 401);
     if (!deps.store) return c.html(loginPage('No database is configured on this deployment.'), 503);
     const f = parseFilters(c.req.query(), now());
@@ -233,7 +245,7 @@ export function adminRoutes(deps: AdminDeps): Hono {
   });
 
   app.get('/admin/export.csv', async (c) => {
-    if (!session) return c.json({ error: 'not_found' }, 404);
+    if (!token) return c.json({ error: 'not_found' }, 404);
     if (!hasSession(c.req.header('cookie'))) return c.html(loginPage(), 401);
     if (!deps.store) return c.json({ error: 'unavailable' }, 503);
     const f = parseFilters(c.req.query(), now());

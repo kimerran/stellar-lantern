@@ -26,13 +26,15 @@ const env = (over: Record<string, string> = {}) =>
 
 function harness(over: Record<string, string> = {}, withStore = true) {
   const store = memoryStore();
+  let clock = NOW();
   const app = createApp({
     env: env(over),
     store: withStore ? store : null,
     log: () => {},
-    nowDate: NOW,
+    nowDate: () => clock,
     adminSessionNonce: 'test-nonce',
   });
+  const advance = (ms: number) => void (clock = new Date(clock.getTime() + ms));
   const login = (token: string) =>
     app.request('/admin/login', {
       method: 'POST',
@@ -96,7 +98,7 @@ function harness(over: Record<string, string> = {}, withStore = true) {
       at('2026-07-01T10:00:00Z'),
     );
   };
-  return { app, store, login, cookieFrom, get, seed };
+  return { app, store, login, cookieFrom, get, seed, advance };
 }
 
 describe('/admin login', () => {
@@ -119,7 +121,7 @@ describe('/admin login', () => {
     const cookie = ok.headers.get('set-cookie')!;
     expect(cookie).toMatch(
       new RegExp(
-        `^${COOKIE}=[0-9a-f]{64}; Path=/admin; HttpOnly; Secure; SameSite=Strict; Max-Age=43200$`,
+        `^${COOKIE}=\\d{13}\\.[0-9a-f]{64}; Path=/admin; HttpOnly; Secure; SameSite=Strict; Max-Age=43200$`,
       ),
     );
     expect(cookie).not.toContain(TOKEN); // the cookie is a derived value, never the token
@@ -129,10 +131,20 @@ describe('/admin login', () => {
     expect(await page.text()).toContain('activity report');
   });
 
-  it('rejects a forged or foreign cookie, and logout clears the session', async () => {
+  it('rejects a forged, foreign, tampered or expired cookie, and logout clears the session', async () => {
     const h = harness();
     expect((await h.get('/admin', `${COOKIE}=${'0'.repeat(64)}`)).status).toBe(401);
     expect((await h.get('/admin', `${COOKIE}=${TOKEN}`)).status).toBe(401);
+    const fresh = h.cookieFrom(await h.login(TOKEN));
+    // Moving the signed expiry forward breaks the MAC.
+    const [name, value] = fresh.split('=') as [string, string];
+    const [exp, mac] = value.split('.') as [string, string];
+    expect((await h.get('/admin', `${name}=${Number(exp) + 3_600_000}.${mac}`)).status).toBe(401);
+    // A copied cookie stops working once its 12 hours are up, even if the
+    // client keeps sending it — the expiry is enforced server-side.
+    expect((await h.get('/admin', fresh)).status).toBe(200);
+    h.advance(12 * 3_600_000 + 1);
+    expect((await h.get('/admin', fresh)).status).toBe(401);
     const cookie = h.cookieFrom(await h.login(TOKEN));
     const out = await h.app.request('/admin/logout', {
       method: 'POST',
