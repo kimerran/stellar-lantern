@@ -75,9 +75,8 @@ export async function bootTelemetry(opts: {
   flushAt?: number;
   flushAfterMs?: number;
 }): Promise<void> {
-  const ingestUrl =
-    opts.ingestUrl ??
-    (import.meta.env as Record<string, string | undefined>).VITE_TELEMETRY_INGEST_URL;
+  // Direct property read so Vite's `define` (vite.flags.ts) can pin it.
+  const ingestUrl = opts.ingestUrl ?? import.meta.env.VITE_TELEMETRY_INGEST_URL;
   if (!ingestUrl) return; // no endpoint configured: stay off
   await startTelemetry({
     ingestUrl,
