@@ -15,7 +15,10 @@
     "skipLibCheck": true,
     "types": ["node"],
     "baseUrl": ".",
-    "paths": { "@lantern/scanner": ["../../packages/lantern-scanner/src/index.ts"] }
+    "paths": {
+      "@lantern/scanner": ["../../packages/lantern-scanner/src/index.ts"],
+      "@lantern/telemetry-validate": ["../../src/core/telemetry/validate.ts"]
+    }
   },
   "include": ["src", "test", "vitest.config.ts"]
 }
