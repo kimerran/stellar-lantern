@@ -1,11 +1,10 @@
 # Telemetry — what Lantern collects, and what it never does
 
-**Status:** implemented and **default-off**. The event core (#83), the ingest
-backend (#85), the consent UI (#86) and the emit points (#87) are in place;
-telemetry is active only in a build made with `VITE_FEATURE_TELEMETRY=true`
-*and* after the user opts in. Every current release and Android build sets the
-flag `false`, so nothing here is active in them (#88 is the build slice that
-turns it on).
+**Status:** implemented and **default-off for the user**. The event core
+(#83), the ingest backend (#85), the consent UI (#86), the emit points (#87)
+and the build plumbing (#88) are in place: the release and Android builds set
+`VITE_FEATURE_TELEMETRY=true` and point at the Lantern API, and nothing is
+sent until the user opts in under Settings → Privacy.
 
 This document is what we point the Chrome Web Store reviewer and grant
 reviewers at.
@@ -122,10 +121,15 @@ git-ignored: it contains real user activity.
 
 ## Build plumbing
 
-- `VITE_FEATURE_TELEMETRY` (`__FEATURE_TELEMETRY__`), default `false`;
-  listed explicitly in `release.yml` as `false`.
-- `VITE_TELEMETRY_INGEST_URL` — the endpoint (a value, not a flag). Its origin
-  must also be added to `manifest.config.ts` `host_permissions` — one origin,
-  ours — when the backend is decided.
+- `VITE_FEATURE_TELEMETRY` (`__FEATURE_TELEMETRY__`): source default `false`
+  (so `npm test` and a local build carry no telemetry); set `true` in
+  `release.yml` and `android.yml` (#88).
+- `VITE_TELEMETRY_INGEST_URL` — the endpoint (a value, not a flag):
+  `https://lantern-api-production-3fad.up.railway.app/v1/telemetry`. Its
+  origin is in `manifest.config.ts` `host_permissions` — one origin, ours; a
+  test asserts the two agree.
+- `npm run verify:flags` builds with the flag off and on and asserts the
+  telemetry module and the ingest URL are absent / present; it runs on every
+  PR (`test.yml`) and in the release build.
 - Generated reports go to `dist-report/`, which is git-ignored: they contain
   real user activity.

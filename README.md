@@ -287,6 +287,17 @@ sequenceDiagram
     end
 ```
 
+## Privacy & analytics
+
+Lantern collects **no** usage data unless you turn it on in **Settings →
+Privacy**, and even then only enum-valued events under a random install id —
+never addresses, keys, amounts, memos or the text of a message you check.
+"Delete my data" removes what was sent. The full event list, the consent
+model and the retention window are in [`docs/telemetry.md`](docs/telemetry.md);
+that document is the disclosure the Chrome Web Store listing points at. The
+extension's only host permission beyond the Stellar endpoints is our own API
+origin, used for this and for the scanner's explainer.
+
 ## Security model
 
 - Only the **encrypted** vault (AES-GCM, PBKDF2 ≥ 600k) is persisted; the decrypted secret lives solely in session memory while unlocked, and the session auto-locks.
