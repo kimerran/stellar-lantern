@@ -3,6 +3,7 @@ import { createApp } from '../src/app';
 import { readEnv } from '../src/env';
 import { memoryStore } from '../src/telemetry/store';
 import { COOKIE, parseFilters, toCsv } from '../src/routes/admin';
+import { summarizeWallets, walletRows } from '../src/routes/admin-views';
 
 // The analytics page (#104): cookie login against the admin token, the
 // report rendered from the store with filters, CSV of the same rows.
@@ -233,6 +234,28 @@ describe('/admin pages', () => {
     expect(byEvents).toContain('class="on">events</a>');
     const junk = await (await h.get('/admin/wallets?sort=drop%20table', cookie)).text();
     expect(junk).toContain('class="on">last seen</a>');
+  });
+
+  it('walletRows keeps only string accounts: null, undefined and empty are anonymous', () => {
+    const base = {
+      id: 1,
+      installId: UUID_A,
+      platform: 'extension',
+      appVersion: '0.1.0',
+      network: 'testnet',
+      event: 'session_start',
+      props: {},
+      ts: '2026-09-10T10:00:00.000Z',
+      receivedAt: '2026-09-10T10:00:00.000Z',
+    };
+    const rows = [
+      { ...base, id: 1, account: ADDRESS },
+      { ...base, id: 2, account: null },
+      { ...base, id: 3 }, // omitted, as the shared Row type allows
+      { ...base, id: 4, account: '' },
+    ];
+    expect(walletRows(rows).map((r) => r.id)).toEqual([1]);
+    expect(summarizeWallets(rows)).toHaveLength(1); // no truncate() on a non-string
   });
 
   it('drill-down: an address; an anonymous install and an unknown key are 404', async () => {

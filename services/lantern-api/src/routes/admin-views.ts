@@ -64,7 +64,7 @@ type WalletRow = Row & { account: string };
 
 // The rows the analytics pages are built from: only those carrying a wallet.
 export const walletRows = (rows: Row[]): WalletRow[] =>
-  rows.filter((r): r is WalletRow => r.account !== null);
+  rows.filter((r): r is WalletRow => typeof r.account === 'string' && r.account.length > 0);
 
 export function summarizeWallets(rows: Row[]): WalletSummary[] {
   const out = new Map<
