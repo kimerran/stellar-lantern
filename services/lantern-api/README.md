@@ -74,18 +74,21 @@ boot — the cookie never carries the token, the expiry is enforced server-side
 invalidates every session, and a leaked cookie cannot be replayed against
 `/v1/telemetry/export`. With a session
 (#106): `/admin` is the **dashboard** (tiles, events-per-day chart as inline
-SVG, event and verdict tables), `/admin/wallets` lists one row per identity
-(address for alpha installs, "User N" for anonymous ones; `?sort=lastSeen|
-firstSeen|events|sessions|txSigned|highRiskGated`), `/admin/wallets/<key>`
-is the drill-down for one identity (`key` = the `G…` address, or the install
-id of an anonymous install) with its counts, daily chart and full trail, and
+SVG, event and verdict tables), `/admin/wallets` lists one row per wallet
+address (`?sort=lastSeen|firstSeen|events|sessions|txSigned|highRiskGated`),
+`/admin/wallets/<address>` is the drill-down for one wallet with its counts,
+daily chart and full trail, and
 `/admin/report` is the emailed-style report — the same code as `npm run
 report:activity` (both import `src/core/telemetry/report.ts`, aliased here as
 `@lantern/telemetry-report`). Every page takes
 `?since=YYYY-MM-DD&until=YYYY-MM-DD&platform=extension|android` (default
 window: the last 30 days). Raw data: `/admin/export.csv` and
 `/admin/export.json` for the same filters, plus `&wallet=<key>` for one
-identity — the drill-down links both. No page carries a `<script>`. Login attempts share
+identity — the drill-down links both. Rows with no wallet address (non-alpha
+builds, or an alpha install's rows sent before it had a wallet) are not
+wallets: the dashboard, wallets table and drill-downs leave them out, while
+the downloads and `/admin/report` keep them (there they are "User N", and
+`&wallet=<install id>` selects one for download). No page carries a `<script>`. Login attempts share
 the telemetry per-IP window; every `/admin*` response is `Cache-Control:
 no-store` + `X-Robots-Tag: noindex`. No `TELEMETRY_ADMIN_TOKEN` → `/admin` is
 404, exactly like the export; no `DATABASE_URL` → 503. The page's Q4 registry
