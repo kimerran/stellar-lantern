@@ -171,20 +171,24 @@ describe('/admin pages', () => {
     expect(page).not.toContain('<script');
     expect(page).toContain('<form class="bar"'); // the toolbar
     expect(page).toContain('value="2026-08-21"'); // default since = now − 30 d
-    expect(page).toContain('<b>2</b><span>wallets</span>');
-    expect(page).toContain('<b>2</b><span>sessions</span>');
+    expect(page).toContain('<b>1</b><span>wallets</span>'); // the anonymous install is not a wallet
+    expect(page).toContain('<b>1</b><span>installs</span>');
+    expect(page).toContain('<b>1</b><span>sessions</span>');
     expect(page).toContain('<b>1</b><span>transactions signed</span>');
     expect(page).toContain('<svg class="chart"'); // daily activity
     expect(page).toContain('2026-09-10: 2 events, 1 sessions, 1 wallets'); // bar tooltip
+    expect(page).toContain('2026-09-11: 0 events, 0 sessions, 0 wallets'); // the anonymous day
     expect(page).toContain(
-      '<code>session_start</code></td><td class="n">2</td><td class="n">2</td>',
+      '<code>session_start</code></td><td class="n">1</td><td class="n">1</td>',
     );
     expect(page).toContain('no transaction scans yet');
     expect(page).not.toContain(UUID_A);
     expect(page).not.toContain(UUID_B);
+    expect(page).not.toContain('User 1');
 
+    // The only android rows are anonymous: nothing to show, but the window is not empty.
     const android = await (await h.get('/admin?platform=android', cookie)).text();
-    expect(android).toContain('<b>1</b><span>wallets</span>');
+    expect(android).toContain('<b>0</b><span>wallets</span>');
     expect(android).toContain('<b>0</b><span>transactions signed</span>');
 
     const none = await (await h.get('/admin?since=2027-01-01&until=2027-02-01', cookie)).text();
@@ -192,27 +196,46 @@ describe('/admin pages', () => {
     expect(none).toContain('<svg class="chart"'); // an empty chart still renders
   });
 
-  it('wallets: one row per identity, links to the drill-down, sortable', async () => {
+  it('wallets: one row per address, anonymous installs absent, links to the drill-down, sortable', async () => {
     const h = harness();
+    const B2 = 'GDVEU3DD4KOFECV66VIHWEZOYX4ZKR3WV27L464SIIPOU2IUI3JCZA57';
     await h.seed();
+    await h.store.insert(
+      [
+        {
+          installId: UUID_B,
+          platform: 'android',
+          appVersion: '0.1.0',
+          network: 'testnet',
+          event: 'session_start',
+          props: {},
+          ts: new Date('2026-09-12T09:00:00Z'),
+          account: B2,
+        },
+      ],
+      new Date('2026-09-12T09:00:00Z'),
+    );
     const cookie = h.cookieFrom(await h.login(TOKEN));
     const page = await (await h.get('/admin/wallets', cookie)).text();
     expect(page).not.toContain('<script');
     expect(page).toContain(`href="/admin/wallets/${ADDRESS}?`);
-    expect(page).toContain(`href="/admin/wallets/${UUID_B}?`); // the anonymous key is a link target…
-    expect(page).toContain('>User 1</a> <span class="pill">anonymous</span>'); // …never a label
+    expect(page).toContain(`href="/admin/wallets/${B2}?`);
+    expect(page).not.toContain(UUID_B); // the anonymous install is neither a row nor a link
+    expect(page).not.toContain('User 1');
+    expect(page).not.toContain('anonymous</span>');
     expect(page).toContain('>GA7Q…VSGZ</a>');
+    expect(page).toContain('>GDVE…ZA57</a>');
     expect(page).toContain('2 wallets');
-    // Default sort is last seen (desc): the android install (09-11) comes first.
-    expect(page.indexOf('User 1')).toBeLessThan(page.indexOf('GA7Q…VSGZ'));
+    // Default sort is last seen (desc): the android wallet (09-12) comes first.
+    expect(page.indexOf('GDVE…ZA57')).toBeLessThan(page.indexOf('GA7Q…VSGZ'));
     const byEvents = await (await h.get('/admin/wallets?sort=events', cookie)).text();
-    expect(byEvents.indexOf('GA7Q…VSGZ')).toBeLessThan(byEvents.indexOf('User 1'));
+    expect(byEvents.indexOf('GA7Q…VSGZ')).toBeLessThan(byEvents.indexOf('GDVE…ZA57'));
     expect(byEvents).toContain('class="on">events</a>');
     const junk = await (await h.get('/admin/wallets?sort=drop%20table', cookie)).text();
     expect(junk).toContain('class="on">last seen</a>');
   });
 
-  it('drill-down: an address, an anonymous install, and an unknown key', async () => {
+  it('drill-down: an address; an anonymous install and an unknown key are 404', async () => {
     const h = harness();
     await h.seed();
     const cookie = h.cookieFrom(await h.login(TOKEN));
@@ -228,12 +251,9 @@ describe('/admin pages', () => {
     );
     expect(at).not.toContain(UUID_A);
 
+    // An install id is a download filter, not a wallet page.
     const b = await h.get(`/admin/wallets/${UUID_B}`, cookie);
-    expect(b.status).toBe(200);
-    const bt = await b.text();
-    expect(bt).toContain('User 1');
-    expect(bt).toContain('anonymous install');
-    expect(bt).toContain('<code>session_start</code>');
+    expect(b.status).toBe(404);
 
     const missing = await h.get(`/admin/wallets/${'G' + 'A'.repeat(55)}`, cookie);
     expect(missing.status).toBe(404);
@@ -282,7 +302,7 @@ describe('/admin pages', () => {
     );
     const cookie = h.cookieFrom(await h.login(TOKEN));
     const list = await (await h.get('/admin/wallets', cookie)).text();
-    expect(list).toContain('3 wallets');
+    expect(list).toContain('2 wallets'); // the pre-wallet row is not an identity on the pages
     expect((await h.get(`/admin/wallets/${B2}`, cookie)).status).toBe(200);
     const b2 = (await (await h.get(`/admin/export.json?wallet=${B2}`, cookie)).json()) as {
       rows: Array<{ event: string }>;
@@ -295,7 +315,7 @@ describe('/admin pages', () => {
     const anon = (await (await h.get(`/admin/export.json?wallet=${UUID_A}`, cookie)).json()) as {
       rows: unknown[];
     };
-    expect(anon.rows).toHaveLength(1);
+    expect(anon.rows).toHaveLength(1); // …but its install id still selects it for download
     // Unknown wallet on a download is a 404, never an empty file.
     expect((await h.get(`/admin/export.csv?wallet=${'G' + 'B'.repeat(55)}`, cookie)).status).toBe(
       404,

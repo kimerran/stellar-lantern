@@ -321,7 +321,7 @@ export function adminRoutes(deps: AdminDeps): Hono {
     if ('deny' in g) return g.deny;
     const { rows, f } = g;
     const key = c.req.param('key');
-    const w = ACCOUNT_RE.test(key) || UUID_RE.test(key) ? walletTrail(rows, key) : null;
+    const w = ACCOUNT_RE.test(key) ? walletTrail(rows, key) : null; // anonymous installs have no page
     if (!w) {
       log({ route: 'admin_wallet', status: 404 });
       return c.html(renderNotFound(queryString(f)), 404);

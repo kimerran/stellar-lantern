@@ -8,17 +8,18 @@ import { esc, CSS, type Row, type UserTrail } from '@lantern/telemetry-report';
 
 // ── Model ────────────────────────────────────────────────────────────────────
 
-// One identity per ROW: the row's wallet address when it carries one (alpha
-// builds, #100), else its install id. Row-local on purpose: an install that
-// switches wallets shows up as two identities, and an install's rows sent
-// before it had a wallet stay with "User N" — nothing is re-attributed. The
-// label is what the pages print; an install id is never a label, only the
-// anonymous drill-down key. `identityKey` is the single definition, shared
-// with the row filter in admin.ts so a drill-down and its download agree.
+// One identity per ROW: the row's wallet address. Row-local on purpose: an
+// install that switches wallets shows up as two identities — nothing is
+// re-attributed. Rows with no address (non-alpha builds, or an alpha install's
+// rows sent before it had a wallet) are not wallets and are dropped from every
+// page here by `walletRows`; they stay in the raw exports and the full report.
+// `identityKey` is the single definition, shared with the row filter in
+// admin.ts so a drill-down and its download agree (there, an install id still
+// selects an anonymous install's rows for download).
 export interface WalletSummary {
-  key: string; // address or installId — the URL segment
-  label: string; // "GA7Q…VSGZ" or "User N"
-  account: string | null;
+  key: string; // the address — the URL segment
+  label: string; // "GA7Q…VSGZ"
+  account: string;
   installs: number;
   platforms: string[];
   appVersion: string; // latest seen
@@ -59,33 +60,26 @@ const DAY_MS = 86_400_000;
 export const identityKey = (r: Pick<Row, 'account' | 'installId'>): string =>
   r.account ?? r.installId;
 
-// key → label, "User N" numbered in first-seen order so it is stable.
-function labels(rows: Row[]): Map<string, string> {
-  const sorted = [...rows].sort((a, b) => a.ts.localeCompare(b.ts) || a.id - b.id);
-  const labelOf = new Map<string, string>();
-  let anon = 0;
-  for (const r of sorted) {
-    const key = identityKey(r);
-    if (!labelOf.has(key)) labelOf.set(key, r.account ? truncate(r.account) : `User ${++anon}`);
-  }
-  return labelOf;
-}
+type WalletRow = Row & { account: string };
+
+// The rows the analytics pages are built from: only those carrying a wallet.
+export const walletRows = (rows: Row[]): WalletRow[] =>
+  rows.filter((r): r is WalletRow => r.account !== null);
 
 export function summarizeWallets(rows: Row[]): WalletSummary[] {
-  const labelOf = labels(rows);
   const out = new Map<
     string,
     WalletSummary & { installSet: Set<string>; platformSet: Set<string>; latest: string }
   >();
-  const sorted = [...rows].sort((a, b) => a.ts.localeCompare(b.ts) || a.id - b.id);
+  const sorted = walletRows(rows).sort((a, b) => a.ts.localeCompare(b.ts) || a.id - b.id);
   for (const r of sorted) {
-    const key = identityKey(r);
+    const key = r.account;
     let w = out.get(key);
     if (!w) {
       w = {
         key,
-        label: labelOf.get(key)!,
-        account: r.account ?? null,
+        label: truncate(r.account),
+        account: r.account,
         installs: 0,
         platforms: [],
         appVersion: r.appVersion,
@@ -162,12 +156,12 @@ export function dailySeries(rows: Row[], since: string, until: string): Daily[] 
       wallets: new Set(),
     });
   }
-  for (const r of rows) {
+  for (const r of walletRows(rows)) {
     const d = byDay.get(r.ts.slice(0, 10));
     if (!d) continue; // outside the window (rows are filtered by receivedAt; ts may straddle)
     d.events += 1;
     if (r.event === 'session_start') d.sessions += 1;
-    d.wallets.add(identityKey(r));
+    d.wallets.add(r.account);
   }
   return [...byDay.entries()].map(([day, d]) => ({
     day,
@@ -177,7 +171,8 @@ export function dailySeries(rows: Row[], since: string, until: string): Daily[] 
   }));
 }
 
-export function buildDashboard(rows: Row[], since: string, until: string): Dashboard {
+export function buildDashboard(allRows: Row[], since: string, until: string): Dashboard {
+  const rows = walletRows(allRows);
   const ws = summarizeWallets(rows);
   const byPlatform: Record<string, number> = {};
   for (const w of ws) for (const p of w.platforms) byPlatform[p] = (byPlatform[p] ?? 0) + 1;
@@ -186,7 +181,7 @@ export function buildDashboard(rows: Row[], since: string, until: string): Dashb
   for (const r of rows) {
     const e = ev.get(r.event) ?? { count: 0, wallets: new Set<string>() };
     e.count += 1;
-    e.wallets.add(identityKey(r));
+    e.wallets.add(r.account);
     ev.set(r.event, e);
     if (r.event === 'tx_scanned') {
       const risk = String(r.props.risk ?? 'unknown');
@@ -216,8 +211,8 @@ export function walletTrail(
 ): { summary: WalletSummary; trail: UserTrail; rows: Row[] } | null {
   const w = summarizeWallets(rows).find((x) => x.key === key);
   if (!w) return null;
-  const mine = rows
-    .filter((r) => identityKey(r) === key)
+  const mine = walletRows(rows)
+    .filter((r) => r.account === key)
     .sort((a, b) => a.ts.localeCompare(b.ts) || a.id - b.id);
   const trail: UserTrail = {
     label: w.label,
@@ -351,7 +346,7 @@ export function renderWallets(
   const rows = ws
     .map(
       (w) =>
-        `<tr><td><a href="/admin/wallets/${esc(w.key)}${opts.qs ? '?' + esc(opts.qs) : ''}">${esc(w.label)}</a>${w.account ? '' : ' <span class="pill">anonymous</span>'}</td><td>${w.platforms.map((p) => `<span class="pill">${esc(p === 'extension' ? 'Chrome' : p)}</span>`).join('')}</td><td>v${esc(w.appVersion)}</td><td>${esc(fmtDay(w.firstSeen))}</td><td>${esc(fmtDay(w.lastSeen))}</td><td class="n">${n(w.sessions)}</td><td class="n">${n(w.events)}</td><td class="n">${n(w.txSigned)}</td><td class="n">${n(w.highRiskGated)}</td></tr>`,
+        `<tr><td><a href="/admin/wallets/${esc(w.key)}${opts.qs ? '?' + esc(opts.qs) : ''}">${esc(w.label)}</a></td><td>${w.platforms.map((p) => `<span class="pill">${esc(p === 'extension' ? 'Chrome' : p)}</span>`).join('')}</td><td>v${esc(w.appVersion)}</td><td>${esc(fmtDay(w.firstSeen))}</td><td>${esc(fmtDay(w.lastSeen))}</td><td class="n">${n(w.sessions)}</td><td class="n">${n(w.events)}</td><td class="n">${n(w.txSigned)}</td><td class="n">${n(w.highRiskGated)}</td></tr>`,
     )
     .join('');
   const table = ws.length
@@ -361,7 +356,7 @@ export function renderWallets(
 ${tabs('wallets', opts.qs)}
 ${opts.toolbar}
 ${table}
-<p class="note">Alpha builds report the wallet's public address; anonymous installs are "User N" in first-seen order. Click a row for the full trail.</p>
+<p class="note">One row per wallet address reported by an alpha build; anonymous installs (no address) are not listed here — they remain in the downloads and the full report. Click a row for the full trail.</p>
 ${downloadLinks(opts.qs)}`;
   return pageShell('Lantern analytics — wallets', body);
 }
@@ -377,8 +372,8 @@ export function renderWallet(
   wq.set('wallet', s.key);
   const body = `<h1><span>Lantern</span> analytics</h1><p class="meta">${esc(opts.window)}</p>
 ${tabs('wallets', opts.qs)}
-<div class="card"><h2>${esc(s.label)}${s.account ? '' : ' <span class="pill">anonymous install</span>'}</h2>
-${s.account ? `<p class="meta"><code class="addr">${esc(s.account)}</code></p>` : ''}
+<div class="card"><h2>${esc(s.label)}</h2>
+<p class="meta"><code class="addr">${esc(s.account)}</code></p>
 <p class="meta">${s.platforms.map((p) => `<span class="pill">${esc(p === 'extension' ? 'Chrome' : p)}</span>`).join('')} v${esc(s.appVersion)} · ${esc(s.network)} · ${n(s.installs)} install${s.installs === 1 ? '' : 's'} · first seen ${esc(fmtTs(s.firstSeen))} · last seen ${esc(fmtTs(s.lastSeen))}</p>
 ${tiles([
   ['sessions', s.sessions],
