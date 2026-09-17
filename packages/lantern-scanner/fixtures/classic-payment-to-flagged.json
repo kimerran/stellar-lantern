@@ -1,0 +1,10 @@
+{
+  "name": "classic-payment-to-flagged",
+  "description": "Classic payment of 5 XLM to the demo flagged address — the one with a live Active entry in the D1 registry (registry-hot-read.json). Screens flagged against the live registry; the QA plan and the demo use it.",
+  "networkPassphrase": "Test SDF Network ; September 2015",
+  "source": "GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK",
+  "recordedAt": null,
+  "rpc": null,
+  "xdr": "AAAAAgAAAAAY0gqcnifD/QFRi3Um28AFmWZwoXTXZlkgmYh/UZB/SQAAAGQAAAAA/N5BswAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAQAAAAA/DDS/k60NmXHQTMyQ9wVRHIOKrZc0pKL7DXoD/H/omgAAAAAAAAAAAvrwgAAAAAAAAAAA",
+  "simulation": null
+}

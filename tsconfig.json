@@ -35,6 +35,8 @@
     "packages",
     "tests",
     "scripts/report-activity.ts",
+    "scripts/scan.ts",
+    "scripts/scan-cli.ts",
     "vite.config.ts",
     "tailwind.config.ts",
     "manifest.config.ts"

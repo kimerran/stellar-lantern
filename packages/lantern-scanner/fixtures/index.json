@@ -11,5 +11,8 @@
   "classic-path-payment-receive",
   "classic-account-merge",
   "classic-multi-op",
-  "token-admin"
+  "token-admin",
+  "classic-payment-to-flagged",
+  "classic-two-recipients-flagged",
+  "classic-flagged-memo-injection"
 ]

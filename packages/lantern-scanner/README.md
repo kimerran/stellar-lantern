@@ -376,7 +376,36 @@ flagged address (a live Active entry) and a never-reported one
 (`import.meta.glob`) and never open a socket. Re-record after a testnet reset
 with `node packages/lantern-scanner/fixtures/record.mjs` (needs a funded
 source account; nothing is signed or submitted). The `classic-*` files need
-no network and are rebuilt by `make-classic.mjs`.
+no network and are rebuilt by `make-classic.mjs` — including the three the
+QA plan and the demo lean on: `classic-payment-to-flagged` (5 XLM to the demo
+flagged address), `classic-two-recipients-flagged` (one clean recipient, one
+flagged — screening must check both) and `classic-flagged-memo-injection`
+(the same payment with a memo that tries to talk the explainer round).
+
+### Running it by hand (#60)
+
+`npm run scan` is the CLI harness the manual test plan
+(`docs/qa/d2-transaction-scanner-test-plan.md`) drives — the same six stages
+and the same deps the wallet wires, from a terminal:
+
+```bash
+npm run scan -- --file classic-payment              # a corpus fixture, live RPC + registry
+npm run scan -- --xdr <base64 envelope>              # any transaction
+npm run scan -- --file sep41-approve --json          # the full ScanResult
+npm run scan -- --file sep41-approve --no-ai         # rules-based sentence only
+npm run scan -- --file sep41-approve --offline       # RPC answered from the recordings
+npm run scan -- --help
+```
+
+It never signs or submits. The AI sentence is off unless `LANTERN_AI_ENDPOINT`
+(the Lantern API proxy) or `LANTERN_AI_API_KEY` (local dev) is set, and the
+output always says which explainer wrote the sentence and whether the
+rules-based fallback was used. `--ai-stub "<text>"` swaps in a model that
+always answers `<text>`, behind the real sanitiser and contradiction guard,
+so a tester can watch a hostile answer get discarded without touching the
+verdict. `scripts/scan-cli.ts` holds the logic with its IO injected;
+`scripts/scan.ts` is the node entry; `tests/scan-cli.test.ts` drives the
+library offline.
 
 ## What it does **not** do (yet)
 
