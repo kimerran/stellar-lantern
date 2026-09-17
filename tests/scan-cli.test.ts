@@ -50,7 +50,9 @@ describe('npm run scan (scan-cli.ts)', () => {
     expect(a.risk).toBe('high');
     expect(a.action).toBe('block_confirm');
     expect(a.effects.approvals[0]?.unlimited).toBe(true);
-    expect(a.screen.outcome).toBe('clean'); // the recorded registry read answers offline
+    // Only the two recorded subjects answer offline; the spender here was
+    // never recorded, so the registry read is an RPC failure → unknown.
+    expect(a.screen.outcome).toBe('unknown');
     expect(b.verdict).toEqual(a.verdict);
     expect(typeof b.explanation).toBe('string');
   });
@@ -142,6 +144,44 @@ describe('npm run scan (scan-cli.ts)', () => {
     expect(s.url).toBe('https://api.example/v1/explain');
     expect(Object.keys(s.headers).join(',')).not.toMatch(/x-api-key|authorization/i);
     expect(s.body).not.toContain('AAAAAgAAAA'); // no XDR leaves the client
+  });
+
+  it('--destination-unfunded reaches the verdict; omitted, the destination is unknown', async () => {
+    const r = json(
+      await run(
+        ['--file', 'classic-payment', '--offline', '--json', '--destination-unfunded'],
+        io(),
+      ),
+    );
+    expect(r.reasons.map((x) => x.code)).toContain('new_account');
+    const plain = json(await run(['--file', 'classic-payment', '--offline', '--json'], io()));
+    expect(plain.reasons.map((x) => x.code)).not.toContain('new_account');
+  });
+
+  it('offline: a registry with no recording screens unknown, never clean', async () => {
+    const other = 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC'; // a real id, never recorded as a registry
+    const r = json(
+      await run(['--file', 'classic-payment', '--offline', '--json', '--registry', other], io()),
+    );
+    expect(r.screen.outcome).toBe('unknown');
+    expect(r.screen.unknown[0]?.reason).toBe('rpc_error');
+    expect(r.risk).not.toBe('low');
+  });
+
+  it('the network follows the input; an explicit --network that disagrees is an error', async () => {
+    const r = await run(['--file', 'classic-payment', '--offline'], io());
+    expect(r.stdout).toContain('Lantern scanner · testnet ·');
+    const clash = await run(
+      ['--file', 'classic-payment', '--offline', '--network', 'mainnet'],
+      io(),
+    );
+    expect(clash.code).toBe(2);
+    expect(clash.stderr).toContain('--network mainnet but the fixture classic-payment is testnet');
+    const agree = await run(
+      ['--file', 'classic-payment', '--offline', '--network', 'testnet'],
+      io(),
+    );
+    expect(agree.code).toBe(0);
   });
 
   it('bad arguments exit 2 with usage; --help exits 0', async () => {

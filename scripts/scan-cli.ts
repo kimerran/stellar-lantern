@@ -77,8 +77,9 @@ interface Args {
   aiStub?: string;
   rpc: string;
   registry: string;
-  network: 'testnet' | 'mainnet';
+  network?: 'testnet' | 'mainnet'; // explicit --network; absent = follow the input
   from?: string;
+  destinationUnfunded: boolean;
   help: boolean;
 }
 
@@ -95,8 +96,12 @@ usage: npm run scan -- (--xdr <base64> | --file <path>) [options]
   --offline            answer RPC from the fixture recordings, never the network
   --rpc <url>          Soroban RPC (env SOROBAN_RPC_URL; default testnet)
   --registry <C…>      blacklist registry contract id (env BLACKLIST_REGISTRY_ID)
-  --network <name>     testnet (default) | mainnet — the passphrase for --xdr
+  --network <name>     testnet (default) | mainnet — the passphrase for --xdr;
+                       a fixture carries its own and must agree
   --from <G…>          the signer's address (default: the transaction source)
+  --destination-unfunded
+                       tell the verdict the recipient has no history (the CLI
+                       does not look it up; omitted = unknown)
   --ai-stub <text>     QA only: an explainer that always answers <text>, to
                        prove the sentence cannot move the verdict (plan §8.3)
   --help
@@ -110,7 +115,7 @@ export function parseArgs(argv: string[], env: Io['env']): Args {
     offline: false,
     rpc: env.SOROBAN_RPC_URL ?? DEFAULT_RPC,
     registry: env.BLACKLIST_REGISTRY_ID ?? TESTNET_REGISTRY_ID,
-    network: 'testnet',
+    destinationUnfunded: false,
     help: false,
   };
   const next = (i: number, flag: string): string => {
@@ -152,6 +157,9 @@ export function parseArgs(argv: string[], env: Io['env']): Args {
       case '--from':
         a.from = next(i++, f);
         break;
+      case '--destination-unfunded':
+        a.destinationUnfunded = true;
+        break;
       case '--ai-stub':
         a.aiStub = next(i++, f);
         break;
@@ -177,10 +185,15 @@ interface Fixture {
   simulation?: RawSimulation | null;
 }
 
+type NetworkName = 'testnet' | 'mainnet';
+const networkOf = (passphrase: string): NetworkName =>
+  passphrase === Networks.PUBLIC ? 'mainnet' : 'testnet';
+
 interface Input {
   label: string;
   xdr: string;
   networkPassphrase: string;
+  network: NetworkName; // derived from the passphrase — the single source
   source?: string;
   fixture?: Fixture;
 }
@@ -211,20 +224,36 @@ function readFixture(io: Io, p: string): Fixture | null {
 }
 
 function loadInput(io: Io, a: Args): Input {
-  const passphrase = a.network === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET;
+  const flagPassphrase = a.network === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET;
   if (a.xdr && a.file) throw new Error('give --xdr or --file, not both');
   if (a.file) {
     const f = readFixture(io, a.file);
     if (!f) throw new Error(`could not read a transaction from ${a.file}`);
+    // The fixture's passphrase wins; an explicit --network that disagrees is
+    // a mistake, not something to decode under one network and judge under
+    // another.
+    const networkPassphrase = f.networkPassphrase ?? flagPassphrase;
+    const network = networkOf(networkPassphrase);
+    if (a.network && a.network !== network) {
+      throw new Error(`--network ${a.network} but the fixture ${f.name} is ${network}`);
+    }
     return {
       label: `fixture ${f.name}`,
       xdr: f.xdr,
-      networkPassphrase: f.networkPassphrase ?? passphrase,
+      networkPassphrase,
+      network,
       ...(f.source ? { source: f.source } : {}),
       fixture: f,
     };
   }
-  if (a.xdr) return { label: 'xdr', xdr: a.xdr, networkPassphrase: passphrase };
+  if (a.xdr) {
+    return {
+      label: 'xdr',
+      xdr: a.xdr,
+      networkPassphrase: flagPassphrase,
+      network: networkOf(flagPassphrase),
+    };
+  }
   throw new Error('nothing to scan: pass --xdr <base64> or --file <path>');
 }
 
@@ -243,18 +272,31 @@ function sourceOf(xdr: string, passphrase: string): string | undefined {
 // ── Offline RPC: answered from the recordings, never the network ─────────────
 
 interface LedgerEntriesRecording {
+  keys?: string[] | Record<string, string>;
   response: { result?: { entries?: Array<{ key: string; xdr: string }>; latestLedger?: number } };
 }
 
 function offlineFetch(io: Io, fixture: Fixture | undefined): typeof fetch {
   const entries = new Map<string, { key: string; xdr: string }>();
+  // Every ledger key a recording asked for, present in its response or not:
+  // a recorded absence is a real "no entry"; a key never asked for is not.
+  const recorded = new Set<string>();
   let latestLedger = 0;
   for (const file of io.fixtures()) {
     try {
       const j = JSON.parse(file.text) as Partial<LedgerEntriesRecording>;
       const r = j.response?.result;
       if (!r || !Array.isArray(r.entries)) continue;
-      for (const e of r.entries) if (e && typeof e.key === 'string') entries.set(e.key, e);
+      const asked = j.keys;
+      for (const k of Array.isArray(asked) ? asked : Object.values(asked ?? {})) {
+        if (typeof k === 'string') recorded.add(k);
+      }
+      for (const e of r.entries) {
+        if (e && typeof e.key === 'string') {
+          entries.set(e.key, e);
+          recorded.add(e.key);
+        }
+      }
       if (typeof r.latestLedger === 'number') latestLedger = Math.max(latestLedger, r.latestLedger);
     } catch {
       // not a recording
@@ -281,6 +323,15 @@ function offlineFetch(io: Io, fixture: Fixture | undefined): typeof fetch {
     }
     if (req.method === 'getLedgerEntries') {
       const keys = req.params?.keys ?? [];
+      // A key no recording ever asked for is an RPC failure, not an absent
+      // entry — otherwise an unrecorded address would screen clean.
+      if (keys.some((k) => !recorded.has(k))) {
+        return reply({
+          jsonrpc: '2.0',
+          id: req.id ?? 1,
+          error: { code: -32000, message: 'offline: ledger key not recorded' },
+        });
+      }
       const found = keys
         .map((k) => entries.get(k))
         .filter((e): e is { key: string; xdr: string } => !!e);
@@ -372,7 +423,7 @@ function render(input: Input, a: Args, r: ScanResult, wiring: Wiring, ms: number
   const h = (t: string) => L.push('', t.toUpperCase());
   const sim = r.simulation;
   L.push(
-    `Lantern scanner · ${a.network} · ${input.label}${a.offline ? ' · OFFLINE (recorded RPC)' : ''}`,
+    `Lantern scanner · ${input.network} · ${input.label}${a.offline ? ' · OFFLINE (recorded RPC)' : ''}`,
   );
   if (input.fixture?.description) L.push(`  ${input.fixture.description}`);
   const from = r.effects.source?.source ?? sourceOf(input.xdr, input.networkPassphrase);
@@ -500,9 +551,11 @@ export async function run(argv: string[], io: Io): Promise<Run> {
     xdr: input.xdr,
     networkPassphrase: input.networkPassphrase,
     context: {
-      network: a.network === 'mainnet' ? 'PUBLIC' : 'TESTNET',
+      network: input.network === 'mainnet' ? 'PUBLIC' : 'TESTNET',
       fromAddress: from,
-      destinationFunded: true,
+      // The CLI never looks the destination up: unknown unless the tester
+      // says otherwise, so the verdict's `new_account` path stays reachable.
+      ...(a.destinationUnfunded ? { destinationFunded: false } : {}),
     },
   };
   const wiring = wire(io, a, input);

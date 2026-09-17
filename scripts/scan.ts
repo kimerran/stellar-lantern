@@ -32,10 +32,10 @@ run(process.argv.slice(2), io).then(
   (r) => {
     if (r.stdout) process.stdout.write(r.stdout);
     if (r.stderr) process.stderr.write(r.stderr);
-    process.exit(r.code);
+    process.exitCode = r.code;
   },
   (e) => {
     process.stderr.write(`scan: ${e instanceof Error ? e.message : String(e)}\n`);
-    process.exit(2);
+    process.exitCode = 2;
   },
 );
