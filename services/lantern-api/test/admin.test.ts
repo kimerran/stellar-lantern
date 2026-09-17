@@ -3,7 +3,7 @@ import { createApp } from '../src/app';
 import { readEnv } from '../src/env';
 import { memoryStore } from '../src/telemetry/store';
 import { COOKIE, parseFilters, toCsv } from '../src/routes/admin';
-import { summarizeWallets, walletRows } from '../src/routes/admin-views';
+import { identityKey, summarizeWallets, walletRows } from '../src/routes/admin-views';
 
 // The analytics page (#104): cookie login against the admin token, the
 // report rendered from the store with filters, CSV of the same rows.
@@ -256,6 +256,9 @@ describe('/admin pages', () => {
     ];
     expect(walletRows(rows).map((r) => r.id)).toEqual([1]);
     expect(summarizeWallets(rows)).toHaveLength(1); // no truncate() on a non-string
+    // The download filter agrees: an empty account is no account.
+    expect(identityKey({ account: '', installId: UUID_A })).toBe(UUID_A);
+    expect(identityKey({ account: ADDRESS, installId: UUID_A })).toBe(ADDRESS);
   });
 
   it('drill-down: an address; an anonymous install and an unknown key are 404', async () => {

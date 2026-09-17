@@ -13,9 +13,10 @@ import { esc, CSS, type Row, type UserTrail } from '@lantern/telemetry-report';
 // re-attributed. Rows with no address (non-alpha builds, or an alpha install's
 // rows sent before it had a wallet) are not wallets and are dropped from every
 // page here by `walletRows`; they stay in the raw exports and the full report.
-// `identityKey` is the single definition, shared with the row filter in
-// admin.ts so a drill-down and its download agree (there, an install id still
-// selects an anonymous install's rows for download).
+// `identityKey` is the download-side key, shared with the row filter in
+// admin.ts (there, an install id still selects an anonymous install's rows);
+// it agrees with `walletRows` that an empty account is no account, so a
+// drill-down and its download name the same identity.
 export interface WalletSummary {
   key: string; // the address — the URL segment
   label: string; // "GA7Q…VSGZ"
@@ -58,7 +59,7 @@ const truncate = (a: string): string => `${a.slice(0, 4)}…${a.slice(-4)}`;
 const DAY_MS = 86_400_000;
 
 export const identityKey = (r: Pick<Row, 'account' | 'installId'>): string =>
-  r.account ?? r.installId;
+  r.account || r.installId;
 
 type WalletRow = Row & { account: string };
 
