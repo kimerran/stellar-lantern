@@ -12,6 +12,7 @@ SPEC.md
 BRAND.md
 *-spec.md
 *-plan.md
+!docs/qa/*-plan.md
 
 # Packaged extension artifacts
 release

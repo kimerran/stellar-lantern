@@ -36,6 +36,20 @@ exports[`verdict: corpus snapshots > classic-account-merge 1`] = `
 }
 `;
 
+exports[`verdict: corpus snapshots > classic-flagged-memo-injection 1`] = `
+{
+  "action": "allow",
+  "reasons": [],
+  "risk": "low",
+  "signals": [
+    "ingest:classic@simulation",
+    "auth:flat@auth.calls",
+    "effects:coverage_full@effects.coverage",
+    "screen:clean@screen",
+  ],
+}
+`;
+
 exports[`verdict: corpus snapshots > classic-multi-op 1`] = `
 {
   "action": "allow",
@@ -68,6 +82,34 @@ exports[`verdict: corpus snapshots > classic-path-payment-receive 1`] = `
 `;
 
 exports[`verdict: corpus snapshots > classic-payment 1`] = `
+{
+  "action": "allow",
+  "reasons": [],
+  "risk": "low",
+  "signals": [
+    "ingest:classic@simulation",
+    "auth:flat@auth.calls",
+    "effects:coverage_full@effects.coverage",
+    "screen:clean@screen",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > classic-payment-to-flagged 1`] = `
+{
+  "action": "allow",
+  "reasons": [],
+  "risk": "low",
+  "signals": [
+    "ingest:classic@simulation",
+    "auth:flat@auth.calls",
+    "effects:coverage_full@effects.coverage",
+    "screen:clean@screen",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > classic-two-recipients-flagged 1`] = `
 {
   "action": "allow",
   "reasons": [],
