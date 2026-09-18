@@ -8,7 +8,7 @@ description: Evidence site for Lantern's Stellar Development Foundation Instawar
 
 | | |
 |---|---|
-| Builder | kimerran ([GitHub](https://github.com/kimerran)) |
+| Builder | Team Lantern |
 | Live site | [lantern.artisam.xyz](https://lantern.artisam.xyz) |
 | Source (MIT) | [github.com/kimerran/stellar-lantern](https://github.com/kimerran/stellar-lantern) |
 | Network | Stellar Testnet (`Test SDF Network ; September 2015`) |
