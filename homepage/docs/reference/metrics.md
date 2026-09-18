@@ -2,11 +2,11 @@
 
 # Metrics
 
-The Statement of Work's §6.3 targets, against actuals read from the analytics dashboard on a dated snapshot. Numbers are never typed from memory: each row names how it is measured and when it was read.
+The Statement of Work's §6.3 targets, against actuals read from the raw analytics export on a dated snapshot. Numbers are never typed from memory: each row names how it is measured and when it was read.
 
 ## How the numbers are measured
 
-Lantern's wallet builds carry **opt-in** usage analytics (off by default; one toggle under Settings → Privacy; delete-my-data on request). Events are enum-only — no amounts, no memos, no keys — under a random install id. Alpha-tester builds may additionally attach the wallet's public address, which is what makes a "unique wallet" countable; installs with no address are counted as installs, not wallets. The Lantern API stores the events and serves the admin dashboard the snapshots below are read from.
+Lantern's wallet builds carry **opt-in** usage analytics (off by default; one toggle under Settings → Privacy; delete-my-data on request). Events are enum-only — no amounts, no memos, no keys — under a random install id. Alpha-tester builds may additionally attach the wallet's public address, which is what makes a "unique wallet" countable; installs with no address are counted as installs, not wallets. The Lantern API stores the events; the snapshots below are read from its raw export (which, unlike the dashboard, also counts installs with no wallet address).
 
 | Metric | Measured as |
 |---|---|

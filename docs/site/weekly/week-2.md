@@ -51,7 +51,7 @@ Deliverable 2 shipped: an MIT-licensed scanner package that simulates a Stellar 
 | §6.1 — MIT-licensed public repository | D2 | Evidenced | [`LICENSE`](https://github.com/kimerran/stellar-lantern/blob/develop/LICENSE) at the root and in [`packages/lantern-scanner/`](https://github.com/kimerran/stellar-lantern/tree/develop/packages/lantern-scanner) |
 | §6.1 — scanner suite green in CI, offline | D2 | Evidenced | [Tests lane run](https://github.com/kimerran/stellar-lantern/actions) on the release commit — 748 passed, 1 skipped, no network |
 | §6.1 — 90-second recording (payment, token call, unverified contract) | D2 | In progress | Runbook written; recording not yet made |
-| §6.1 — QA sign-off against the manual plan | D2 | Done | [Test plan](https://github.com/kimerran/stellar-lantern/blob/develop/docs/qa/d2-transaction-scanner-test-plan.md) merged with a full dry run; an independent tester's sign-off is pending |
+| §6.1 — QA sign-off against the manual plan | D2 | In progress | Complete: the [test plan](https://github.com/kimerran/stellar-lantern/blob/develop/docs/qa/d2-transaction-scanner-test-plan.md) is merged, and the author's full dry run passes every runnable case including the three hard blockers. Not complete: an independent tester's sign-off in the results table |
 | §3.9 — the verdict describes what a transaction does, never whether a trade is fairly priced | D2 | Evidenced | Every verdict carries the constant `effects shown, terms not judged`; visible on every proof slide |
 | §3.9 — no secrets in the repository | D2 | Evidenced | No AI key ships: the flag is OFF in every release build, the key lives in the Lantern API; no CI secret exists |
 

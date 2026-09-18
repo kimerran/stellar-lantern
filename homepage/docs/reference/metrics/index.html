@@ -26,9 +26,9 @@
         <p class="crumbs"><a href="/docs/">Lantern — Instawards Phase 1</a> <span class="sep">/</span> <span>Reference</span> <span class="sep">/</span> <span>Metrics</span></p>
         <article class="prose">
 <h1>Metrics</h1>
-<p>The Statement of Work's §6.3 targets, against actuals read from the analytics dashboard on a dated snapshot. Numbers are never typed from memory: each row names how it is measured and when it was read.</p>
+<p>The Statement of Work's §6.3 targets, against actuals read from the raw analytics export on a dated snapshot. Numbers are never typed from memory: each row names how it is measured and when it was read.</p>
 <h2>How the numbers are measured</h2>
-<p>Lantern's wallet builds carry <strong>opt-in</strong> usage analytics (off by default; one toggle under Settings → Privacy; delete-my-data on request). Events are enum-only — no amounts, no memos, no keys — under a random install id. Alpha-tester builds may additionally attach the wallet's public address, which is what makes a &quot;unique wallet&quot; countable; installs with no address are counted as installs, not wallets. The Lantern API stores the events and serves the admin dashboard the snapshots below are read from.</p>
+<p>Lantern's wallet builds carry <strong>opt-in</strong> usage analytics (off by default; one toggle under Settings → Privacy; delete-my-data on request). Events are enum-only — no amounts, no memos, no keys — under a random install id. Alpha-tester builds may additionally attach the wallet's public address, which is what makes a &quot;unique wallet&quot; countable; installs with no address are counted as installs, not wallets. The Lantern API stores the events; the snapshots below are read from its raw export (which, unlike the dashboard, also counts installs with no wallet address).</p>
 <div class="table"><table><thead>
 <tr>
 <th>Metric</th>
