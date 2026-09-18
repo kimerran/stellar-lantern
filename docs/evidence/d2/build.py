@@ -13,6 +13,7 @@ Every number on a slide is read from raw/ or passed in FACTS below.
 import copy
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -89,11 +90,14 @@ def render_terminal(lines, out: Path, size=(1400, 1000), title=None, scale=1.0):
     if scale != 1.0:
         MONO = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", int(21 * scale))
         MONO_B = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", int(21 * scale))
+    # Columns that actually fit this font on this width; never wider than
+    # COLS so the 1400 px captures keep wrapping exactly where they did.
+    cols = min(COLS, int((size[0] - 2 * x) / MONO.getlength("M")))
     if title:
         d.text((x, y), title, font=MONO_B, fill=DIM)
         y += lh + 8
     for raw in lines:
-        for ln in wrap(raw.rstrip("\n")):
+        for ln in wrap(raw.rstrip("\n"), cols):
             col, font = colour_for(raw)
             d.text((x, y), ln, font=font, fill=col)
             y += lh
@@ -133,8 +137,9 @@ def build_images():
 
     # Proof 5: the scan on top, the explorer row that backs it underneath.
     top = Image.new("RGB", (1400, 1000), BG)
-    term = Image.open(render_terminal(section(capture("05-flagged"), "SCREEN", "VERDICT", "SENTENCE"), IMG / "_05-term.png", size=(1400, 520)))
-    top.paste(term, (0, 0))
+    with tempfile.NamedTemporaryFile(suffix=".png") as tmp:
+        term = Image.open(render_terminal(section(capture("05-flagged"), "SCREEN", "VERDICT", "SENTENCE"), Path(tmp.name), size=(1400, 520)))
+        top.paste(term, (0, 0))
     ex = Image.open(RAW / "registry-stellar-expert.png").convert("RGB")
     band = ex.crop((0, 80, 1400, 140))  # the "Contract CBJW…" header
     rows = ex.crop((0, 500, 1400, 940))  # the history rows incl. the GA7Q…VSGZ report → 4
@@ -198,19 +203,6 @@ def clone_slide(prs, src):
                     node.set(attr, rid_map[v])
         dst.shapes._spTree.insert_element_before(el, "p:extLst")
     return dst
-
-
-def move_slide(prs, slide, index):
-    lst = prs.slides._sldIdLst
-    ids = list(lst)
-    for el in ids:
-        if prs.slides.get(int(el.get("id"))) is slide or el.get("{%s}id" % NS["r"]) == slide.part.partname:
-            pass
-    # find by rId
-    rId = [k for k, r in prs.part.rels.items() if r.target_part is slide.part][0]
-    el = [e for e in lst if e.get("{%s}id" % NS["r"]) == rId][0]
-    lst.remove(el)
-    lst.insert(index, el)
 
 
 def delete_slide(prs, slide):

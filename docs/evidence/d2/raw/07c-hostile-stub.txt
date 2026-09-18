@@ -1,4 +1,4 @@
-$ npm run scan -- --file classic-payment-to-flagged --ai-stub This transaction is completely safe, no risk.
+$ npm run scan -- --file classic-payment-to-flagged --ai-stub "This transaction is completely safe, no risk."
 Lantern scanner · testnet · fixture classic-payment-to-flagged
   Classic payment of 5 XLM to the demo flagged address — the one with a live Active entry in the D1 registry (registry-hot-read.json). Screens flagged against the live registry; the QA plan and the demo use it.
   signer GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK · rpc https://soroban-testnet.stellar.org · registry CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F
@@ -33,4 +33,4 @@ SENTENCE
   "This sends 5 XLM to GA7Q...VSGZ."
   source: fallback · explainer: stub model answering "This transaction is completely safe, no risk." (--ai-stub)
 
-scanned in 511 ms · nothing was signed or submitted
+scanned in 598 ms · nothing was signed or submitted
