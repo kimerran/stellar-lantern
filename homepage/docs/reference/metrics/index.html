@@ -26,9 +26,88 @@
         <p class="crumbs"><a href="/docs/">Lantern — Instawards Phase 1</a> <span class="sep">/</span> <span>Reference</span> <span class="sep">/</span> <span>Metrics</span></p>
         <article class="prose">
 <h1>Metrics</h1>
-<blockquote>
-<p><strong>Placeholder.</strong> This page is filled in by a later change; the site tree is complete so links resolve.</p>
-</blockquote>
+<p>The Statement of Work's §6.3 targets, against actuals read from the analytics dashboard on a dated snapshot. Numbers are never typed from memory: each row names how it is measured and when it was read.</p>
+<h2>How the numbers are measured</h2>
+<p>Lantern's wallet builds carry <strong>opt-in</strong> usage analytics (off by default; one toggle under Settings → Privacy; delete-my-data on request). Events are enum-only — no amounts, no memos, no keys — under a random install id. Alpha-tester builds may additionally attach the wallet's public address, which is what makes a &quot;unique wallet&quot; countable; installs with no address are counted as installs, not wallets. The Lantern API stores the events and serves the admin dashboard the snapshots below are read from.</p>
+<div class="table"><table><thead>
+<tr>
+<th>Metric</th>
+<th>Measured as</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Transactions scanned end-to-end</td>
+<td>Count of <code>tx_scanned</code> events across all installs in the window</td>
+</tr>
+<tr>
+<td>Unique wallets that ran a scan</td>
+<td>Distinct wallet addresses with at least one <code>tx_scanned</code> event in the window</td>
+</tr>
+<tr>
+<td>Transactions signed</td>
+<td>Count of <code>tx_signed</code> events (context only; not an SOW target)</td>
+</tr>
+</tbody>
+</table></div><h2>Snapshot</h2>
+<div class="table"><table><thead>
+<tr>
+<th>Metric</th>
+<th>Target</th>
+<th>At 2026-09-17 (snapshot)</th>
+<th>Change</th>
+<th>Met</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Transactions scanned end-to-end</td>
+<td>≥ 60</td>
+<td>18</td>
+<td>+18 (first data: 16 Sep)</td>
+<td>Not yet</td>
+</tr>
+<tr>
+<td>Unique wallets that ran a scan</td>
+<td>≥ 15</td>
+<td>4</td>
+<td>+4</td>
+<td>Not yet</td>
+</tr>
+<tr>
+<td>Transactions signed</td>
+<td>—</td>
+<td>6 across 4 wallets</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Installs reporting</td>
+<td>—</td>
+<td>6 (4 with a wallet address)</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div><p>Snapshot read from the analytics export on 2026-09-17; window 2026-09-16 → 2026-09-17 (the first day the instrumented builds were in testers' hands). The scanner is a library in Week 2 — every scan above came from the alpha wallet's existing review screen. The SOW's counts are expected to move in Weeks 3 and 4, when the D2 scanner sits in the wallet's pre-sign review (D3) and a public playground opens (D4).</p>
+<h2>History</h2>
+<div class="table"><table><thead>
+<tr>
+<th>Snapshot</th>
+<th>Scanned</th>
+<th>Wallets scanned</th>
+<th>Signed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-09-17</td>
+<td>18</td>
+<td>4</td>
+<td>6</td>
+</tr>
+</tbody>
+</table></div><p>Each weekly report from Week 3 on adds a row.</p>
 
         </article>
         <footer class="docs-foot">
