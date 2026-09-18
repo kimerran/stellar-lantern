@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Lantern — Instawards Phase 1</title>
+    <meta name="description" content="Evidence site for Lantern's Stellar Development Foundation Instawards sprint." />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/docs/docs.css" />
+  </head>
+  <body class="docs">
+    <header class="docs-top">
+      <div class="docs-top-inner">
+        <a class="brand" href="/docs/"><img src="/logo.jpg" alt="Lantern logo" /><span>Lantern</span><em>Instawards evidence</em></a>
+        <a class="md-link" href="/docs/index.md" title="This page as markdown">view as markdown</a>
+      </div>
+    </header>
+    <div class="docs-layout">
+      <nav class="side" aria-label="Pages"><ul><li class="on"><a href="/docs/">Overview</a></li><li><a href="/docs/sow/">Statement of Work</a></li><li class="group"><span>Weekly reports</span><ul><li><a href="/docs/weekly/week-1/">Week 1 — 7–13 Sep</a></li><li><a href="/docs/weekly/week-2/">Week 2 — 14–20 Sep</a></li><li><a href="/docs/weekly/week-3/">Week 3 — 21–27 Sep</a></li><li><a href="/docs/weekly/week-4/">Week 4 — 28 Sep – 4 Oct</a></li></ul></li><li class="group"><span>Deliverables</span><ul><li><a href="/docs/deliverables/d1/">D1 — On-chain blacklist registry</a></li><li><a href="/docs/deliverables/d2/">D2 — Transaction security scanner</a></li><li><a href="/docs/deliverables/d3/">D3 — Scanner in the wallet</a></li><li><a href="/docs/deliverables/d4/">D4 — Public demo</a></li></ul></li><li class="group"><span>Reference</span><ul><li><a href="/docs/reference/scanner/">Scanner package</a></li><li><a href="/docs/reference/registry/">Registry contract</a></li><li><a href="/docs/reference/metrics/">Metrics</a></li><li><a href="/docs/reference/evidence/">Evidence index</a></li><li><a href="/docs/reference/changelog/">Full changelog</a></li></ul></li></ul></nav>
+      <main class="docs-main">
+        <p class="crumbs"><a href="/docs/">Lantern — Instawards Phase 1</a></p>
+        <article class="prose">
+<h1>Lantern — Instawards Phase 1</h1>
+<p><strong>Lantern</strong> is a non-custodial Stellar wallet — a Chrome extension and an Android app — with a security layer that reads every transaction <em>before</em> it is signed and says, in plain language, what it does, who it pays, and whether that counterparty has been reported. This site is the evidence trail for the four-week Stellar Development Foundation <strong>Instawards</strong> sprint (Philippines chapter): what was promised, what shipped each week, and where a reviewer can verify it independently.</p>
+<div class="table"><table><thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Builder</td>
+<td>Team Lantern</td>
+</tr>
+<tr>
+<td>Live site</td>
+<td><a href="https://lantern.artisam.xyz" target="_blank" rel="noopener">lantern.artisam.xyz</a></td>
+</tr>
+<tr>
+<td>Source (MIT)</td>
+<td><a href="https://github.com/kimerran/stellar-lantern" target="_blank" rel="noopener">github.com/kimerran/stellar-lantern</a></td>
+</tr>
+<tr>
+<td>Network</td>
+<td>Stellar Testnet (<code>Test SDF Network ; September 2015</code>)</td>
+</tr>
+<tr>
+<td>Sprint</td>
+<td>7 September – 4 October 2026, four weeks, Monday–Sunday</td>
+</tr>
+</tbody>
+</table></div><h2>The four deliverables</h2>
+<div class="table"><table><thead>
+<tr>
+<th>Week</th>
+<th>Deliverable</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 — 7–13 Sep</td>
+<td><a href="/docs/deliverables/d1/">D1 — On-chain blacklist registry</a></td>
+<td>Complete</td>
+</tr>
+<tr>
+<td>2 — 14–20 Sep</td>
+<td><a href="/docs/deliverables/d2/">D2 — Transaction security scanner</a></td>
+<td>Complete, recording pending</td>
+</tr>
+<tr>
+<td>3 — 21–27 Sep</td>
+<td><a href="/docs/deliverables/d3/">D3 — Scanner in the wallet</a></td>
+<td>Planned</td>
+</tr>
+<tr>
+<td>4 — 28 Sep – 4 Oct</td>
+<td><a href="/docs/deliverables/d4/">D4 — Public demo</a></td>
+<td>Planned</td>
+</tr>
+</tbody>
+</table></div><h2>How to read this site</h2>
+<ul>
+<li><strong>Weekly reports</strong> are the progress log: a plain-English summary, the changelog of merged changes, Statement-of-Work progress, evidence added that week, metrics, decisions, issues fixed, maintenance, and what comes next.</li>
+<li><strong>Deliverables</strong> are the traceability view: for each deliverable, every SOW clause mapped to the change that satisfied it and the public evidence that proves it.</li>
+<li><strong>Reference</strong> holds the <a href="/docs/reference/evidence/">Evidence index</a> (every contract id, hash, transaction and artifact in one table — the page to keep open while reviewing), the <a href="/docs/reference/metrics/">Metrics</a> against the SOW's targets, the <a href="/docs/reference/changelog/">Full changelog</a>, and condensed references for the <a href="/docs/reference/scanner/">scanner package</a> and the <a href="/docs/reference/registry/">registry contract</a>.</li>
+<li>The <a href="/docs/sow/">Statement of Work</a> page holds the approved SOW and is never edited; deviations are recorded in the weekly report where they happened.</li>
+</ul>
+<p>Every claim on this site links to something public: a commit in the public repository, a page on stellar.expert, a CI run, a recording, a deck slide or a test-plan result. A claim with no link is a bug — please report it.</p>
+<h2>For AI agents</h2>
+<p>Every page has a markdown twin (the <em>view as markdown</em> link at the top of each page, or replace the trailing <code>/</code> with <code>.md</code>; for the home page it is <a href="/docs/index.md"><code>/docs/index.md</code></a>), and <a href="/docs/llms.txt"><code>/docs/llms.txt</code></a> indexes all of them. There is no client-side JavaScript; the HTML is complete as served.</p>
+
+        </article>
+        <footer class="docs-foot">
+          <p>Unlisted evidence site for the Stellar Development Foundation Instawards programme. Not indexed; no links from the landing page. Machine-readable index: <a href="/docs/llms.txt">llms.txt</a>.</p>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Registry contract — Lantern — Instawards Phase 1</title>
+    <meta name="description" content="Evidence site for Lantern's Stellar Development Foundation Instawards sprint: weekly reports, deliverable traceability, and an index of every on-chain and off-chain artifact." />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/docs/docs.css" />
+  </head>
+  <body class="docs">
+    <header class="docs-top">
+      <div class="docs-top-inner">
+        <a class="brand" href="/docs/"><img src="/logo.jpg" alt="Lantern logo" /><span>Lantern</span><em>Instawards evidence</em></a>
+        <a class="md-link" href="/docs/reference/registry.md" title="This page as markdown">view as markdown</a>
+      </div>
+    </header>
+    <div class="docs-layout">
+      <nav class="side" aria-label="Pages"><ul><li><a href="/docs/">Overview</a></li><li><a href="/docs/sow/">Statement of Work</a></li><li class="group"><span>Weekly reports</span><ul><li><a href="/docs/weekly/week-1/">Week 1 — 7–13 Sep</a></li><li><a href="/docs/weekly/week-2/">Week 2 — 14–20 Sep</a></li><li><a href="/docs/weekly/week-3/">Week 3 — 21–27 Sep</a></li><li><a href="/docs/weekly/week-4/">Week 4 — 28 Sep – 4 Oct</a></li></ul></li><li class="group"><span>Deliverables</span><ul><li><a href="/docs/deliverables/d1/">D1 — On-chain blacklist registry</a></li><li><a href="/docs/deliverables/d2/">D2 — Transaction security scanner</a></li><li><a href="/docs/deliverables/d3/">D3 — Scanner in the wallet</a></li><li><a href="/docs/deliverables/d4/">D4 — Public demo</a></li></ul></li><li class="group"><span>Reference</span><ul><li><a href="/docs/reference/scanner/">Scanner package</a></li><li class="on"><a href="/docs/reference/registry/">Registry contract</a></li><li><a href="/docs/reference/metrics/">Metrics</a></li><li><a href="/docs/reference/evidence/">Evidence index</a></li><li><a href="/docs/reference/changelog/">Full changelog</a></li></ul></li></ul></nav>
+      <main class="docs-main">
+        <p class="crumbs"><a href="/docs/">Lantern — Instawards Phase 1</a> <span class="sep">/</span> <span>Reference</span> <span class="sep">/</span> <span>Registry contract</span></p>
+        <article class="prose">
+<h1>Registry contract — on-chain blacklist</h1>
+<p>Condensed from the <a href="https://github.com/kimerran/stellar-lantern/blob/main/docs/blacklist-registry.md" target="_blank" rel="noopener">full reference</a>, which has the complete ABI, the numbered error table, the nine-field data model, the event schema, the fee model and both read paths. Source: <a href="https://github.com/kimerran/stellar-lantern/tree/main/contracts/blacklist-registry" target="_blank" rel="noopener"><code>contracts/blacklist-registry/</code></a>.</p>
+<h2>Deployment (Stellar Testnet)</h2>
+<div class="table"><table><thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Contract id</td>
+<td><a href="https://stellar.expert/explorer/testnet/contract/CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F" target="_blank" rel="noopener"><code>CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F</code></a></td>
+</tr>
+<tr>
+<td>WASM hash</td>
+<td><code>40fd37718c3fbc7f849c4d414364cdd86c01b4db9ab86be9099007ba5be23783</code> — the sha256 of the built artifact; the deploy script refuses to continue if the uploaded hash disagrees with the local build</td>
+</tr>
+<tr>
+<td>Admin</td>
+<td><code>GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK</code></td>
+</tr>
+<tr>
+<td>Treasury</td>
+<td><code>GA4A2EPXERUUVMBMH3D5OV4ONZ7QXIYKHBSI2ZWZ5HQAIFUMYCQZRSNR</code></td>
+</tr>
+<tr>
+<td>Fee</td>
+<td>1 XLM (<code>10000000</code> stroops) of the native XLM SAC, per accepted report</td>
+</tr>
+<tr>
+<td>Smoke report transaction</td>
+<td><a href="https://stellar.expert/explorer/testnet/tx/81fa64a67eb583f8fb499b2d425e88754b701480f1c8aff2e3ad8a6725fb8ed8" target="_blank" rel="noopener"><code>81fa64a6…8ed8</code></a></td>
+</tr>
+</tbody>
+</table></div><p>Admin and treasury are local <code>stellar keys</code> identities on the deploying machine; no secret is in the repository.</p>
+<h2>Interface</h2>
+<div class="table"><table><thead>
+<tr>
+<th>Entry point</th>
+<th>Who</th>
+<th>What</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>report(reporter, subject, reason, evidence) → u32</code></td>
+<td>Anyone</td>
+<td>Records <code>subject</code> as malicious, returns its new total report count, charges the fee reporter → treasury inside the same transaction. <code>reporter.require_auth()</code> runs first. Self-report is rejected.</td>
+</tr>
+<tr>
+<td><code>set_status(subject, status)</code></td>
+<td>Admin</td>
+<td>Active / Disputed / Revoked. Only Active raises a warning; the entry is never deleted.</td>
+</tr>
+<tr>
+<td><code>set_fee</code>, <code>set_fee_token</code>, <code>set_treasury</code>, <code>set_admin</code></td>
+<td>Admin</td>
+<td>Config. <code>set_admin</code> requires both the outgoing and the incoming admin to sign.</td>
+</tr>
+<tr>
+<td><code>is_flagged(subject) → bool</code>, <code>get(subject)</code>, <code>count()</code>, <code>list(start, limit)</code>, <code>config()</code></td>
+<td>Anyone</td>
+<td>Public reads; no fee, no auth.</td>
+</tr>
+</tbody>
+</table></div><h2>Two read paths</h2>
+<ol>
+<li><strong>Contract views</strong> (<code>is_flagged</code>, <code>get</code>, <code>list</code>) via a simulated call — for UIs and indexers.</li>
+<li><strong>Direct ledger read</strong> — the entry's ledger key is deterministic from the contract id and the subject address, so a single <code>getLedgerEntries</code> RPC call returns it with <strong>no source account, no signature, no fee and no simulation round-trip</strong>. This is the path the scanner's Screen stage uses per counterparty, and the path a visitor to the public demo (who has no key) can take. <code>scripts/hot-read-blacklist-registry.mjs</code> is the reference implementation; the worked example in the full reference is re-derived by the test suite so it cannot drift from the deployment.</li>
+</ol>
+<h2>Data model, in one line</h2>
+<p>Each entry records the subject, the reporter, the reason (an enum), the status, a 32-byte evidence hash (the material stays off chain), first-reported and last-updated ledger times, the report count and an index for paging.</p>
+<h2>After a testnet reset</h2>
+<p>Testnet is periodically reset. <code>scripts/deploy-blacklist-registry.sh</code> is re-runnable and prints every value to update; the runbook is three steps (README row, deployment table, worked example), and the scanner's registry fixture is re-recorded with <code>fixtures/record-registry.mjs</code>.</p>
+
+        </article>
+        <footer class="docs-foot">
+          <p>Unlisted evidence site for the Stellar Development Foundation Instawards programme. Not indexed; no links from the landing page. Machine-readable index: <a href="/docs/llms.txt">llms.txt</a>.</p>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

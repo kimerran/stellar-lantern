@@ -1,0 +1,6 @@
+---
+title: Week 1 — 7–13 Sep
+---
+# Week 1 — 7–13 September 2026 · D1, on-chain blacklist registry
+
+> **Placeholder.** This page is filled in by a later change; the site tree is complete so links resolve.
