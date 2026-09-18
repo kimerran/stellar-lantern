@@ -26,9 +26,128 @@
         <p class="crumbs"><a href="/docs/">Lantern — Instawards Phase 1</a> <span class="sep">/</span> <span>Deliverables</span> <span class="sep">/</span> <span>D1 — On-chain blacklist registry</span></p>
         <article class="prose">
 <h1>D1 — On-chain blacklist registry</h1>
-<blockquote>
-<p><strong>Placeholder.</strong> This page is filled in by a later change; the site tree is complete so links resolve.</p>
-</blockquote>
+<p><strong>Statement of Work:</strong> Deliverable 1 · <strong>Target:</strong> Week 1 (7–13 Sep) · <strong>Status:</strong> Complete and closed</p>
+<p>A Soroban contract that replaces the hardcoded demo deny-list baked into the wallet's scanner. A list inside one wallet's bundle protects one wallet's users; a contract any wallet or dApp can read protects everyone.</p>
+<h2>Evidence</h2>
+<div class="table"><table><thead>
+<tr>
+<th>SOW §6.1 evidence</th>
+<th>Where</th>
+<th>What it shows</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>stellar.expert testnet contract page</td>
+<td><a href="https://stellar.expert/explorer/testnet/contract/CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F" target="_blank" rel="noopener"><code>CBJWD6SA…G623F</code></a></td>
+<td>The deployed contract, its WASM hash, creation time, storage entries, and a history of <code>report</code> and <code>set_status</code> calls from several accounts</td>
+<td>Present</td>
+</tr>
+<tr>
+<td>WASM hash published in the README</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/blob/main/README.md#testnet-smart-contracts" target="_blank" rel="noopener">README — Testnet smart contracts</a></td>
+<td><code>40fd37718c3fbc7f849c4d414364cdd86c01b4db9ab86be9099007ba5be23783</code>, identical on the published and sandbox instances and to a fresh local build</td>
+<td>Present</td>
+</tr>
+<tr>
+<td>Sample on-chain report transaction with the fee routed to the treasury</td>
+<td><a href="https://stellar.expert/explorer/testnet/tx/81fa64a67eb583f8fb499b2d425e88754b701480f1c8aff2e3ad8a6725fb8ed8" target="_blank" rel="noopener"><code>81fa64a6…8ed8</code></a></td>
+<td>One transaction carrying the write, the attribution and the 1 XLM transfer reporter → treasury; the smoke script asserts the treasury delta equals the fee</td>
+<td>Present</td>
+</tr>
+<tr>
+<td>Recordings (registry end to end; captioned terminal capture)</td>
+<td><em>TODO: link</em></td>
+<td>Report → fee lands → address reads flagged → admin disputes → warning stops, on the public explorer; then the same loop from the command line</td>
+<td>Pending link</td>
+</tr>
+<tr>
+<td>Evidence decks</td>
+<td><em>TODO: link</em></td>
+<td>Proof of Deliverables (7 slides) and Technical Documentation &amp; Demo Evidence (8 slides)</td>
+<td>Pending link</td>
+</tr>
+</tbody>
+</table></div><h2>What a user can do when this is done</h2>
+<p>Anyone can report a Stellar address as a scam by paying a small fee, and anyone — a wallet, a dApp, a script — can ask whether an address has been reported, by whom, why, and how many times, without owning an account, signing anything or paying. A reported address raises a warning in every wallet that reads the registry, not just the one where it was reported. An administrator can mark an entry Disputed or Revoked so a wrongful report stops raising a warning while the record of it survives.</p>
+<h2>Traceability</h2>
+<div class="table"><table><thead>
+<tr>
+<th>SOW clause</th>
+<th>Change</th>
+<th>Evidence</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A registry contract on Soroban with a data model for reports</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/22de070" target="_blank" rel="noopener"><code>22de070</code></a> — crate scaffold, nine-field entry, storage schema, constructor</td>
+<td>Contract page; <a href="https://github.com/kimerran/stellar-lantern/blob/main/docs/blacklist-registry.md" target="_blank" rel="noopener">reference: data model</a></td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>Fee-gated <code>report()</code> with the fee routed to a treasury in the same transaction</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/072c336" target="_blank" rel="noopener"><code>072c336</code></a></td>
+<td><a href="https://stellar.expert/explorer/testnet/tx/81fa64a67eb583f8fb499b2d425e88754b701480f1c8aff2e3ad8a6725fb8ed8" target="_blank" rel="noopener">Report tx <code>81fa64a6…</code></a>; smoke script asserts +1 XLM on the treasury</td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>Admin status transitions (Active / Disputed / Revoked) and config management</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/76edfba" target="_blank" rel="noopener"><code>76edfba</code></a></td>
+<td><code>set_status</code> transactions on the contract history; sandbox tx <a href="https://stellar.expert/explorer/testnet/tx/ae57d1890c5ef6198e08e9723d063b1186889bef4b20286c826deb984b9130b8" target="_blank" rel="noopener"><code>ae57d189…</code></a></td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>Public read API (<code>is_flagged</code>, <code>get</code>, <code>count</code>, <code>list</code>)</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/4d7b093" target="_blank" rel="noopener"><code>4d7b093</code></a></td>
+<td>Interface tab on the contract page; unit tests with committed snapshots</td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>Fee-free read path for per-signature screening</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/3bcfc4e" target="_blank" rel="noopener"><code>3bcfc4e</code></a> — deterministic ledger key + <code>getLedgerEntries</code></td>
+<td><code>scripts/hot-read-blacklist-registry.mjs</code> prints FLAGGED for the demo address with no account and no signature; the worked example in the reference is re-derived by the test suite</td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>Continuous integration for the contract</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/619214a" target="_blank" rel="noopener"><code>619214a</code></a> — fmt, clippy <code>-D warnings</code>, tests, wasm build, vendored-artifact check</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/actions/workflows/contracts.yml" target="_blank" rel="noopener">Contracts lane</a></td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>Deployed to testnet with the evidence the SOW names</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/96c4713" target="_blank" rel="noopener"><code>96c4713</code></a> — re-runnable deploy script that refuses an unverifiable hash; smoke script</td>
+<td>Contract page; README row; report tx</td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>Documented end to end</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/7983bd3" target="_blank" rel="noopener"><code>7983bd3</code></a> — full ABI, error table, data model, events, both read paths</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/blob/main/docs/blacklist-registry.md" target="_blank" rel="noopener"><code>docs/blacklist-registry.md</code></a></td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>§3.9 — no secrets in the repository</td>
+<td>Admin and treasury are local <code>stellar keys</code> identities; deploy script documents that real secrets live in environment secrets</td>
+<td>Repository grep; CI</td>
+<td>Evidenced</td>
+</tr>
+</tbody>
+</table></div><h2>Scope notes</h2>
+<ul>
+<li>The registry <strong>informs a warning; it does not gate a transaction on its own</strong>. Attribution (who reported) is stored so a consumer can weight the claim; an auto-block on one stranger's word was deliberately not built.</li>
+<li>Evidence is a 32-byte hash. The material itself never goes on chain.</li>
+<li>The wallet did not read the registry in Week 1; that wiring is Deliverable 2's Screen stage (done) and Deliverable 3's pre-sign screen.</li>
+</ul>
+<h2>Implementation choices</h2>
+<ul>
+<li><strong>Two instances of the same bytecode.</strong> The published deployment is the one named in the README and the reference; a separate QA sandbox instance (<a href="https://stellar.expert/explorer/testnet/contract/CDPEFCHAYIGBHZWEF4TA5VC4V6TX4DIO3KM2E25TZARQMPR2J6E53F4N" target="_blank" rel="noopener"><code>CDPEFCHA…53F4N</code></a>) lets a tester hold the admin key and exercise the admin paths without touching the published one. Same WASM hash on both.</li>
+<li><strong>The deploy script is the runbook.</strong> Testnet is periodically reset; the script re-creates identities only if absent, prints every value the README needs, and aborts rather than publish a WASM hash it cannot reproduce locally.</li>
+<li><strong>Documentation coupled to code.</strong> The reference document's worked example is parsed by the test suite and re-derived, so a half-finished re-deployment fails the tests instead of shipping a document that lies.</li>
+</ul>
 
         </article>
         <footer class="docs-foot">
