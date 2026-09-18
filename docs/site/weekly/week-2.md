@@ -48,7 +48,7 @@ Deliverable 2 shipped: an MIT-licensed scanner package that simulates a Stellar 
 | §4.1 — structured effects + plain-language explanation for payments | D2 | Evidenced | Proof slide 3; QA plan section 3 |
 | §4.1 — the same for token-interface calls (SEP-41 / SAC) | D2 | Evidenced | Unlimited approval caught (proof slide 4); QA plan section 4 |
 | §4.1 — an "unverified contract" case handled safely | D2 | Evidenced | Proof slide 6; QA plan section 5 |
-| §6.1 — MIT-licensed public repository | D2 | Evidenced | [`LICENSE`](https://github.com/kimerran/stellar-lantern/blob/main/LICENSE) at the root and in [`packages/lantern-scanner/`](https://github.com/kimerran/stellar-lantern/tree/develop/packages/lantern-scanner) |
+| §6.1 — MIT-licensed public repository | D2 | Evidenced | [`LICENSE`](https://github.com/kimerran/stellar-lantern/blob/develop/LICENSE) at the root and in [`packages/lantern-scanner/`](https://github.com/kimerran/stellar-lantern/tree/develop/packages/lantern-scanner) |
 | §6.1 — scanner suite green in CI, offline | D2 | Evidenced | [Tests lane run](https://github.com/kimerran/stellar-lantern/actions) on the release commit — 748 passed, 1 skipped, no network |
 | §6.1 — 90-second recording (payment, token call, unverified contract) | D2 | In progress | Runbook written; recording not yet made |
 | §6.1 — QA sign-off against the manual plan | D2 | Done | [Test plan](https://github.com/kimerran/stellar-lantern/blob/develop/docs/qa/d2-transaction-scanner-test-plan.md) merged with a full dry run; an independent tester's sign-off is pending |
