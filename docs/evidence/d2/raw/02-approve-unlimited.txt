@@ -1,0 +1,33 @@
+$ npm run scan -- --file sep41-approve
+Lantern scanner · testnet · fixture sep41-approve
+  SEP-41 `approve(from, spender, amount, expiration_ledger)` on the USDC SAC — the "unlimited approval" shape.
+  signer GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK · rpc https://soroban-testnet.stellar.org · registry CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F
+
+INGEST
+  ok · 1 op(s) · simulated via RPC
+  1 authorization entry
+
+EFFECTS
+  token_approve · op 0 · approve() · → GBVG…FJBP
+  APPROVAL GAMN…SRNK lets GBVG…FJBP spend 17014118346046923173168730371588.4105727 USDC(GATA…5V56) until ledger 5666220 · UNLIMITED
+  coverage full
+
+SCREEN
+  outcome clean · checked 2
+
+VERDICT
+  risk HIGH · action BLOCK_CONFIRM · effects shown, terms not judged
+  [high] unlimited_allowance — Unlimited token allowance: This lets GBVG…FJBP spend an unlimited amount of your USDC. Only continue if you fully trust that address.
+  signals (6)
+    ingest · simulated · simulation — 1 auth entries
+    auth · flat · auth.calls — 1 entries, 1 calls, 0 nested, depth 0
+    effects · coverage_full · effects.coverage — token_approve
+    screen · clean · screen — 2 checked, 0 hits, 0 unknown
+    effects · unlimited_allowance · approvals[0] — USDC → GBVG…FJBP, 17014118346046923173168730371588.4105727, expires ledger 5666220, depth 0
+    verdict · unlimited_allowance · approvals[0] — Unlimited token allowance
+
+SENTENCE
+  "This transaction grants GBVG…FJBP permission to spend an unlimited amount of USDC from GAMN…SRNK until ledger 5666220. This presents high risk and confirmation is blocked."
+  source: explainer · explainer: Lantern API proxy https://lantern-api-production-3fad.up.railway.app/v1/explain
+
+scanned in 2678 ms · nothing was signed or submitted

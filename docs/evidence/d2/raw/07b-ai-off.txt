@@ -1,0 +1,267 @@
+$ npm run scan -- --file classic-payment-to-flagged --json --no-ai
+{
+  "risk": "high",
+  "action": "block_confirm",
+  "reasons": [
+    {
+      "code": "reported_address",
+      "severity": "high",
+      "title": "Reported address",
+      "detail": "GA7Q…VSGZ is on the Lantern blacklist registry: reported as Scam by GAMN…SRNK, 4 reports.",
+      "ref": "screen.hits[0]"
+    }
+  ],
+  "signals": [
+    {
+      "stage": "ingest",
+      "code": "classic",
+      "detail": "no simulation needed",
+      "ref": "simulation"
+    },
+    {
+      "stage": "auth",
+      "code": "flat",
+      "detail": "0 entries, 0 calls, 0 nested, depth 0",
+      "ref": "auth.calls"
+    },
+    {
+      "stage": "effects",
+      "code": "coverage_full",
+      "detail": "payment",
+      "ref": "effects.coverage"
+    },
+    {
+      "stage": "screen",
+      "code": "flagged",
+      "detail": "1 checked, 1 hits, 0 unknown",
+      "ref": "screen"
+    },
+    {
+      "detail": "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
+      "stage": "screen",
+      "code": "reported_address",
+      "ref": "screen.hits[0]"
+    }
+  ],
+  "explanation": "This sends 5 XLM to GA7Q...VSGZ.",
+  "explanationSource": "explainer",
+  "verdict": {
+    "risk": "high",
+    "action": "block_confirm",
+    "reasons": [
+      {
+        "code": "reported_address",
+        "severity": "high",
+        "title": "Reported address",
+        "detail": "GA7Q…VSGZ is on the Lantern blacklist registry: reported as Scam by GAMN…SRNK, 4 reports.",
+        "ref": "screen.hits[0]"
+      }
+    ],
+    "signals": [
+      {
+        "stage": "ingest",
+        "code": "classic",
+        "detail": "no simulation needed",
+        "ref": "simulation"
+      },
+      {
+        "stage": "auth",
+        "code": "flat",
+        "detail": "0 entries, 0 calls, 0 nested, depth 0",
+        "ref": "auth.calls"
+      },
+      {
+        "stage": "effects",
+        "code": "coverage_full",
+        "detail": "payment",
+        "ref": "effects.coverage"
+      },
+      {
+        "stage": "screen",
+        "code": "flagged",
+        "detail": "1 checked, 1 hits, 0 unknown",
+        "ref": "screen"
+      },
+      {
+        "detail": "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
+        "stage": "screen",
+        "code": "reported_address",
+        "ref": "screen.hits[0]"
+      }
+    ],
+    "scope": "effects shown, terms not judged"
+  },
+  "simulation": {
+    "ok": true,
+    "outcome": "ok",
+    "decoded": {
+      "source": "GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK",
+      "operations": [
+        {
+          "type": "payment",
+          "destination": "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
+          "amount": "5.0000000",
+          "assetCode": "XLM"
+        }
+      ],
+      "isSoroban": false,
+      "primaryDestination": "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
+      "primaryAmount": "5.0000000",
+      "primaryAssetCode": "XLM"
+    },
+    "simulated": false,
+    "auth": [],
+    "footprint": {
+      "readOnly": [],
+      "readWrite": []
+    },
+    "events": [],
+    "stateChanges": []
+  },
+  "auth": {
+    "entries": [],
+    "calls": [],
+    "roots": [],
+    "nestedCount": 0,
+    "maxDepth": 0,
+    "unparseable": 0,
+    "analyzed": true
+  },
+  "effects": {
+    "source": {
+      "source": "GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK",
+      "operations": [
+        {
+          "type": "payment",
+          "destination": "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
+          "amount": "5.0000000",
+          "assetCode": "XLM"
+        }
+      ],
+      "isSoroban": false,
+      "primaryDestination": "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
+      "primaryAmount": "5.0000000",
+      "primaryAssetCode": "XLM"
+    },
+    "effects": [
+      {
+        "kind": "payment",
+        "opIndex": 0,
+        "counterparty": "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
+        "assetCode": "XLM",
+        "amount": "5.0000000"
+      }
+    ],
+    "deltas": [
+      {
+        "address": "GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK",
+        "direction": "out",
+        "asset": {
+          "code": "XLM",
+          "decimals": 7
+        },
+        "amount": "5.0000000",
+        "bound": "exact",
+        "opIndex": 0,
+        "source": "classic"
+      },
+      {
+        "address": "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
+        "direction": "in",
+        "asset": {
+          "code": "XLM",
+          "decimals": 7
+        },
+        "amount": "5.0000000",
+        "bound": "exact",
+        "opIndex": 0,
+        "source": "classic"
+      }
+    ],
+    "net": [
+      {
+        "address": "GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK",
+        "asset": {
+          "code": "XLM",
+          "decimals": 7
+        },
+        "in": "0.0000000",
+        "inAtLeast": false,
+        "inIsTotal": false,
+        "out": "5.0000000",
+        "outUpTo": false,
+        "outIsTotal": false
+      },
+      {
+        "address": "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
+        "asset": {
+          "code": "XLM",
+          "decimals": 7
+        },
+        "in": "5.0000000",
+        "inAtLeast": false,
+        "inIsTotal": false,
+        "out": "0.0000000",
+        "outUpTo": false,
+        "outIsTotal": false
+      }
+    ],
+    "closes": [],
+    "contractsTouched": [],
+    "approvals": [],
+    "unverified": [],
+    "observed": [],
+    "observedNet": [],
+    "coverage": "full"
+  },
+  "screen": {
+    "outcome": "flagged",
+    "checked": [
+      "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
+    ],
+    "hits": [
+      {
+        "address": "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
+        "source": "registry",
+        "entry": {
+          "subject": "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
+          "reporter": "GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK",
+          "reason": "Scam",
+          "status": "Active",
+          "evidence": "7f107062713d6b640e0491e374f26314e3d12a1c4e3687959269ae5d32e411d8",
+          "reportedAt": 1788922492,
+          "updatedAt": 1788958527,
+          "reports": 4,
+          "index": 0
+        }
+      }
+    ],
+    "unknown": [],
+    "answers": [
+      {
+        "address": "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
+        "answer": {
+          "outcome": "flagged",
+          "entry": {
+            "subject": "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
+            "reporter": "GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK",
+            "reason": "Scam",
+            "status": "Active",
+            "evidence": "7f107062713d6b640e0491e374f26314e3d12a1c4e3687959269ae5d32e411d8",
+            "reportedAt": 1788922492,
+            "updatedAt": 1788958527,
+            "reports": 4,
+            "index": 0
+          },
+          "source": "registry"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "input": "fixture classic-payment-to-flagged",
+    "offline": false,
+    "explainer": "rules-based (--no-ai)",
+    "ms": 599
+  }
+}
