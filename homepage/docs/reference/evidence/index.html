@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Evidence index — Lantern — Instawards Phase 1</title>
+    <meta name="description" content="Evidence site for Lantern's Stellar Development Foundation Instawards sprint: weekly reports, deliverable traceability, and an index of every on-chain and off-chain artifact." />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/docs/docs.css" />
+  </head>
+  <body class="docs">
+    <header class="docs-top">
+      <div class="docs-top-inner">
+        <a class="brand" href="/docs/"><img src="/logo.jpg" alt="Lantern logo" /><span>Lantern</span><em>Instawards evidence</em></a>
+        <a class="md-link" href="/docs/reference/evidence.md" title="This page as markdown">view as markdown</a>
+      </div>
+    </header>
+    <div class="docs-layout">
+      <nav class="side" aria-label="Pages"><ul><li><a href="/docs/">Overview</a></li><li><a href="/docs/sow/">Statement of Work</a></li><li class="group"><span>Weekly reports</span><ul><li><a href="/docs/weekly/week-1/">Week 1 — 7–13 Sep</a></li><li><a href="/docs/weekly/week-2/">Week 2 — 14–20 Sep</a></li><li><a href="/docs/weekly/week-3/">Week 3 — 21–27 Sep</a></li><li><a href="/docs/weekly/week-4/">Week 4 — 28 Sep – 4 Oct</a></li></ul></li><li class="group"><span>Deliverables</span><ul><li><a href="/docs/deliverables/d1/">D1 — On-chain blacklist registry</a></li><li><a href="/docs/deliverables/d2/">D2 — Transaction security scanner</a></li><li><a href="/docs/deliverables/d3/">D3 — Scanner in the wallet</a></li><li><a href="/docs/deliverables/d4/">D4 — Public demo</a></li></ul></li><li class="group"><span>Reference</span><ul><li><a href="/docs/reference/scanner/">Scanner package</a></li><li><a href="/docs/reference/registry/">Registry contract</a></li><li><a href="/docs/reference/metrics/">Metrics</a></li><li class="on"><a href="/docs/reference/evidence/">Evidence index</a></li><li><a href="/docs/reference/changelog/">Full changelog</a></li></ul></li></ul></nav>
+      <main class="docs-main">
+        <p class="crumbs"><a href="/docs/">Lantern — Instawards Phase 1</a> <span class="sep">/</span> <span>Reference</span> <span class="sep">/</span> <span>Evidence index</span></p>
+        <article class="prose">
+<h1>Evidence index</h1>
+<p>Every contract id, hash, address, transaction, recording, deck, document and CI run referenced anywhere on this site, in one table. Keep this page open while reviewing. A cell reading <em>TODO: link</em> is a known gap, not a missing artifact.</p>
+<h2>On chain (Stellar Testnet)</h2>
+<div class="table"><table><thead>
+<tr>
+<th>Item</th>
+<th>Type</th>
+<th>Value / link</th>
+<th>Introduced in</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Blacklist registry — published deployment</td>
+<td>Contract</td>
+<td><a href="https://stellar.expert/explorer/testnet/contract/CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F" target="_blank" rel="noopener"><code>CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F</code></a></td>
+<td><a href="/docs/weekly/week-1/">Week 1</a></td>
+</tr>
+<tr>
+<td>Blacklist registry — QA sandbox instance (same WASM)</td>
+<td>Contract</td>
+<td><a href="https://stellar.expert/explorer/testnet/contract/CDPEFCHAYIGBHZWEF4TA5VC4V6TX4DIO3KM2E25TZARQMPR2J6E53F4N" target="_blank" rel="noopener"><code>CDPEFCHAYIGBHZWEF4TA5VC4V6TX4DIO3KM2E25TZARQMPR2J6E53F4N</code></a></td>
+<td>Week 1</td>
+</tr>
+<tr>
+<td>Registry WASM hash</td>
+<td>Hash</td>
+<td><code>40fd37718c3fbc7f849c4d414364cdd86c01b4db9ab86be9099007ba5be23783</code></td>
+<td>Week 1</td>
+</tr>
+<tr>
+<td>Registry admin (published deployment)</td>
+<td>Account</td>
+<td><code>GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK</code></td>
+<td>Week 1</td>
+</tr>
+<tr>
+<td>Registry treasury (published deployment)</td>
+<td>Account</td>
+<td><code>GA4A2EPXERUUVMBMH3D5OV4ONZ7QXIYKHBSI2ZWZ5HQAIFUMYCQZRSNR</code></td>
+<td>Week 1</td>
+</tr>
+<tr>
+<td>Fee token (native XLM SAC)</td>
+<td>Contract</td>
+<td><a href="https://stellar.expert/explorer/testnet/contract/CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC" target="_blank" rel="noopener"><code>CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC</code></a></td>
+<td>Week 1</td>
+</tr>
+<tr>
+<td>Smoke report transaction — fee routed (published deployment)</td>
+<td>Transaction</td>
+<td><a href="https://stellar.expert/explorer/testnet/tx/81fa64a67eb583f8fb499b2d425e88754b701480f1c8aff2e3ad8a6725fb8ed8" target="_blank" rel="noopener"><code>81fa64a67eb583f8fb499b2d425e88754b701480f1c8aff2e3ad8a6725fb8ed8</code></a></td>
+<td>Week 1</td>
+</tr>
+<tr>
+<td>Demo flagged address (reported as Scam, 4 reports, Active)</td>
+<td>Account</td>
+<td><code>GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ</code></td>
+<td>Week 1</td>
+</tr>
+<tr>
+<td>Sandbox treasury</td>
+<td>Account</td>
+<td><code>GBVS2HW246PBWEY2NHMC65CNZD73VIWOKC5MBLX46DTGVEI3TA4OWMLL</code></td>
+<td>Week 1</td>
+</tr>
+<tr>
+<td>Sandbox report transaction</td>
+<td>Transaction</td>
+<td><a href="https://stellar.expert/explorer/testnet/tx/eda0d8e042773a1a83a6c7d955829b3fe0aca9654cf41b5435fcda1b99a852aa" target="_blank" rel="noopener"><code>eda0d8e042773a1a83a6c7d955829b3fe0aca9654cf41b5435fcda1b99a852aa</code></a></td>
+<td>Week 1</td>
+</tr>
+<tr>
+<td>Sandbox <code>set_status(Disputed)</code> transaction</td>
+<td>Transaction</td>
+<td><a href="https://stellar.expert/explorer/testnet/tx/ae57d1890c5ef6198e08e9723d063b1186889bef4b20286c826deb984b9130b8" target="_blank" rel="noopener"><code>ae57d1890c5ef6198e08e9723d063b1186889bef4b20286c826deb984b9130b8</code></a></td>
+<td>Week 1</td>
+</tr>
+<tr>
+<td>USDC SAC used by the scanner fixtures</td>
+<td>Contract</td>
+<td><a href="https://stellar.expert/explorer/testnet/contract/CAQCFVLOBK5GIULPNZRGATJJMIZL5BSP7X5YJVMGCPTUEPFM4AVSRCJU" target="_blank" rel="noopener"><code>CAQCFVLOBK5GIULPNZRGATJJMIZL5BSP7X5YJVMGCPTUEPFM4AVSRCJU</code></a></td>
+<td>Week 2</td>
+</tr>
+</tbody>
+</table></div><h2>Code and releases</h2>
+<div class="table"><table><thead>
+<tr>
+<th>Item</th>
+<th>Type</th>
+<th>Value / link</th>
+<th>Introduced in</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Public repository (MIT)</td>
+<td>Repository</td>
+<td><a href="https://github.com/kimerran/stellar-lantern" target="_blank" rel="noopener">github.com/kimerran/stellar-lantern</a></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Scanner package (MIT)</td>
+<td>Code</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/tree/main/packages/lantern-scanner" target="_blank" rel="noopener"><code>packages/lantern-scanner/</code></a></td>
+<td>Week 2</td>
+</tr>
+<tr>
+<td>Registry contract source</td>
+<td>Code</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/tree/main/contracts/blacklist-registry" target="_blank" rel="noopener"><code>contracts/blacklist-registry/</code></a></td>
+<td>Week 1</td>
+</tr>
+<tr>
+<td>Lantern API (explainer proxy, telemetry, analytics)</td>
+<td>Code · Service</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/tree/main/services/lantern-api" target="_blank" rel="noopener"><code>services/lantern-api/</code></a> · <code>https://lantern-api-production-3fad.up.railway.app/healthz</code></td>
+<td>Week 2</td>
+</tr>
+<tr>
+<td>D1 release to <code>main</code></td>
+<td>Release</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/pull/153" target="_blank" rel="noopener">Release: on-chain blacklist registry</a> — <code>af35851</code>, 14 Sep</td>
+<td>Week 2</td>
+</tr>
+<tr>
+<td>D2 release to <code>main</code></td>
+<td>Release</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/pull/154" target="_blank" rel="noopener">Release: transaction security scanner</a> — from <code>73d5b34</code></td>
+<td>Week 2</td>
+</tr>
+<tr>
+<td>Contracts CI lane</td>
+<td>CI</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/actions/workflows/contracts.yml" target="_blank" rel="noopener">contracts.yml</a></td>
+<td>Week 1</td>
+</tr>
+<tr>
+<td>Tests CI lane (offline suite, build, flag proof)</td>
+<td>CI</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/actions/workflows/test.yml" target="_blank" rel="noopener">test.yml</a></td>
+<td>Week 1</td>
+</tr>
+<tr>
+<td>Services CI lane (Lantern API)</td>
+<td>CI</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/actions/workflows/services.yml" target="_blank" rel="noopener">services.yml</a></td>
+<td>Week 2</td>
+</tr>
+</tbody>
+</table></div><h2>Documents, plans and decks</h2>
+<div class="table"><table><thead>
+<tr>
+<th>Item</th>
+<th>Type</th>
+<th>Value / link</th>
+<th>Introduced in</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Registry reference — ABI, data model, errors, events, read paths</td>
+<td>Document</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/blob/main/docs/blacklist-registry.md" target="_blank" rel="noopener"><code>docs/blacklist-registry.md</code></a></td>
+<td>Week 1</td>
+</tr>
+<tr>
+<td>Scanner reference</td>
+<td>Document</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/blob/main/packages/lantern-scanner/README.md" target="_blank" rel="noopener"><code>packages/lantern-scanner/README.md</code></a></td>
+<td>Week 2</td>
+</tr>
+<tr>
+<td>Lantern API reference and threat model</td>
+<td>Document</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/blob/main/services/lantern-api/README.md" target="_blank" rel="noopener"><code>services/lantern-api/README.md</code></a></td>
+<td>Week 2</td>
+</tr>
+<tr>
+<td>Analytics disclosure</td>
+<td>Document</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/blob/main/docs/telemetry.md" target="_blank" rel="noopener"><code>docs/telemetry.md</code></a></td>
+<td>Week 2</td>
+</tr>
+<tr>
+<td>Dated delivery log</td>
+<td>Document</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/blob/main/docs/features.md" target="_blank" rel="noopener"><code>docs/features.md</code></a></td>
+<td>—</td>
+</tr>
+<tr>
+<td>D2 manual test plan + results table</td>
+<td>QA</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/blob/main/docs/qa/d2-transaction-scanner-test-plan.md" target="_blank" rel="noopener"><code>docs/qa/d2-transaction-scanner-test-plan.md</code></a></td>
+<td>Week 2</td>
+</tr>
+<tr>
+<td>D1 QA sign-off</td>
+<td>QA</td>
+<td><em>TODO: link</em></td>
+<td>Week 1</td>
+</tr>
+<tr>
+<td>D1 evidence decks (Proof of Deliverables; Technical Documentation &amp; Demo Evidence)</td>
+<td>Deck</td>
+<td><em>TODO: link</em></td>
+<td>Week 1</td>
+</tr>
+<tr>
+<td>D2 evidence decks + raw captures per slide</td>
+<td>Deck</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/tree/main/docs/evidence/d2" target="_blank" rel="noopener"><code>docs/evidence/d2/</code></a></td>
+<td>Week 2</td>
+</tr>
+<tr>
+<td>D1 recording — registry end to end (1:40)</td>
+<td>Recording</td>
+<td><em>TODO: link</em></td>
+<td>Week 1</td>
+</tr>
+<tr>
+<td>D1 recording — captioned terminal capture (1:07)</td>
+<td>Recording</td>
+<td><em>TODO: link</em></td>
+<td>Week 1</td>
+</tr>
+<tr>
+<td>D2 recording (90–120 s)</td>
+<td>Recording</td>
+<td><em>TODO: link — not yet recorded</em></td>
+<td>Week 2</td>
+</tr>
+<tr>
+<td>Analytics dashboard (admin, token-protected)</td>
+<td>Dashboard</td>
+<td><code>https://lantern-api-production-3fad.up.railway.app/admin</code> — reviewers receive snapshots on the <a href="/docs/reference/metrics/">Metrics</a> page rather than a login</td>
+<td>Week 2</td>
+</tr>
+</tbody>
+</table></div>
+        </article>
+        <footer class="docs-foot">
+          <p>Unlisted evidence site for the Stellar Development Foundation Instawards programme. Not indexed; no links from the landing page. Machine-readable index: <a href="/docs/llms.txt">llms.txt</a>.</p>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>
