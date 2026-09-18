@@ -1,5 +1,6 @@
 ---
 title: Evidence index
+links: Paths not yet on the public main branch (packages/lantern-scanner, services/lantern-api, docs/telemetry.md, docs/qa/, docs/evidence/d2) link to /blob/develop/ or /tree/develop/ until the D2 release PR merges to main; then switch them to main. Paths already on main link to main. Decision taken on the slice-1 review; slices 2 and 3 follow it.
 ---
 # Evidence index
 
@@ -27,9 +28,9 @@ Every contract id, hash, address, transaction, recording, deck, document and CI 
 | Item | Type | Value / link | Introduced in |
 |---|---|---|---|
 | Public repository (MIT) | Repository | [github.com/kimerran/stellar-lantern](https://github.com/kimerran/stellar-lantern) | — |
-| Scanner package (MIT) | Code | [`packages/lantern-scanner/`](https://github.com/kimerran/stellar-lantern/tree/main/packages/lantern-scanner) | Week 2 |
+| Scanner package (MIT) | Code | [`packages/lantern-scanner/`](https://github.com/kimerran/stellar-lantern/tree/develop/packages/lantern-scanner) | Week 2 |
 | Registry contract source | Code | [`contracts/blacklist-registry/`](https://github.com/kimerran/stellar-lantern/tree/main/contracts/blacklist-registry) | Week 1 |
-| Lantern API (explainer proxy, telemetry, analytics) | Code · Service | [`services/lantern-api/`](https://github.com/kimerran/stellar-lantern/tree/main/services/lantern-api) · `https://lantern-api-production-3fad.up.railway.app/healthz` | Week 2 |
+| Lantern API (explainer proxy, telemetry, analytics) | Code · Service | [`services/lantern-api/`](https://github.com/kimerran/stellar-lantern/tree/develop/services/lantern-api) · `https://lantern-api-production-3fad.up.railway.app/healthz` | Week 2 |
 | D1 release to `main` | Release | [Release: on-chain blacklist registry](https://github.com/kimerran/stellar-lantern/pull/153) — `af35851`, 14 Sep | Week 2 |
 | D2 release to `main` | Release | [Release: transaction security scanner](https://github.com/kimerran/stellar-lantern/pull/154) — from `73d5b34` | Week 2 |
 | Contracts CI lane | CI | [contracts.yml](https://github.com/kimerran/stellar-lantern/actions/workflows/contracts.yml) | Week 1 |
@@ -41,14 +42,14 @@ Every contract id, hash, address, transaction, recording, deck, document and CI 
 | Item | Type | Value / link | Introduced in |
 |---|---|---|---|
 | Registry reference — ABI, data model, errors, events, read paths | Document | [`docs/blacklist-registry.md`](https://github.com/kimerran/stellar-lantern/blob/main/docs/blacklist-registry.md) | Week 1 |
-| Scanner reference | Document | [`packages/lantern-scanner/README.md`](https://github.com/kimerran/stellar-lantern/blob/main/packages/lantern-scanner/README.md) | Week 2 |
-| Lantern API reference and threat model | Document | [`services/lantern-api/README.md`](https://github.com/kimerran/stellar-lantern/blob/main/services/lantern-api/README.md) | Week 2 |
-| Analytics disclosure | Document | [`docs/telemetry.md`](https://github.com/kimerran/stellar-lantern/blob/main/docs/telemetry.md) | Week 2 |
+| Scanner reference | Document | [`packages/lantern-scanner/README.md`](https://github.com/kimerran/stellar-lantern/blob/develop/packages/lantern-scanner/README.md) | Week 2 |
+| Lantern API reference and threat model | Document | [`services/lantern-api/README.md`](https://github.com/kimerran/stellar-lantern/blob/develop/services/lantern-api/README.md) | Week 2 |
+| Analytics disclosure | Document | [`docs/telemetry.md`](https://github.com/kimerran/stellar-lantern/blob/develop/docs/telemetry.md) | Week 2 |
 | Dated delivery log | Document | [`docs/features.md`](https://github.com/kimerran/stellar-lantern/blob/main/docs/features.md) | — |
-| D2 manual test plan + results table | QA | [`docs/qa/d2-transaction-scanner-test-plan.md`](https://github.com/kimerran/stellar-lantern/blob/main/docs/qa/d2-transaction-scanner-test-plan.md) | Week 2 |
+| D2 manual test plan + results table | QA | [`docs/qa/d2-transaction-scanner-test-plan.md`](https://github.com/kimerran/stellar-lantern/blob/develop/docs/qa/d2-transaction-scanner-test-plan.md) | Week 2 |
 | D1 QA sign-off | QA | *TODO: link* | Week 1 |
 | D1 evidence decks (Proof of Deliverables; Technical Documentation & Demo Evidence) | Deck | *TODO: link* | Week 1 |
-| D2 evidence decks + raw captures per slide | Deck | [`docs/evidence/d2/`](https://github.com/kimerran/stellar-lantern/tree/main/docs/evidence/d2) | Week 2 |
+| D2 evidence decks + raw captures per slide | Deck | [`docs/evidence/d2/`](https://github.com/kimerran/stellar-lantern/tree/develop/docs/evidence/d2) | Week 2 |
 | D1 recording — registry end to end (1:40) | Recording | *TODO: link* | Week 1 |
 | D1 recording — captioned terminal capture (1:07) | Recording | *TODO: link* | Week 1 |
 | D2 recording (90–120 s) | Recording | *TODO: link — not yet recorded* | Week 2 |

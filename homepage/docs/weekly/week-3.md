@@ -1,5 +1,3 @@
-# Week 3 — 21–27 Sep
-
 > Markdown twin of https://lantern.artisam.xyz/docs/weekly/week-3/ — index of every page: https://lantern.artisam.xyz/docs/llms.txt
 
 # Week 3 — 21–27 September 2026 · D3, scanner in the wallet

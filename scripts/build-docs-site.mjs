@@ -10,7 +10,10 @@
 // just this folder — no service, no framework, no client-side JS. Every page
 // is `noindex, nofollow` and nothing on the landing page links here: the
 // site is unlisted, not secret. A static host cannot send X-Robots-Tag, so
-// the meta tag plus homepage/robots.txt is the whole mechanism.
+// the meta tag is the whole mechanism — deliberately NOT a robots.txt
+// Disallow, which would stop crawlers fetching the pages and so never
+// seeing the noindex (a bare URL linked from elsewhere could still be
+// indexed).
 //
 // The page tree is docs/site/site.json — order and titles come from there,
 // never from the filesystem, so a stray file cannot appear in the nav. Every
@@ -150,6 +153,10 @@ rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
 
 const problems = [];
+// Assets the shell hard-codes; the link guard never sees them.
+for (const asset of ['/favicon.png', '/styles.css', '/logo.jpg']) {
+  if (!existsSync(join(ROOT, 'homepage', asset))) problems.push(`shell: missing homepage asset ${asset}`);
+}
 const knownTargets = new Set();
 for (const p of pages) {
   knownTargets.add(hrefOf(p));
@@ -171,7 +178,7 @@ for (const p of pages) {
   const html = md.render(body);
 
   // Internal links: anything starting with /docs must resolve to a page.
-  for (const m of html.matchAll(/href="([^"]+)"/g)) {
+  for (const m of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
     const href = m[1].split('#')[0];
     if (!href || /^(https?:|mailto:)/.test(href)) continue;
     if (href.startsWith('/docs')) {
@@ -201,7 +208,8 @@ for (const [path, { page, html, body }] of rendered) {
   writeFileSync(join(dir, 'index.html'), shell(page, html));
   const twin = path === '' ? join(OUT, 'index.md') : join(OUT, `${path}.md`);
   mkdirSync(dirname(twin), { recursive: true });
-  writeFileSync(twin, `# ${page.title}\n\n> Markdown twin of ${SITE_URL}${hrefOf(page)} — index of every page: ${SITE_URL}${BASE}/llms.txt\n\n${body}`);
+  // The body carries its own H1; the twin only prepends a provenance line.
+  writeFileSync(twin, `> Markdown twin of ${SITE_URL}${hrefOf(page)} — index of every page: ${SITE_URL}${BASE}/llms.txt\n\n${body}`);
 }
 
 // llms.txt — the whole tree with .md URLs, for agents.

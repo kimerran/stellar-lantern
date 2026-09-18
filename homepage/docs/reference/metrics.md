@@ -1,5 +1,3 @@
-# Metrics
-
 > Markdown twin of https://lantern.artisam.xyz/docs/reference/metrics/ — index of every page: https://lantern.artisam.xyz/docs/llms.txt
 
 # Metrics

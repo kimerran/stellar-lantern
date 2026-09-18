@@ -1,5 +1,3 @@
-# Full changelog
-
 > Markdown twin of https://lantern.artisam.xyz/docs/reference/changelog/ — index of every page: https://lantern.artisam.xyz/docs/llms.txt
 
 # Full changelog

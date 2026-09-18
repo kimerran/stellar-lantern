@@ -1,5 +1,3 @@
-# Week 4 — 28 Sep – 4 Oct
-
 > Markdown twin of https://lantern.artisam.xyz/docs/weekly/week-4/ — index of every page: https://lantern.artisam.xyz/docs/llms.txt
 
 # Week 4 — 28 September – 4 October 2026 · D4, public demo

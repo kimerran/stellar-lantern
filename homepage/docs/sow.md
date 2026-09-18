@@ -1,5 +1,3 @@
-# Statement of Work
-
 > Markdown twin of https://lantern.artisam.xyz/docs/sow/ — index of every page: https://lantern.artisam.xyz/docs/llms.txt
 
 # Statement of Work

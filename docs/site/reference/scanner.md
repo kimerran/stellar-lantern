@@ -3,7 +3,7 @@ title: Scanner package
 ---
 # Scanner package — `@lantern/scanner`
 
-Condensed from the package's [README](https://github.com/kimerran/stellar-lantern/blob/main/packages/lantern-scanner/README.md), which is the full reference. MIT-licensed; lives at [`packages/lantern-scanner/`](https://github.com/kimerran/stellar-lantern/tree/main/packages/lantern-scanner) and is what the wallet, the QA harness and (in D4) the public playground call.
+Condensed from the package's [README](https://github.com/kimerran/stellar-lantern/blob/develop/packages/lantern-scanner/README.md), which is the full reference. MIT-licensed; lives at [`packages/lantern-scanner/`](https://github.com/kimerran/stellar-lantern/tree/develop/packages/lantern-scanner) and is what the wallet, the QA harness and (in D4) the public playground call.
 
 ## What it does
 
@@ -35,7 +35,7 @@ npm run scan -- --file sep41-approve --no-ai         # rules-based sentence only
 npm run scan -- --file sep41-approve --offline       # RPC answered from the recorded corpus
 ```
 
-The AI sentence is off unless `LANTERN_AI_ENDPOINT` (the Lantern API) or a local key is set, and the output always says which explainer wrote the sentence. `--ai-stub "<text>"` runs a model that always answers `<text>` through the real sanitiser and contradiction guard, so a tester can watch a hostile answer get discarded. Full instructions and every test case: the [manual test plan](https://github.com/kimerran/stellar-lantern/blob/main/docs/qa/d2-transaction-scanner-test-plan.md).
+The AI sentence is off unless `LANTERN_AI_ENDPOINT` (the Lantern API) or a local key is set, and the output always says which explainer wrote the sentence. `--ai-stub "<text>"` runs a model that always answers `<text>` through the real sanitiser and contradiction guard, so a tester can watch a hostile answer get discarded. Full instructions and every test case: the [manual test plan](https://github.com/kimerran/stellar-lantern/blob/develop/docs/qa/d2-transaction-scanner-test-plan.md).
 
 ## Tests
 

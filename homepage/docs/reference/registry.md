@@ -1,5 +1,3 @@
-# Registry contract
-
 > Markdown twin of https://lantern.artisam.xyz/docs/reference/registry/ — index of every page: https://lantern.artisam.xyz/docs/llms.txt
 
 # Registry contract — on-chain blacklist

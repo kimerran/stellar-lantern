@@ -34,4 +34,4 @@ Every claim on this site links to something public: a commit in the public repos
 
 ## For AI agents
 
-Every page has a markdown twin (the *view as markdown* link at the top of each page, or replace the trailing `/` with `.md`), and [`/docs/llms.txt`](/docs/llms.txt) indexes all of them. There is no client-side JavaScript; the HTML is complete as served.
+Every page has a markdown twin (the *view as markdown* link at the top of each page, or replace the trailing `/` with `.md`; for the home page it is [`/docs/index.md`](/docs/index.md)), and [`/docs/llms.txt`](/docs/llms.txt) indexes all of them. There is no client-side JavaScript; the HTML is complete as served.

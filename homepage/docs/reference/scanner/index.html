@@ -26,7 +26,7 @@
         <p class="crumbs"><a href="/docs/">Lantern — Instawards Phase 1</a> <span class="sep">/</span> <span>Reference</span> <span class="sep">/</span> <span>Scanner package</span></p>
         <article class="prose">
 <h1>Scanner package — <code>@lantern/scanner</code></h1>
-<p>Condensed from the package's <a href="https://github.com/kimerran/stellar-lantern/blob/main/packages/lantern-scanner/README.md" target="_blank" rel="noopener">README</a>, which is the full reference. MIT-licensed; lives at <a href="https://github.com/kimerran/stellar-lantern/tree/main/packages/lantern-scanner" target="_blank" rel="noopener"><code>packages/lantern-scanner/</code></a> and is what the wallet, the QA harness and (in D4) the public playground call.</p>
+<p>Condensed from the package's <a href="https://github.com/kimerran/stellar-lantern/blob/develop/packages/lantern-scanner/README.md" target="_blank" rel="noopener">README</a>, which is the full reference. MIT-licensed; lives at <a href="https://github.com/kimerran/stellar-lantern/tree/develop/packages/lantern-scanner" target="_blank" rel="noopener"><code>packages/lantern-scanner/</code></a> and is what the wallet, the QA harness and (in D4) the public playground call.</p>
 <h2>What it does</h2>
 <p>Given an unsigned transaction envelope (XDR), the network passphrase and a little context (the signer's address), <code>runPipeline</code> returns a <code>ScanResult</code> with a risk level, an action, reasons, an audit trail of signals, the structured effects, the screening result, and one sentence. It never signs and never submits.</p>
 <h2>The six stages</h2>
@@ -88,7 +88,7 @@ npm run scan -- --file sep41-approve --json          # the full ScanResult
 npm run scan -- --file sep41-approve --no-ai         # rules-based sentence only
 npm run scan -- --file sep41-approve --offline       # RPC answered from the recorded corpus
 </code></pre>
-<p>The AI sentence is off unless <code>LANTERN_AI_ENDPOINT</code> (the Lantern API) or a local key is set, and the output always says which explainer wrote the sentence. <code>--ai-stub &quot;&lt;text&gt;&quot;</code> runs a model that always answers <code>&lt;text&gt;</code> through the real sanitiser and contradiction guard, so a tester can watch a hostile answer get discarded. Full instructions and every test case: the <a href="https://github.com/kimerran/stellar-lantern/blob/main/docs/qa/d2-transaction-scanner-test-plan.md" target="_blank" rel="noopener">manual test plan</a>.</p>
+<p>The AI sentence is off unless <code>LANTERN_AI_ENDPOINT</code> (the Lantern API) or a local key is set, and the output always says which explainer wrote the sentence. <code>--ai-stub &quot;&lt;text&gt;&quot;</code> runs a model that always answers <code>&lt;text&gt;</code> through the real sanitiser and contradiction guard, so a tester can watch a hostile answer get discarded. Full instructions and every test case: the <a href="https://github.com/kimerran/stellar-lantern/blob/develop/docs/qa/d2-transaction-scanner-test-plan.md" target="_blank" rel="noopener">manual test plan</a>.</p>
 <h2>Tests</h2>
 <p>The whole suite runs offline against 19 recorded fixtures (real testnet XDR and the raw RPC bodies as returned), so CI needs no RPC, no registry and no model — and no secret. The invariant is pinned from several sides: a type-level test refuses an explainer that returns a verdict; a hostile-model test and a prompt-injection test leave the verdict byte-identical; the harness's <code>--json</code> output with and without the model is asserted equal.</p>
 
