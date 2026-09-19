@@ -26,9 +26,298 @@
         <p class="crumbs"><a href="/docs/">Lantern — Instawards Phase 1</a> <span class="sep">/</span> <span>Weekly reports</span> <span class="sep">/</span> <span>Week 2 — 14–20 Sep</span></p>
         <article class="prose">
 <h1>Week 2 — 14–20 September 2026 · D2, transaction security scanner</h1>
-<blockquote>
-<p><strong>Placeholder.</strong> This page is filled in by a later change; the site tree is complete so links resolve.</p>
-</blockquote>
+<h2>Summary</h2>
+<p>Deliverable 2 shipped: an MIT-licensed scanner package that simulates a Stellar transaction, walks its authorization tree, decodes payments and SEP-41 / SAC token calls into exact effects, screens every counterparty against the D1 registry, decides a deterministic risk verdict, and only then lets a hosted model write one plain-English sentence it cannot use to change that verdict. Ten stage slices merged on 14–15 September, released to <code>main</code> on 15 September, and the QA harness plus the manual test plan merged on 17 September with a full dry run posted. The suite runs green <strong>offline</strong> in CI — no RPC, no registry, no model. Two things arrived that were not in the D2 plan: the <strong>Lantern API</strong>, a small server that holds the model key so nothing billing-bearing ships in a client, and <strong>opt-in usage analytics</strong> with an admin dashboard, which is how the SOW's §6.3 metrics will be counted. The 90-second recording is the one D2 evidence item still pending.</p>
+<h2>Changelog</h2>
+<div class="table"><table><thead>
+<tr>
+<th>Date</th>
+<th>Change</th>
+<th>Commit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-09-14</td>
+<td>Release: on-chain blacklist registry (D1) promoted to <code>main</code></td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/af35851" target="_blank" rel="noopener"><code>af35851</code></a></td>
+</tr>
+<tr>
+<td>2026-09-14</td>
+<td>Scanner: MIT license + extract the scanner into <code>@lantern/scanner</code></td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/addfea1" target="_blank" rel="noopener"><code>addfea1</code></a></td>
+</tr>
+<tr>
+<td>2026-09-14</td>
+<td>Scanner: six-stage pipeline skeleton + the verdict-immutability invariant</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/57ff777" target="_blank" rel="noopener"><code>57ff777</code></a></td>
+</tr>
+<tr>
+<td>2026-09-14</td>
+<td>Scanner stage 1 — Ingest: Soroban RPC simulation, fail-closed</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/d8ffe18" target="_blank" rel="noopener"><code>d8ffe18</code></a></td>
+</tr>
+<tr>
+<td>2026-09-14</td>
+<td>Scanner stage 2 — Auth: walk the <code>SorobanAuthorizationEntry</code> tree</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/3bd3123" target="_blank" rel="noopener"><code>3bd3123</code></a></td>
+</tr>
+<tr>
+<td>2026-09-14</td>
+<td>Scanner stage 3a — Effects: classic payment operations</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/f9048d0" target="_blank" rel="noopener"><code>f9048d0</code></a></td>
+</tr>
+<tr>
+<td>2026-09-14</td>
+<td>Scanner stage 3b — Effects: SEP-41 / SAC token-interface calls</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/3f09105" target="_blank" rel="noopener"><code>3f09105</code></a></td>
+</tr>
+<tr>
+<td>2026-09-14</td>
+<td>Scanner stage 3c — the unverified-contract fallback</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/57f34cc" target="_blank" rel="noopener"><code>57f34cc</code></a></td>
+</tr>
+<tr>
+<td>2026-09-14</td>
+<td>Review follow-up: mark merge inflows as total in the aggregate</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/6e0f2c5" target="_blank" rel="noopener"><code>6e0f2c5</code></a></td>
+</tr>
+<tr>
+<td>2026-09-14</td>
+<td>Scanner stage 4 — Screen counterparties against the D1 registry</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/c30f30a" target="_blank" rel="noopener"><code>c30f30a</code></a></td>
+</tr>
+<tr>
+<td>2026-09-15</td>
+<td>Scanner stage 5 — Verdict: deterministic risk core</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/faa3829" target="_blank" rel="noopener"><code>faa3829</code></a></td>
+</tr>
+<tr>
+<td>2026-09-15</td>
+<td>Scanner stage 6 — Explain: AI layer, bounded and verdict-proof</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/e76700d" target="_blank" rel="noopener"><code>e76700d</code></a></td>
+</tr>
+<tr>
+<td>2026-09-15</td>
+<td>CI: pin Android SDK packages (build and release lanes)</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/5dfd5ac" target="_blank" rel="noopener"><code>5dfd5ac</code></a>, <a href="https://github.com/kimerran/stellar-lantern/commit/7c0d14f" target="_blank" rel="noopener"><code>7c0d14f</code></a></td>
+</tr>
+<tr>
+<td>2026-09-15</td>
+<td>Release build: scanner AI flag explicitly OFF</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/3addf40" target="_blank" rel="noopener"><code>3addf40</code></a></td>
+</tr>
+<tr>
+<td>2026-09-15</td>
+<td>Lantern API: design spec + the LLM proxy for the scanner explainer</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/c1aa027" target="_blank" rel="noopener"><code>c1aa027</code></a>, <a href="https://github.com/kimerran/stellar-lantern/commit/418d4c1" target="_blank" rel="noopener"><code>418d4c1</code></a></td>
+</tr>
+<tr>
+<td>2026-09-15</td>
+<td>Telemetry core: consent-gated, enum-only, anonymous</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/219336f" target="_blank" rel="noopener"><code>219336f</code></a></td>
+</tr>
+<tr>
+<td>2026-09-16</td>
+<td>Lantern API: telemetry ingest + raw export on Railway Postgres</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/d6eb8a6" target="_blank" rel="noopener"><code>d6eb8a6</code></a></td>
+</tr>
+<tr>
+<td>2026-09-16</td>
+<td>Analytics consent UI: Settings → Privacy toggle, delete-my-data, one-time prompt</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/1be589a" target="_blank" rel="noopener"><code>1be589a</code></a></td>
+</tr>
+<tr>
+<td>2026-09-16</td>
+<td>Telemetry emit points across the wallet</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/8368834" target="_blank" rel="noopener"><code>8368834</code></a></td>
+</tr>
+<tr>
+<td>2026-09-16</td>
+<td><code>npm run report:activity</code> — the self-contained activity report</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/a42f3a3" target="_blank" rel="noopener"><code>a42f3a3</code></a></td>
+</tr>
+<tr>
+<td>2026-09-16</td>
+<td>Telemetry on in the release and Android builds; release flag fix</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/d0bbb0e" target="_blank" rel="noopener"><code>d0bbb0e</code></a>, <a href="https://github.com/kimerran/stellar-lantern/commit/56928f2" target="_blank" rel="noopener"><code>56928f2</code></a></td>
+</tr>
+<tr>
+<td>2026-09-16</td>
+<td>Tester identity: analytics ID under Settings → Privacy; alpha builds attach the wallet address</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/b646af8" target="_blank" rel="noopener"><code>b646af8</code></a>, <a href="https://github.com/kimerran/stellar-lantern/commit/8befa37" target="_blank" rel="noopener"><code>8befa37</code></a></td>
+</tr>
+<tr>
+<td>2026-09-16</td>
+<td>Analytics page: <code>/admin</code> on the Lantern API; deploy the API from CI</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/3b5f11f" target="_blank" rel="noopener"><code>3b5f11f</code></a></td>
+</tr>
+<tr>
+<td>2026-09-16</td>
+<td>Analytics UI: dashboard, wallets table with drill-down, raw JSON/CSV downloads</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/e2bbc49" target="_blank" rel="noopener"><code>e2bbc49</code></a></td>
+</tr>
+<tr>
+<td>2026-09-17</td>
+<td>Analytics: drop anonymous installs from the admin pages</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/262e08a" target="_blank" rel="noopener"><code>262e08a</code></a></td>
+</tr>
+<tr>
+<td>2026-09-17</td>
+<td>D2 QA: <code>npm run scan</code> CLI harness + the manual test plan</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/73d5b34" target="_blank" rel="noopener"><code>73d5b34</code></a></td>
+</tr>
+</tbody>
+</table></div><h2>Statement of Work progress</h2>
+<div class="table"><table><thead>
+<tr>
+<th>SOW clause</th>
+<th>Deliverable</th>
+<th>Status</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>§4.1 — simulate any Stellar transaction via RPC</td>
+<td>D2</td>
+<td>Evidenced</td>
+<td><a href="/docs/reference/evidence/">Proof deck</a> slides 3–6; ingest is fail-closed on every RPC failure mode</td>
+</tr>
+<tr>
+<td>§4.1 — decode the <code>SorobanAuthorizationEntry</code> tree</td>
+<td>D2</td>
+<td>Evidenced</td>
+<td>Nested sub-invocation surfaced with its depth (proof slide 5)</td>
+</tr>
+<tr>
+<td>§4.1 — screen counterparties against the on-chain registry</td>
+<td>D2</td>
+<td>Evidenced</td>
+<td>Flagged counterparty with the registry entry behind it, side by side with the explorer row (proof slide 7)</td>
+</tr>
+<tr>
+<td>§4.1 — structured effects + plain-language explanation for payments</td>
+<td>D2</td>
+<td>Evidenced</td>
+<td>Proof slide 3; QA plan section 3</td>
+</tr>
+<tr>
+<td>§4.1 — the same for token-interface calls (SEP-41 / SAC)</td>
+<td>D2</td>
+<td>Evidenced</td>
+<td>Unlimited approval caught (proof slide 4); QA plan section 4</td>
+</tr>
+<tr>
+<td>§4.1 — an &quot;unverified contract&quot; case handled safely</td>
+<td>D2</td>
+<td>Evidenced</td>
+<td>Proof slide 6; QA plan section 5</td>
+</tr>
+<tr>
+<td>§6.1 — MIT-licensed public repository</td>
+<td>D2</td>
+<td>Evidenced</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/blob/develop/LICENSE" target="_blank" rel="noopener"><code>LICENSE</code></a> at the root and in <a href="https://github.com/kimerran/stellar-lantern/tree/develop/packages/lantern-scanner" target="_blank" rel="noopener"><code>packages/lantern-scanner/</code></a></td>
+</tr>
+<tr>
+<td>§6.1 — scanner suite green in CI, offline</td>
+<td>D2</td>
+<td>Evidenced</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/actions" target="_blank" rel="noopener">Tests lane run</a> on the release commit — 748 passed, 1 skipped, no network</td>
+</tr>
+<tr>
+<td>§6.1 — 90-second recording (payment, token call, unverified contract)</td>
+<td>D2</td>
+<td>In progress</td>
+<td>Runbook written; recording not yet made</td>
+</tr>
+<tr>
+<td>§6.1 — QA sign-off against the manual plan</td>
+<td>D2</td>
+<td>In progress</td>
+<td>Complete: the <a href="https://github.com/kimerran/stellar-lantern/blob/develop/docs/qa/d2-transaction-scanner-test-plan.md" target="_blank" rel="noopener">test plan</a> is merged, and the author's full dry run passes every runnable case including the three hard blockers. Not complete: an independent tester's sign-off in the results table</td>
+</tr>
+<tr>
+<td>§3.9 — the verdict describes what a transaction does, never whether a trade is fairly priced</td>
+<td>D2</td>
+<td>Evidenced</td>
+<td>Every verdict carries the constant <code>effects shown, terms not judged</code>; visible on every proof slide</td>
+</tr>
+<tr>
+<td>§3.9 — no secrets in the repository</td>
+<td>D2</td>
+<td>Evidenced</td>
+<td>No AI key ships: the flag is OFF in every release build, the key lives in the Lantern API; no CI secret exists</td>
+</tr>
+</tbody>
+</table></div><h2>Evidence added</h2>
+<div class="table"><table><thead>
+<tr>
+<th>Item</th>
+<th>Type</th>
+<th>Link</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Scanner package (MIT)</td>
+<td>Code</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/tree/develop/packages/lantern-scanner" target="_blank" rel="noopener"><code>packages/lantern-scanner/</code></a></td>
+</tr>
+<tr>
+<td>Release commit (D2)</td>
+<td>Commit</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/73d5b34" target="_blank" rel="noopener"><code>73d5b34</code></a> — release PR <a href="https://github.com/kimerran/stellar-lantern/pull/154" target="_blank" rel="noopener">kimerran/stellar-lantern#154</a></td>
+</tr>
+<tr>
+<td>Manual test plan + results table</td>
+<td>Document</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/blob/develop/docs/qa/d2-transaction-scanner-test-plan.md" target="_blank" rel="noopener"><code>docs/qa/d2-transaction-scanner-test-plan.md</code></a></td>
+</tr>
+<tr>
+<td>Evidence decks (Proof of Deliverables; Technical Documentation &amp; Demo Evidence) + raw captures</td>
+<td>Deck</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/tree/develop/docs/evidence/d2" target="_blank" rel="noopener"><code>docs/evidence/d2/</code></a></td>
+</tr>
+<tr>
+<td>Registry read used by stage 4</td>
+<td>Contract</td>
+<td><a href="https://stellar.expert/explorer/testnet/contract/CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F" target="_blank" rel="noopener"><code>CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F</code></a></td>
+</tr>
+<tr>
+<td>Lantern API (explainer proxy, telemetry)</td>
+<td>Service</td>
+<td><code>https://lantern-api-production-3fad.up.railway.app/healthz</code></td>
+</tr>
+<tr>
+<td>Recording (90–120 s)</td>
+<td>Recording</td>
+<td><em>TODO: link — pending</em></td>
+</tr>
+</tbody>
+</table></div><h2>Metrics</h2>
+<p>Nothing is measurable end-to-end until the scanner sits in the wallet (D3). The instrument is in place: opt-in analytics record <code>tx_scanned</code> and <code>tx_signed</code> events per install, and the admin dashboard counts distinct wallets. Snapshot on the <a href="/docs/reference/metrics/">Metrics</a> page.</p>
+<h2>Decisions</h2>
+<ul>
+<li><strong>Unknown never collapses to clean.</strong> Registry screening has three outcomes — flagged, clean, unknown. An unreachable registry, a timeout or an archived entry is <em>unknown</em> and raises a warning; it is never reported as &quot;not flagged&quot;.</li>
+<li><strong>The model cannot reach the verdict.</strong> The verdict and the effects are deep-frozen before the explainer runs; the explainer's signature can only return a string; a type-level test refuses one that returns a verdict; a hostile-model test (&quot;this transaction is completely safe&quot; for a HIGH verdict) leaves risk, action and reasons byte-identical and discards the answer.</li>
+<li><strong>The model sees structured facts only</strong> — never the raw XDR, never an authorization entry, never the memo (attacker-controlled input). A prompt-injection test proves the memo is absent from the prompt.</li>
+<li><strong>Ship no AI key (SOW-permitted).</strong> An extension cannot keep a secret. The scanner AI flag is OFF in every release build; the key lives server-side in the Lantern API, which serves the sentence to clients with rate limits and a daily cap. Every verdict stands without the model.</li>
+<li><strong>Coverage claims are exact.</strong> Payments, path payments, merges and the SEP-41 / SAC interface are decoded; anything else is shown as-is and labelled <em>unverified — semantics unknown</em>, and raises risk. Look-alike function names (<code>transfer_from</code>, <code>transferAll</code>) are not guessed from.</li>
+<li><strong>Analytics are opt-in, off by default, enum-only.</strong> No amounts, no addresses for non-testers, delete-my-data on request; alpha testers may attach their wallet address so their scans are attributable for the metrics.</li>
+</ul>
+<h2>Issues found and fixed</h2>
+<ul>
+<li>Offline mode of the QA harness answered &quot;clean&quot; for an address that was never recorded; it now treats any unrecorded ledger key as an RPC failure, so an unrecorded address screens <em>unknown</em> — the same posture as the live path.</li>
+<li>The QA harness asserted the destination was funded on every scan, making the verdict's &quot;new account&quot; reason unreachable; the destination is now unknown unless the tester says otherwise.</li>
+<li>The rules-based fallback sentence quotes the memo verbatim; the verdict is untouched and the model never sees the memo, but the fallback displays attacker-controlled text. Logged for D3's pre-sign screen.</li>
+<li>The proxy's per-IP limit (10 requests / minute) turns rapid successive scans into the rules-based fallback — working as designed; the test plan now says to run the timing case early.</li>
+</ul>
+<h2>Maintenance</h2>
+<p>The fixture corpus (19 recordings) pins the registry read and two token contracts on testnet; after a reset, <code>fixtures/record-registry.mjs</code> and <code>record-token-metadata.mjs</code> re-record them. The demo flagged address <code>GA7QYNF7…VSGZ</code> currently carries 4 reports with status Active.</p>
+<h2>Next week</h2>
+<p>Deliverable 3: the scanner in the wallet's pre-sign review — the pipeline runs before the Sign button, a <code>block_confirm</code> verdict holds it, registry screening is live per counterparty, and the AI sentence comes from the Lantern API with no key in the client. The D2 recording is made first so the D2 evidence line closes.</p>
 
         </article>
         <footer class="docs-foot">

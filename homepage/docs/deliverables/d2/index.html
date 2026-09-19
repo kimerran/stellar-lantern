@@ -26,9 +26,155 @@
         <p class="crumbs"><a href="/docs/">Lantern — Instawards Phase 1</a> <span class="sep">/</span> <span>Deliverables</span> <span class="sep">/</span> <span>D2 — Transaction security scanner</span></p>
         <article class="prose">
 <h1>D2 — Transaction security scanner</h1>
+<p><strong>Statement of Work:</strong> Deliverable 2, §4.1 · <strong>Target:</strong> Week 2 (14–20 Sep) · <strong>Status:</strong> Complete — recording pending</p>
 <blockquote>
-<p><strong>Placeholder.</strong> This page is filled in by a later change; the site tree is complete so links resolve.</p>
+<p><em>&quot;A scanner that simulates any Stellar transaction via RPC, decodes the <code>SorobanAuthorizationEntry</code> tree, and screens counterparties against the on-chain registry. Committed coverage: full structured effect-decoding and plain-language explanation for payment operations and token-interface calls (SEP-41 / SAC) — the operations most users actually sign.&quot;</em> — SOW §4.1</p>
 </blockquote>
+<h2>Evidence</h2>
+<div class="table"><table><thead>
+<tr>
+<th>SOW §6.1 evidence</th>
+<th>Where</th>
+<th>What it shows</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Public MIT-licensed repository</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/blob/develop/LICENSE" target="_blank" rel="noopener"><code>LICENSE</code></a> · <a href="https://github.com/kimerran/stellar-lantern/blob/develop/packages/lantern-scanner/LICENSE" target="_blank" rel="noopener"><code>packages/lantern-scanner/LICENSE</code></a></td>
+<td>MIT at the repository root and inside the package; <code>&quot;license&quot;: &quot;MIT&quot;</code> in both <code>package.json</code> files</td>
+<td>Present</td>
+</tr>
+<tr>
+<td>Scanner test suite green in CI, offline</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/actions/workflows/test.yml" target="_blank" rel="noopener">Tests workflow</a></td>
+<td>748 passed, 1 skipped, 67 files, no network — every RPC answer comes from a recorded fixture; no CI secret exists</td>
+<td>Present</td>
+</tr>
+<tr>
+<td>90-second recording: a payment and a token-interface call decoded into effects + summary + verdict, plus an unverified contract handled safely</td>
+<td><em>TODO: link — pending</em></td>
+<td>Shot list and read-aloud script are written; the recording has not been made</td>
+<td>Pending</td>
+</tr>
+<tr>
+<td>QA sign-off against the manual plan</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/blob/develop/docs/qa/d2-transaction-scanner-test-plan.md" target="_blank" rel="noopener"><code>docs/qa/d2-transaction-scanner-test-plan.md</code></a></td>
+<td>Complete: a ten-section plan with a results table, merged; the author's full dry run passes every runnable case including the three hard blockers. Not complete: an independent tester's sign-off in the results table</td>
+<td>In progress</td>
+</tr>
+<tr>
+<td>Evidence decks + raw captures</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/tree/develop/docs/evidence/d2" target="_blank" rel="noopener"><code>docs/evidence/d2/</code></a></td>
+<td>Proof of Deliverables (9 slides) and Technical Documentation &amp; Demo Evidence (6 slides); every proof slide's terminal output is committed alongside so a slide can be diffed against its source</td>
+<td>Present</td>
+</tr>
+</tbody>
+</table></div><h2>What a user can do when this is done</h2>
+<p>Before signing anything, a user (or a wallet, a dApp, a command line) can hand the scanner a transaction and get back: exactly what it does — what leaves, what arrives, who receives, including money moved by a contract calling another contract — whether any recipient has been reported on the Deliverable 1 registry, a risk level with reasons that comes from deterministic rules, and one plain-English sentence. When the scanner cannot read or simulate the transaction, cannot reach the registry, or does not know what a contract does, it says so and raises the risk instead of guessing.</p>
+<h2>Traceability</h2>
+<div class="table"><table><thead>
+<tr>
+<th>SOW clause</th>
+<th>Change</th>
+<th>Evidence</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Open-source, MIT-licensed package</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/addfea1" target="_blank" rel="noopener"><code>addfea1</code></a> — <code>@lantern/scanner</code> extracted with its own LICENSE and README</td>
+<td>Repository</td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>A pipeline whose verdict cannot be moved by the explainer</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/57ff777" target="_blank" rel="noopener"><code>57ff777</code></a> — six stage signatures; verdict and effects deep-frozen before stage 6; type-level test</td>
+<td>Proof deck slide 9; <code>tests/scanner-explain.test.ts</code></td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>§4.1 — simulate via RPC</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/d8ffe18" target="_blank" rel="noopener"><code>d8ffe18</code></a> — Ingest: timeout + backoff, fail-closed on undecodable / transport / timeout / malformed / reverted / archived</td>
+<td>Proof deck slide 8 (fails closed); QA plan section 7</td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>§4.1 — decode the authorization tree</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/3bd3123" target="_blank" rel="noopener"><code>3bd3123</code></a> — every entry, every nested sub-invocation, with depth</td>
+<td>Proof deck slide 5</td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>§4.1 — structured effects for payment operations</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/f9048d0" target="_blank" rel="noopener"><code>f9048d0</code></a>, <a href="https://github.com/kimerran/stellar-lantern/commit/6e0f2c5" target="_blank" rel="noopener"><code>6e0f2c5</code></a> — payment, createAccount, path payments (min/max bounds), accountMerge (entire balance), per-address aggregate</td>
+<td>Proof deck slide 3; QA plan section 3</td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>§4.1 — structured effects for SEP-41 / SAC token calls</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/3f09105" target="_blank" rel="noopener"><code>3f09105</code></a> — transfer, approve (allowance + expiry, unlimited flagged), burn, mint, clawback; amounts scaled by resolved decimals or shown raw with &quot;decimals unknown&quot;</td>
+<td>Proof deck slide 4; QA plan section 4</td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>§4.1 — an unverified contract handled safely</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/57f34cc" target="_blank" rel="noopener"><code>57f34cc</code></a> — structured label <em>unverified — semantics unknown</em>, decoded args shown, no name-based guessing, risk raised</td>
+<td>Proof deck slide 6; QA plan section 5</td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>§4.1 — screen counterparties against the registry</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/c30f30a" target="_blank" rel="noopener"><code>c30f30a</code></a> — every address, three outcomes, unknown never folded into clean, TTL cache</td>
+<td>Proof deck slide 7 with the explorer row; QA plan section 6</td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>A deterministic risk verdict</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/faa3829" target="_blank" rel="noopener"><code>faa3829</code></a> — pure rules; signal trail with provenance; <code>effects shown, terms not judged</code> on every verdict</td>
+<td>Proof deck slides 3–8</td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>§4.1 — plain-language explanation</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/e76700d" target="_blank" rel="noopener"><code>e76700d</code></a> — one hosted model (<code>claude-haiku-4-5-20251001</code>), structured facts only, 4 s deadline, sanitised, contradiction-guarded, rules-based fallback</td>
+<td>Proof deck slide 9; QA plan section 8</td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>No key ships in a client</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/418d4c1" target="_blank" rel="noopener"><code>418d4c1</code></a> — the Lantern API proxy (<code>POST /v1/explain</code>), rate-limited and capped; <a href="https://github.com/kimerran/stellar-lantern/commit/3addf40" target="_blank" rel="noopener"><code>3addf40</code></a> — AI flag OFF in release builds</td>
+<td>Service <code>/healthz</code>; release workflow</td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>§6.1 — manual QA plan and a way to run the scanner by hand</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/73d5b34" target="_blank" rel="noopener"><code>73d5b34</code></a> — <code>npm run scan</code> harness (online, offline, <code>--no-ai</code>, hostile-stub mode) + the plan with real fixture names</td>
+<td>Test plan; dry run</td>
+<td>In progress</td>
+</tr>
+<tr>
+<td>§6.1 — 90-second recording</td>
+<td>Runbook written</td>
+<td>—</td>
+<td>In progress</td>
+</tr>
+</tbody>
+</table></div><h2>Scope notes</h2>
+<ul>
+<li><strong>Committed coverage is payments and the token interface.</strong> Anything else is decoded as far as the bytes allow and labelled <em>unverified — semantics unknown</em>; the scanner does not attempt DeFi-protocol semantics in D2.</li>
+<li><strong>The scanner never signs and never submits.</strong> Its only network calls are two read-only RPC methods (<code>simulateTransaction</code>, <code>getLedgerEntries</code>) and, when configured, the explainer.</li>
+<li><strong>The verdict is about what a transaction does, not whether it is a good deal</strong> (§3.9) — every verdict carries that scope statement as a constant.</li>
+</ul>
+<h2>Implementation choices</h2>
+<ul>
+<li><strong>The AI layer arrived last, on purpose.</strong> The deterministic core was built and tested to stand on its own before a model was attached to it; the SOW explicitly allows the verdict to stand without the sentence.</li>
+<li><strong>Option 2 for the model key — ship none</strong> — then option 1, a proxy, before any public surface. A browser extension cannot keep a secret, so the release builds carry no key and no endpoint; the Lantern API holds the key and serves the sentence with a per-IP window and a daily cap.</li>
+<li><strong>Offline by construction.</strong> Nineteen recorded fixtures (real testnet XDR and the raw RPC bodies) answer every network call in tests; a QA harness <code>--offline</code> mode uses the same recordings and fails closed on anything unrecorded.</li>
+<li><strong>Three fixtures were added for the QA plan</strong> (payment to the flagged address; two recipients with one flagged; the flagged payment with a prompt-injection memo) so a tester can exercise screening and the injection case without building transactions.</li>
+</ul>
 
         </article>
         <footer class="docs-foot">
