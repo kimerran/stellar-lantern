@@ -15,9 +15,7 @@ import {
 } from '@core/recovery/guardians';
 import { buildTransferXdr } from '@core/stellar/tx';
 import { totalFeeXlm } from '@core/stellar/tx';
-import { decodeTransaction } from '@core/scan/decode';
-import { scan } from '@core/scan/engine';
-import { explainTransaction } from '@core/scan/explainer';
+import { decodeTransaction, scan, explainTransaction } from '@lantern/scanner';
 
 const SOURCE = 'GDRXE2BQUC3AZNPVFSCEZ76NJ3WWL25FYFK6RGZGIEKWE4SOOHSUJUJ6';
 const NEW_KEY = 'GBVG3DQJNAYAPTB4FKPLL65BUNF76K2TKPTK72LDIAJKRATGRY5BFJBP';

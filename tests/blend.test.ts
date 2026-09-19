@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Networks, StrKey, TransactionBuilder, scValToNative } from '@stellar/stellar-sdk';
 import { buildBlendSubmitXdr, BLEND_REQUEST_TYPE } from '@core/blend/pool';
-import { decodeTransaction } from '@core/scan/decode';
+import { decodeTransaction } from '@lantern/scanner';
 
 const pp = Networks.TESTNET;
 const USER = 'GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ';

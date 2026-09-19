@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { track } from '@core/telemetry';
 import type { NetworkConfig } from '@shared/constants';
 import { sendMessage } from '@shared/messages';
 import { anchorsForNetwork, type AnchorEntry } from '@core/anchor/directory';
@@ -98,13 +99,16 @@ export function CashInOut({ address, network, onBack }: Props) {
         setTransfer((t) => (t && t.id === activeId ? { ...t, status: u.info } : t)),
       isCancelled: () => cancelled,
     })
-      .then((final) =>
+      .then((final) => {
+        if (__FEATURE_TELEMETRY__ && final.info.terminal) {
+          track.anchorFlow(transfer.direction, final.info.kind === 'done' ? 'completed' : 'failed');
+        }
         setTransfer((t) =>
           t && t.id === activeId
             ? { ...t, status: final.info, phase: final.info.terminal ? 'done' : t.phase }
             : t,
-        ),
-      )
+        );
+      })
       .catch(() => {
         // A polling failure is non-fatal — the anchor's own window still works and
         // the user can watch the result there; we just stop reflecting status.
@@ -138,6 +142,7 @@ export function CashInOut({ address, network, onBack }: Props) {
       });
       return;
     }
+    if (__FEATURE_TELEMETRY__) track.anchorFlow(direction, 'started');
     setTransfer({ asset, direction, phase: 'authing' });
     try {
       const jwt = await authenticateSep10({
@@ -168,6 +173,7 @@ export function CashInOut({ address, network, onBack }: Props) {
       });
       setTransfer({ asset, direction, phase: 'interactive', url, id });
     } catch (e) {
+      if (__FEATURE_TELEMETRY__) track.anchorFlow(direction, 'failed');
       setTransfer({
         asset,
         direction,

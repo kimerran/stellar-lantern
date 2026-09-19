@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { track } from '@core/telemetry';
 import { BASE_FEE } from '@stellar/stellar-sdk';
 import type { NetworkConfig } from '@shared/constants';
 import type { AssetBalance } from '@shared/types';
@@ -10,8 +11,8 @@ import { isValidPublicKey } from '@core/wallet/wallet';
 import { isNativePlatform } from '@shared/kv';
 import { MAX_MEMO_BYTES } from '@shared/constants';
 import { formatAmount, truncateAddress } from '@shared/format';
-import { scan } from '@core/scan/engine';
-import type { ScanVerdict } from '@core/scan/types';
+import { scan } from '@core/scan';
+import type { ScanVerdict } from '@core/scan';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { Card } from '../components/Card';
@@ -191,6 +192,7 @@ export function Send({ address, network, onDone }: Props) {
         memo: memo.trim(),
         fee: formatAmount(String(Number(baseFee) / 1e7)),
       });
+      if (__FEATURE_TELEMETRY__) track.txScanned(scanVerdict);
       setVerdict(scanVerdict);
       setConfirmText('');
       setStep('review');

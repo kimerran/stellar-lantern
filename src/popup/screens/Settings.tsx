@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { APP_VERSION } from '@shared/version';
 import type { NetworkId } from '@shared/constants';
 import { NETWORKS } from '@shared/constants';
 import type { Settings as SettingsType } from '@shared/types';
@@ -8,6 +9,7 @@ import { Icon } from '../components/Icon';
 import { Input } from '../components/Input';
 import { NetworkBadge } from '../components/NetworkBadge';
 import { useToast } from '../components/Toast';
+import { CONSENT_COPY } from '@core/telemetry';
 
 interface Props {
   address: string;
@@ -26,9 +28,12 @@ interface Props {
   setAutoLock: (minutes: number) => void;
   setHorizonOverrides: (o: SettingsType['horizonOverrides']) => void;
   setRpcOverrides: (o: SettingsType['rpcOverrides']) => void;
+  // Analytics consent (#86); rendered only under __FEATURE_TELEMETRY__.
+  setAnalyticsConsent?: (on: boolean) => Promise<void>;
+  deleteAnalytics?: () => Promise<void>;
+  // The analytics install id to show for copying (#98); null = none minted.
+  installId?: string | null;
 }
-
-const APP_VERSION = '0.1.0'; // package.json — Lantern is pre-1.0.
 
 // Auto-lock presets (minutes). 0 = never (armAutoLock leaves the timer disarmed).
 const AUTO_LOCK_OPTIONS: { value: number; label: string }[] = [
@@ -60,64 +65,85 @@ export function Settings({
   setAutoLock,
   setHorizonOverrides,
   setRpcOverrides,
+  setAnalyticsConsent,
+  deleteAnalytics,
+  installId = null,
 }: Props) {
+  const toast = useToast();
   const content = (
     <>
-        <Section title="Account">
-          <button
-            onClick={onCopyAddress}
-            className="flex w-full min-h-[52px] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-variant active:scale-[0.99]"
-          >
-            <Icon name="account_circle" size={22} className="shrink-0 text-on-surface-variant" />
-            <span className="min-w-0 flex-1">
-              <span className="block text-body-md text-on-surface">Your address</span>
-              <span className="block truncate font-mono text-label-md text-on-surface-variant">
-                {truncateAddress(address, 6, 6)}
-              </span>
+      <Section title="Account">
+        <button
+          onClick={onCopyAddress}
+          className="flex w-full min-h-[52px] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-variant active:scale-[0.99]"
+        >
+          <Icon name="account_circle" size={22} className="shrink-0 text-on-surface-variant" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-body-md text-on-surface">Your address</span>
+            <span className="block truncate font-mono text-label-md text-on-surface-variant">
+              {truncateAddress(address, 6, 6)}
             </span>
-            <Icon name="content_copy" size={18} className="shrink-0 text-on-surface-variant" />
-          </button>
-          <Divider />
-          <NavRow icon="qr_code_2" label="Receive" hint="Address & QR code" onClick={onOpenReceive} />
-        </Section>
+          </span>
+          <Icon name="content_copy" size={18} className="shrink-0 text-on-surface-variant" />
+        </button>
+        <Divider />
+        <NavRow icon="qr_code_2" label="Receive" hint="Address & QR code" onClick={onOpenReceive} />
+      </Section>
 
-        <Section title="Security">
-          <NavRow icon="shield_person" label="Guardians & recovery" onClick={onOpenGuardians} />
-          <Divider />
-          <NavRow icon="security" label="Security & scam check" onClick={onOpenScan} />
-          <Divider />
-          <AutoLockRow value={settings.autoLockMinutes} onChange={setAutoLock} />
-        </Section>
+      <Section title="Security">
+        <NavRow icon="shield_person" label="Guardians & recovery" onClick={onOpenGuardians} />
+        <Divider />
+        <NavRow icon="security" label="Security & scam check" onClick={onOpenScan} />
+        <Divider />
+        <AutoLockRow value={settings.autoLockMinutes} onChange={setAutoLock} />
+      </Section>
 
-        <Section title="Cash">
-          <NavRow icon="currency_exchange" label="Cash in / Cash out" hint="Deposit & withdraw via anchors" onClick={onOpenCashInOut} />
-        </Section>
+      <Section title="Cash">
+        <NavRow
+          icon="currency_exchange"
+          label="Cash in / Cash out"
+          hint="Deposit & withdraw via anchors"
+          onClick={onOpenCashInOut}
+        />
+      </Section>
 
-        <Section title="Network">
-          <NetworkRow current={settings.network} onSelect={setNetwork} />
-          <Divider />
-          <AdvancedEndpoints
-            settings={settings}
-            setHorizonOverrides={setHorizonOverrides}
-            setRpcOverrides={setRpcOverrides}
+      {__FEATURE_TELEMETRY__ && setAnalyticsConsent && deleteAnalytics && (
+        <Section title="Privacy">
+          <PrivacyRows
+            consent={settings.analyticsConsent === true}
+            installId={installId}
+            setAnalyticsConsent={setAnalyticsConsent}
+            deleteAnalytics={deleteAnalytics}
+            toast={toast}
           />
         </Section>
+      )}
 
-        <Section title="About">
-          <div className="flex min-h-[52px] items-center gap-3 px-4 py-3">
-            <Icon name="info" size={22} className="shrink-0 text-on-surface-variant" />
-            <span className="flex-1 text-body-md text-on-surface">Version</span>
-            <span className="font-mono text-label-md text-on-surface-variant">{APP_VERSION}</span>
-          </div>
-          <Divider />
-          <button
-            onClick={onLock}
-            className="flex w-full min-h-[52px] items-center gap-3 px-4 py-3 text-left text-error transition-colors hover:bg-error/10 active:scale-[0.99]"
-          >
-            <Icon name="lock" size={22} className="shrink-0" />
-            <span className="flex-1 text-body-md">Lock wallet</span>
-          </button>
-        </Section>
+      <Section title="Network">
+        <NetworkRow current={settings.network} onSelect={setNetwork} />
+        <Divider />
+        <AdvancedEndpoints
+          settings={settings}
+          setHorizonOverrides={setHorizonOverrides}
+          setRpcOverrides={setRpcOverrides}
+        />
+      </Section>
+
+      <Section title="About">
+        <div className="flex min-h-[52px] items-center gap-3 px-4 py-3">
+          <Icon name="info" size={22} className="shrink-0 text-on-surface-variant" />
+          <span className="flex-1 text-body-md text-on-surface">Version</span>
+          <span className="font-mono text-label-md text-on-surface-variant">{APP_VERSION}</span>
+        </div>
+        <Divider />
+        <button
+          onClick={onLock}
+          className="flex w-full min-h-[52px] items-center gap-3 px-4 py-3 text-left text-error transition-colors hover:bg-error/10 active:scale-[0.99]"
+        >
+          <Icon name="lock" size={22} className="shrink-0" />
+          <span className="flex-1 text-body-md">Lock wallet</span>
+        </button>
+      </Section>
     </>
   );
 
@@ -140,10 +166,143 @@ export function Settings({
   );
 }
 
+// The analytics toggle + "delete my data" (#86). Copy comes from
+// core/telemetry/consent.ts so it can be asserted against docs/telemetry.md.
+function PrivacyRows({
+  consent,
+  installId,
+  setAnalyticsConsent,
+  deleteAnalytics,
+  toast,
+}: {
+  consent: boolean;
+  installId: string | null;
+  setAnalyticsConsent: (on: boolean) => Promise<void>;
+  deleteAnalytics: () => Promise<void>;
+  toast: (msg: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  async function run(action: () => Promise<void>, done: string) {
+    setBusy(true);
+    try {
+      await action();
+      toast(done);
+    } finally {
+      setBusy(false);
+      setConfirmDelete(false);
+    }
+  }
+  return (
+    <>
+      <button
+        role="switch"
+        aria-checked={consent}
+        disabled={busy}
+        onClick={() =>
+          void run(
+            () => setAnalyticsConsent(!consent),
+            consent ? 'Usage data sharing is off.' : 'Thanks — sharing anonymous usage data.',
+          )
+        }
+        className="flex w-full min-h-[52px] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-variant active:scale-[0.99] disabled:opacity-60"
+      >
+        <Icon name="insights" size={22} className="shrink-0 text-on-surface-variant" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-body-md text-on-surface">{CONSENT_COPY.title}</span>
+          <span className="block text-label-md text-on-surface-variant">
+            {CONSENT_COPY.summary}
+          </span>
+        </span>
+        <span
+          aria-hidden
+          className={`ml-2 inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors ${consent ? 'bg-primary' : 'bg-outline-variant'}`}
+        >
+          <span
+            className={`h-5 w-5 rounded-full bg-surface transition-transform ${consent ? 'translate-x-5' : ''}`}
+          />
+        </span>
+      </button>
+      <div className="px-4 pb-3 text-label-md text-on-surface-variant">
+        <p className="mt-1 font-medium text-on-surface">What we collect</p>
+        <ul className="list-disc pl-5">
+          {CONSENT_COPY.collected.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+        <p className="mt-2 font-medium text-on-surface">What we never collect</p>
+        <ul className="list-disc pl-5">
+          {CONSENT_COPY.neverCollected.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </div>
+      {consent && installId && (
+        <>
+          <Divider />
+          <button
+            onClick={() =>
+              void navigator.clipboard.writeText(installId).then(
+                () => toast('Analytics ID copied.'),
+                () => toast('Could not copy — long-press to select it.'),
+              )
+            }
+            className="flex w-full min-h-[52px] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-variant active:scale-[0.99]"
+          >
+            <Icon name="content_copy" size={22} className="shrink-0 text-on-surface-variant" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-body-md text-on-surface">{CONSENT_COPY.idTitle}</span>
+              <span className="block select-all break-all font-mono text-label-md text-on-surface-variant">
+                {installId}
+              </span>
+              <span className="mt-1 block text-label-md text-on-surface-variant">
+                {CONSENT_COPY.idHint}
+              </span>
+            </span>
+          </button>
+        </>
+      )}
+      <Divider />
+      {confirmDelete ? (
+        <div className="flex min-h-[52px] items-center gap-2 px-4 py-3">
+          <span className="flex-1 text-body-md text-on-surface">
+            Delete everything sent from this install?
+          </span>
+          <Button variant="secondary" onClick={() => setConfirmDelete(false)} disabled={busy}>
+            Keep
+          </Button>
+          <Button
+            onClick={() => void run(deleteAnalytics, 'Deletion requested. Sharing is off.')}
+            loading={busy}
+          >
+            Delete
+          </Button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setConfirmDelete(true)}
+          disabled={busy}
+          className="flex w-full min-h-[52px] items-center gap-3 px-4 py-3 text-left text-error transition-colors hover:bg-error/10 active:scale-[0.99] disabled:opacity-60"
+        >
+          <Icon name="delete" size={22} className="shrink-0" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-body-md">{CONSENT_COPY.deleteTitle}</span>
+            <span className="block text-label-md text-on-surface-variant">
+              {CONSENT_COPY.deleteHint}
+            </span>
+          </span>
+        </button>
+      )}
+    </>
+  );
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mt-5">
-      <h2 className="mb-2 px-1 text-label-sm uppercase tracking-wide text-on-surface-variant">{title}</h2>
+      <h2 className="mb-2 px-1 text-label-sm uppercase tracking-wide text-on-surface-variant">
+        {title}
+      </h2>
       <div className="overflow-hidden rounded-2xl bg-surface-container">{children}</div>
     </section>
   );
@@ -172,7 +331,9 @@ function NavRow({
       <Icon name={icon} size={22} className="shrink-0 text-on-surface-variant" />
       <span className="min-w-0 flex-1">
         <span className="block text-body-md text-on-surface">{label}</span>
-        {hint && <span className="block truncate text-label-md text-on-surface-variant">{hint}</span>}
+        {hint && (
+          <span className="block truncate text-label-md text-on-surface-variant">{hint}</span>
+        )}
       </span>
       <Icon name="chevron_right" size={20} className="shrink-0 text-on-surface-variant" />
     </button>
@@ -200,7 +361,13 @@ function AutoLockRow({ value, onChange }: { value: number; onChange: (m: number)
   );
 }
 
-function NetworkRow({ current, onSelect }: { current: NetworkId; onSelect: (n: NetworkId) => void }) {
+function NetworkRow({
+  current,
+  onSelect,
+}: {
+  current: NetworkId;
+  onSelect: (n: NetworkId) => void;
+}) {
   const ids: NetworkId[] = ['TESTNET', 'PUBLIC'];
   return (
     <div className="flex min-h-[52px] items-center gap-3 px-4 py-3">
@@ -275,7 +442,11 @@ function AdvancedEndpoints({
       >
         <Icon name="tune" size={22} className="shrink-0 text-on-surface-variant" />
         <span className="flex-1 text-body-md text-on-surface">Advanced</span>
-        <Icon name={open ? 'expand_less' : 'expand_more'} size={20} className="shrink-0 text-on-surface-variant" />
+        <Icon
+          name={open ? 'expand_less' : 'expand_more'}
+          size={20}
+          className="shrink-0 text-on-surface-variant"
+        />
       </button>
 
       {open && (

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Metrics — Lantern — Instawards Phase 1</title>
+    <meta name="description" content="Evidence site for Lantern's Stellar Development Foundation Instawards sprint: weekly reports, deliverable traceability, and an index of every on-chain and off-chain artifact." />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/docs/docs.css" />
+  </head>
+  <body class="docs">
+    <header class="docs-top">
+      <div class="docs-top-inner">
+        <a class="brand" href="/docs/"><img src="/logo.jpg" alt="Lantern logo" /><span>Lantern</span><em>Instawards evidence</em></a>
+        <a class="md-link" href="/docs/reference/metrics.md" title="This page as markdown">view as markdown</a>
+      </div>
+    </header>
+    <div class="docs-layout">
+      <nav class="side" aria-label="Pages"><ul><li><a href="/docs/">Overview</a></li><li><a href="/docs/sow/">Statement of Work</a></li><li class="group"><span>Weekly reports</span><ul><li><a href="/docs/weekly/week-1/">Week 1 — 7–13 Sep</a></li><li><a href="/docs/weekly/week-2/">Week 2 — 14–20 Sep</a></li><li><a href="/docs/weekly/week-3/">Week 3 — 21–27 Sep</a></li><li><a href="/docs/weekly/week-4/">Week 4 — 28 Sep – 4 Oct</a></li></ul></li><li class="group"><span>Deliverables</span><ul><li><a href="/docs/deliverables/d1/">D1 — On-chain blacklist registry</a></li><li><a href="/docs/deliverables/d2/">D2 — Transaction security scanner</a></li><li><a href="/docs/deliverables/d3/">D3 — Scanner in the wallet</a></li><li><a href="/docs/deliverables/d4/">D4 — Public demo</a></li></ul></li><li class="group"><span>Reference</span><ul><li><a href="/docs/reference/scanner/">Scanner package</a></li><li><a href="/docs/reference/registry/">Registry contract</a></li><li class="on"><a href="/docs/reference/metrics/">Metrics</a></li><li><a href="/docs/reference/evidence/">Evidence index</a></li><li><a href="/docs/reference/changelog/">Full changelog</a></li></ul></li></ul></nav>
+      <main class="docs-main">
+        <p class="crumbs"><a href="/docs/">Lantern — Instawards Phase 1</a> <span class="sep">/</span> <span>Reference</span> <span class="sep">/</span> <span>Metrics</span></p>
+        <article class="prose">
+<h1>Metrics</h1>
+<p>The Statement of Work's §6.3 targets, against actuals read from the raw analytics export on a dated snapshot. Numbers are never typed from memory: each row names how it is measured and when it was read.</p>
+<h2>How the numbers are measured</h2>
+<p>Lantern's wallet builds carry <strong>opt-in</strong> usage analytics (off by default; one toggle under Settings → Privacy; delete-my-data on request). Events are enum-only — no amounts, no memos, no keys — under a random install id. Alpha-tester builds may additionally attach the wallet's public address, which is what makes a &quot;unique wallet&quot; countable; installs with no address are counted as installs, not wallets. The Lantern API stores the events; the snapshots below are read from its raw export (which, unlike the dashboard, also counts installs with no wallet address).</p>
+<div class="table"><table><thead>
+<tr>
+<th>Metric</th>
+<th>Measured as</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Transactions scanned end-to-end</td>
+<td>Count of <code>tx_scanned</code> events across all installs in the window</td>
+</tr>
+<tr>
+<td>Unique wallets that ran a scan</td>
+<td>Distinct wallet addresses with at least one <code>tx_scanned</code> event in the window</td>
+</tr>
+<tr>
+<td>Transactions signed</td>
+<td>Count of <code>tx_signed</code> events (context only; not an SOW target)</td>
+</tr>
+</tbody>
+</table></div><h2>Snapshot</h2>
+<div class="table"><table><thead>
+<tr>
+<th>Metric</th>
+<th>Target</th>
+<th>At 2026-09-17 (snapshot)</th>
+<th>Change</th>
+<th>Met</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Transactions scanned end-to-end</td>
+<td>≥ 60</td>
+<td>18</td>
+<td>+18 (first data: 16 Sep)</td>
+<td>Not yet</td>
+</tr>
+<tr>
+<td>Unique wallets that ran a scan</td>
+<td>≥ 15</td>
+<td>4</td>
+<td>+4</td>
+<td>Not yet</td>
+</tr>
+<tr>
+<td>Transactions signed</td>
+<td>—</td>
+<td>6 across 4 wallets</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Installs reporting</td>
+<td>—</td>
+<td>6 (4 with a wallet address)</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div><p>Snapshot read from the analytics export on 2026-09-17; window 2026-09-16 → 2026-09-17 (the first day the instrumented builds were in testers' hands). The scanner is a library in Week 2 — every scan above came from the alpha wallet's existing review screen. The SOW's counts are expected to move in Weeks 3 and 4, when the D2 scanner sits in the wallet's pre-sign review (D3) and a public playground opens (D4).</p>
+<h2>History</h2>
+<div class="table"><table><thead>
+<tr>
+<th>Snapshot</th>
+<th>Scanned</th>
+<th>Wallets scanned</th>
+<th>Signed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-09-17</td>
+<td>18</td>
+<td>4</td>
+<td>6</td>
+</tr>
+</tbody>
+</table></div><p>Each weekly report from Week 3 on adds a row.</p>
+
+        </article>
+        <footer class="docs-foot">
+          <p>Unlisted evidence site for the Stellar Development Foundation Instawards programme. Not indexed; no links from the landing page. Machine-readable index: <a href="/docs/llms.txt">llms.txt</a>.</p>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

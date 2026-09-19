@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { track } from '@core/telemetry';
 import { sendMessage } from '@shared/messages';
 import { isNativePlatform } from '@shared/kv';
 import { normalizeMnemonic } from '@core/wallet/wallet';
@@ -54,7 +55,10 @@ export function Onboarding({
     setError(null);
     const res = await sendMessage({ type: 'CREATE_WALLET', mnemonic, password });
     setBusy(false);
-    if (res.ok) onDone();
+    if (res.ok) {
+      if (__FEATURE_TELEMETRY__) track.walletCreated('create');
+      onDone();
+    }
     else setError(res.error);
   }
 
@@ -63,7 +67,10 @@ export function Onboarding({
     setError(null);
     const res = await sendMessage({ type: 'IMPORT_WALLET', input: importInput, password });
     setBusy(false);
-    if (res.ok) onDone();
+    if (res.ok) {
+      if (__FEATURE_TELEMETRY__) track.walletCreated('import');
+      onDone();
+    }
     else setError(res.error);
   }
 

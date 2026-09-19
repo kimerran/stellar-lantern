@@ -3,12 +3,13 @@
   "version": "0.1.0",
   "description": "Lantern — a non-custodial Stellar browser-extension wallet (MV3).",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" \"packages/**/*.ts\"",
     "verify:flags": "node scripts/verify-flags-dce.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -17,7 +18,10 @@
     "screenshots": "vite build --config scripts/screenshots/vite.config.ts && node scripts/screenshots/capture.mjs",
     "package": "npm run build && node scripts/package.mjs",
     "build:mobile": "tsc --noEmit && vite build --config vite.config.mobile.ts",
-    "cap:sync": "npx cap sync android"
+    "cap:sync": "npx cap sync android",
+    "scan": "esbuild scripts/scan.ts --bundle --platform=node --format=esm --target=node22 --packages=external --alias:@lantern/scanner=./packages/lantern-scanner/src/index.ts --outfile=dist-report/.build/scan.mjs --log-level=warning && node dist-report/.build/scan.mjs",
+    "docs:build": "node scripts/build-docs-site.mjs",
+    "report:activity": "esbuild scripts/report-activity.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist-report/.build/report.mjs --log-level=warning && node dist-report/.build/report.mjs"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.0",
@@ -49,6 +53,7 @@
     "buffer": "6.0.3",
     "eslint": "8.57.1",
     "eslint-plugin-react-hooks": "4.6.2",
+    "markdown-it": "14.3.2",
     "postcss": "8.5.15",
     "prettier": "3.4.2",
     "sharp": "^0.35.3",

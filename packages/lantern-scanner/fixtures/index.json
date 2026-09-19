@@ -1,0 +1,18 @@
+[
+  "classic-payment",
+  "path-payment",
+  "sac-transfer",
+  "sep41-approve",
+  "nested-subinvocation",
+  "unknown-contract",
+  "malformed-xdr",
+  "archived-state",
+  "deep-auth",
+  "classic-path-payment-receive",
+  "classic-account-merge",
+  "classic-multi-op",
+  "token-admin",
+  "classic-payment-to-flagged",
+  "classic-two-recipients-flagged",
+  "classic-flagged-memo-injection"
+]

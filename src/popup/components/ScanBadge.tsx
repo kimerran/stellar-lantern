@@ -1,4 +1,4 @@
-import type { RiskLevel } from '@core/scan/types';
+import type { RiskLevel } from '@core/scan';
 import { Icon } from './Icon';
 
 // "Checked by Lantern" badge (spec §4.1, §7 Phase 4). Calm by default; the colour

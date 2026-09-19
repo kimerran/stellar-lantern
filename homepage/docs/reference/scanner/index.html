@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Scanner package — Lantern — Instawards Phase 1</title>
+    <meta name="description" content="Evidence site for Lantern's Stellar Development Foundation Instawards sprint: weekly reports, deliverable traceability, and an index of every on-chain and off-chain artifact." />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/docs/docs.css" />
+  </head>
+  <body class="docs">
+    <header class="docs-top">
+      <div class="docs-top-inner">
+        <a class="brand" href="/docs/"><img src="/logo.jpg" alt="Lantern logo" /><span>Lantern</span><em>Instawards evidence</em></a>
+        <a class="md-link" href="/docs/reference/scanner.md" title="This page as markdown">view as markdown</a>
+      </div>
+    </header>
+    <div class="docs-layout">
+      <nav class="side" aria-label="Pages"><ul><li><a href="/docs/">Overview</a></li><li><a href="/docs/sow/">Statement of Work</a></li><li class="group"><span>Weekly reports</span><ul><li><a href="/docs/weekly/week-1/">Week 1 — 7–13 Sep</a></li><li><a href="/docs/weekly/week-2/">Week 2 — 14–20 Sep</a></li><li><a href="/docs/weekly/week-3/">Week 3 — 21–27 Sep</a></li><li><a href="/docs/weekly/week-4/">Week 4 — 28 Sep – 4 Oct</a></li></ul></li><li class="group"><span>Deliverables</span><ul><li><a href="/docs/deliverables/d1/">D1 — On-chain blacklist registry</a></li><li><a href="/docs/deliverables/d2/">D2 — Transaction security scanner</a></li><li><a href="/docs/deliverables/d3/">D3 — Scanner in the wallet</a></li><li><a href="/docs/deliverables/d4/">D4 — Public demo</a></li></ul></li><li class="group"><span>Reference</span><ul><li class="on"><a href="/docs/reference/scanner/">Scanner package</a></li><li><a href="/docs/reference/registry/">Registry contract</a></li><li><a href="/docs/reference/metrics/">Metrics</a></li><li><a href="/docs/reference/evidence/">Evidence index</a></li><li><a href="/docs/reference/changelog/">Full changelog</a></li></ul></li></ul></nav>
+      <main class="docs-main">
+        <p class="crumbs"><a href="/docs/">Lantern — Instawards Phase 1</a> <span class="sep">/</span> <span>Reference</span> <span class="sep">/</span> <span>Scanner package</span></p>
+        <article class="prose">
+<h1>Scanner package — <code>@lantern/scanner</code></h1>
+<p>Condensed from the package's <a href="https://github.com/kimerran/stellar-lantern/blob/develop/packages/lantern-scanner/README.md" target="_blank" rel="noopener">README</a>, which is the full reference. MIT-licensed; lives at <a href="https://github.com/kimerran/stellar-lantern/tree/develop/packages/lantern-scanner" target="_blank" rel="noopener"><code>packages/lantern-scanner/</code></a> and is what the wallet, the QA harness and (in D4) the public playground call.</p>
+<h2>What it does</h2>
+<p>Given an unsigned transaction envelope (XDR), the network passphrase and a little context (the signer's address), <code>runPipeline</code> returns a <code>ScanResult</code> with a risk level, an action, reasons, an audit trail of signals, the structured effects, the screening result, and one sentence. It never signs and never submits.</p>
+<h2>The six stages</h2>
+<div class="table"><table><thead>
+<tr>
+<th>#</th>
+<th>Stage</th>
+<th>What it produces</th>
+<th>Posture</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Ingest</td>
+<td>The decoded transaction and, for Soroban calls, the raw simulation from the RPC</td>
+<td>Fail-closed: undecodable, unreachable, timed out, malformed, reverted or archived-state all come back as a failure with its cause, never as a clean result</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Auth</td>
+<td>The <code>SorobanAuthorizationEntry</code> tree — every entry, every nested sub-invocation, with depth</td>
+<td>A nested call that moves money must never be invisible</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Effects</td>
+<td>Per-address balance deltas and their aggregate; approvals; account closes; unverified calls; balance changes the simulation observed</td>
+<td>Payments and the SEP-41 / SAC interface are decoded exactly; anything else is labelled <em>unverified — semantics unknown</em></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Screen</td>
+<td>Each counterparty checked against the D1 registry: flagged / clean / unknown, with the entry behind a hit</td>
+<td>Unknown (unreachable, timeout, archived) is a warning, never clean</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Verdict</td>
+<td><code>low</code> / <code>medium</code> / <code>high</code> → <code>allow</code> / <code>warn</code> / <code>block_confirm</code>, with reasons and a signal trail</td>
+<td>Deterministic rules; same input, same answer; carries <em>effects shown, terms not judged</em></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Explain</td>
+<td>One plain-English sentence</td>
+<td>Receives only the frozen verdict and effects — never raw XDR, auth entries or the memo; bounded by a deadline; sanitised; a contradicting answer is discarded for the rules-based sentence. It cannot change the verdict</td>
+</tr>
+</tbody>
+</table></div><h2>What is covered, and what is not</h2>
+<ul>
+<li><strong>Covered:</strong> classic payment, createAccount, path payments (strict-send and strict-receive, with their min/max bounds), accountMerge (entire balance), setOptions signer changes; SEP-41 / SAC <code>transfer</code>, <code>approve</code> (allowance and expiry; unlimited allowances flagged), <code>burn</code>, <code>mint</code>, <code>clawback</code>; token metadata resolved from the contract instance so amounts are scaled, or shown raw with &quot;decimals unknown&quot; — never a guessed scale.</li>
+<li><strong>Not covered (by design in D2):</strong> DeFi-protocol semantics (swaps, lending); any contract call outside the token interface is decoded as far as the bytes allow and labelled unverified. Look-alike names (<code>transfer_from</code>, <code>transferAll</code>) are not guessed from.</li>
+</ul>
+<h2>Running it by hand</h2>
+<pre><code class="language-bash">npm run scan -- --file classic-payment              # a corpus fixture, live RPC + registry
+npm run scan -- --xdr &lt;base64 envelope&gt;              # any transaction
+npm run scan -- --file sep41-approve --json          # the full ScanResult
+npm run scan -- --file sep41-approve --no-ai         # rules-based sentence only
+npm run scan -- --file sep41-approve --offline       # RPC answered from the recorded corpus
+</code></pre>
+<p>The AI sentence is off unless <code>LANTERN_AI_ENDPOINT</code> (the Lantern API) or a local key is set, and the output always says which explainer wrote the sentence. <code>--ai-stub &quot;&lt;text&gt;&quot;</code> runs a model that always answers <code>&lt;text&gt;</code> through the real sanitiser and contradiction guard, so a tester can watch a hostile answer get discarded. Full instructions and every test case: the <a href="https://github.com/kimerran/stellar-lantern/blob/develop/docs/qa/d2-transaction-scanner-test-plan.md" target="_blank" rel="noopener">manual test plan</a>.</p>
+<h2>Tests</h2>
+<p>The whole suite runs offline against 19 recorded fixtures (real testnet XDR and the raw RPC bodies as returned), so CI needs no RPC, no registry and no model — and no secret. The invariant is pinned from several sides: a type-level test refuses an explainer that returns a verdict; a hostile-model test and a prompt-injection test leave the verdict byte-identical; the harness's <code>--json</code> output with and without the model is asserted equal.</p>
+
+        </article>
+        <footer class="docs-foot">
+          <p>Unlisted evidence site for the Stellar Development Foundation Instawards programme. Not indexed; no links from the landing page. Machine-readable index: <a href="/docs/llms.txt">llms.txt</a>.</p>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

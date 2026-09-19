@@ -1,0 +1,37 @@
+{
+  "name": "token-metadata",
+  "description": "Recorded getLedgerEntries response for the contract-instance entries of the XLM SAC and the USDC SAC (README 'Reserve / asset tokens'). The instance storage carries METADATA {decimal, name, symbol} and AssetInfo; the token-metadata resolver reads these without a source account. Re-record with record-token-metadata.mjs after a testnet reset.",
+  "rpc": "https://soroban-testnet.stellar.org",
+  "recordedAt": "2026-09-14T00:00:00Z",
+  "contracts": [
+    "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+    "CAQCFVLOBK5GIULPNZRGATJJMIZL5BSP7X5YJVMGCPTUEPFM4AVSRCJU"
+  ],
+  "keys": [
+    "AAAABgAAAAHXkotywnA8z+r365/0701QSlWouXn8m0UOoshCtNHOYQAAABQAAAAB",
+    "AAAABgAAAAEgItVuCrpkUW9uYmBNKWIyvoZP/fuE1YYT50I8rOArKAAAABQAAAAB"
+  ],
+  "response": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "entries": [
+        {
+          "key": "AAAABgAAAAHXkotywnA8z+r365/0701QSlWouXn8m0UOoshCtNHOYQAAABQAAAAB",
+          "xdr": "AAAABgAAAAAAAAAB15KLcsJwPM/q9+uf9O9NUEpVqLl5/JtFDqLIQrTRzmEAAAAUAAAAAQAAABMAAAABAAAAAQAAAAIAAAAPAAAACE1FVEFEQVRBAAAAEQAAAAEAAAADAAAADwAAAAdkZWNpbWFsAAAAAAMAAAAHAAAADwAAAARuYW1lAAAADgAAAAZuYXRpdmUAAAAAAA8AAAAGc3ltYm9sAAAAAAAOAAAABm5hdGl2ZQAAAAAAEAAAAAEAAAABAAAADwAAAAlBc3NldEluZm8AAAAAAAAQAAAAAQAAAAEAAAAPAAAABk5hdGl2ZQAA",
+          "lastModifiedLedgerSeq": 4609662,
+          "liveUntilLedgerSeq": 7561567,
+          "extXdr": "AAAAAA=="
+        },
+        {
+          "key": "AAAABgAAAAEgItVuCrpkUW9uYmBNKWIyvoZP/fuE1YYT50I8rOArKAAAABQAAAAB",
+          "xdr": "AAAABgAAAAAAAAABICLVbgq6ZFFvbmJgTSliMr6GT/37hNWGE+dCPKzgKygAAAAUAAAAAQAAABMAAAABAAAAAQAAAAMAAAAPAAAACE1FVEFEQVRBAAAAEQAAAAEAAAADAAAADwAAAAdkZWNpbWFsAAAAAAMAAAAHAAAADwAAAARuYW1lAAAADgAAAD1VU0RDOkdBVEFMVEdUV0lPVDZCVURCQ1pNM1E0T1E0Qk8yQ09MT0FaN0lZU0tQTEMyUE1TT1BQR0Y1VjU2AAAAAAAADwAAAAZzeW1ib2wAAAAAAA4AAAAEVVNEQwAAABAAAAABAAAAAQAAAA8AAAAFQWRtaW4AAAAAAAASAAAAAAAAAAAmBczTsh0/BoMIss3DjocC7QnLcDP0Ykp6xaeyTnvMXgAAABAAAAABAAAAAQAAAA8AAAAJQXNzZXRJbmZvAAAAAAAAEAAAAAEAAAACAAAADwAAAAlBbHBoYU51bTQAAAAAAAARAAAAAQAAAAIAAAAPAAAACmFzc2V0X2NvZGUAAAAAAA4AAAAEVVNEQwAAAA8AAAAGaXNzdWVyAAAAAAANAAAAICYFzNOyHT8GgwiyzcOOhwLtCctwM/RiSnrFp7JOe8xe",
+          "lastModifiedLedgerSeq": 769,
+          "liveUntilLedgerSeq": 4774908,
+          "extXdr": "AAAAAA=="
+        }
+      ],
+      "latestLedger": 4669867
+    }
+  }
+}

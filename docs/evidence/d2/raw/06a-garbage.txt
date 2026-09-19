@@ -1,0 +1,28 @@
+$ npm run scan -- --xdr not-valid-base64
+Lantern scanner · testnet · xdr
+  signer unknown · rpc https://soroban-testnet.stellar.org · registry CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F
+
+INGEST
+  FAILED · undecodable · undecodable
+
+EFFECTS
+  none decoded
+  coverage none
+
+SCREEN
+  outcome clean · checked 0
+
+VERDICT
+  risk HIGH · action BLOCK_CONFIRM · effects shown, terms not judged
+  [high] undecodable — Couldn’t read this transaction: Lantern couldn’t decode this transaction and can’t verify it’s safe — do not sign unless you’re certain.
+  signals (4)
+    ingest · fail_closed · simulation — undecodable: undecodable
+    auth · flat · auth.calls — 0 entries, 0 calls, 0 nested, depth 0
+    effects · coverage_none · effects.coverage — none
+    screen · clean · screen — 0 checked, 0 hits, 0 unknown
+
+SENTENCE
+  "This transaction could not be read or analyzed, so it is blocked and cannot be confirmed."
+  source: explainer · explainer: Lantern API proxy https://lantern-api-production-3fad.up.railway.app/v1/explain
+
+scanned in 1195 ms · nothing was signed or submitted

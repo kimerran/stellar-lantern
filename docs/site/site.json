@@ -1,0 +1,36 @@
+{
+  "name": "Lantern — Instawards Phase 1",
+  "description": "Evidence site for Lantern's Stellar Development Foundation Instawards sprint: weekly reports, deliverable traceability, and an index of every on-chain and off-chain artifact.",
+  "pages": [
+    { "path": "", "title": "Lantern — Instawards Phase 1", "nav": "Overview", "file": "index.md" },
+    { "path": "sow", "title": "Statement of Work", "file": "sow.md" },
+    {
+      "group": "Weekly reports",
+      "pages": [
+        { "path": "weekly/week-1", "title": "Week 1 — 7–13 Sep", "file": "weekly/week-1.md" },
+        { "path": "weekly/week-2", "title": "Week 2 — 14–20 Sep", "file": "weekly/week-2.md" },
+        { "path": "weekly/week-3", "title": "Week 3 — 21–27 Sep", "file": "weekly/week-3.md" },
+        { "path": "weekly/week-4", "title": "Week 4 — 28 Sep – 4 Oct", "file": "weekly/week-4.md" }
+      ]
+    },
+    {
+      "group": "Deliverables",
+      "pages": [
+        { "path": "deliverables/d1", "title": "D1 — On-chain blacklist registry", "file": "deliverables/d1.md" },
+        { "path": "deliverables/d2", "title": "D2 — Transaction security scanner", "file": "deliverables/d2.md" },
+        { "path": "deliverables/d3", "title": "D3 — Scanner in the wallet", "file": "deliverables/d3.md" },
+        { "path": "deliverables/d4", "title": "D4 — Public demo", "file": "deliverables/d4.md" }
+      ]
+    },
+    {
+      "group": "Reference",
+      "pages": [
+        { "path": "reference/scanner", "title": "Scanner package", "file": "reference/scanner.md" },
+        { "path": "reference/registry", "title": "Registry contract", "file": "reference/registry.md" },
+        { "path": "reference/metrics", "title": "Metrics", "file": "reference/metrics.md" },
+        { "path": "reference/evidence", "title": "Evidence index", "file": "reference/evidence.md" },
+        { "path": "reference/changelog", "title": "Full changelog", "file": "reference/changelog.md" }
+      ]
+    }
+  ]
+}

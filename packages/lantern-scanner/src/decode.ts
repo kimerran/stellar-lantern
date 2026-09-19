@@ -1,5 +1,6 @@
-import { Address, TransactionBuilder, Memo } from '@stellar/stellar-sdk';
+import { Address, TransactionBuilder, Memo, type xdr } from '@stellar/stellar-sdk';
 import type { DecodedOp, DecodedTx } from './types';
+import { decodeScVal } from './scval';
 
 // Decode a Stellar transaction XDR into a display/scan summary (spec §4.1).
 // Pure: no network, no chrome. Returns null if the XDR can't be parsed.
@@ -18,6 +19,7 @@ export function decodeTransaction(xdr: string, networkPassphrase: string): Decod
     const primary = operations.find((o) => o.amount != null) ?? operations[0];
 
     return {
+      source: inner.source,
       operations,
       memo,
       isSoroban,
@@ -32,17 +34,21 @@ export function decodeTransaction(xdr: string, networkPassphrase: string): Decod
 
 function mapOp(op: Record<string, unknown>): DecodedOp {
   const type = String(op.type ?? 'unknown');
+  // Per-op source override (the account the op acts for), when set (#54).
+  const source = str(op.source);
+  const base: DecodedOp = source ? { type, sourceAccount: source } : { type };
   switch (type) {
     case 'payment':
       return {
-        type,
+        ...base,
         destination: str(op.destination),
         amount: str(op.amount),
         assetCode: assetCode(op.asset),
+        assetIssuer: assetIssuer(op.asset),
       };
     case 'createAccount':
       return {
-        type,
+        ...base,
         destination: str(op.destination),
         amount: str(op.startingBalance),
         assetCode: 'XLM',
@@ -50,38 +56,44 @@ function mapOp(op: Record<string, unknown>): DecodedOp {
     case 'pathPaymentStrictSend':
       // Strict-send: spend an exact `sendAmount`, receive at least `destMin`.
       return {
-        type,
+        ...base,
         destination: str(op.destination),
         amount: str(op.sendAmount), // headline = what leaves the wallet
         assetCode: assetCode(op.sendAsset),
+        assetIssuer: assetIssuer(op.sendAsset),
         sendAssetCode: assetCode(op.sendAsset),
+        sendAssetIssuer: assetIssuer(op.sendAsset),
         sendAmount: str(op.sendAmount),
         destAssetCode: assetCode(op.destAsset),
+        destAssetIssuer: assetIssuer(op.destAsset),
         destMin: str(op.destMin),
       };
     case 'pathPaymentStrictReceive':
       // Strict-receive: receive an exact `destAmount`, spend at most `sendMax`.
       return {
-        type,
+        ...base,
         destination: str(op.destination),
         amount: str(op.destAmount),
         assetCode: assetCode(op.destAsset),
+        assetIssuer: assetIssuer(op.destAsset),
         sendAssetCode: assetCode(op.sendAsset),
+        sendAssetIssuer: assetIssuer(op.sendAsset),
         sendAmount: str(op.sendMax),
         destAssetCode: assetCode(op.destAsset),
+        destAssetIssuer: assetIssuer(op.destAsset),
       };
     case 'accountMerge':
       // accountMerge sends the ENTIRE remaining XLM balance to `destination` and
       // deletes this account. There is no explicit amount field (it's always
       // "everything"), so at least surface the merge target so it doesn't render
       // blank; the engine flags it as high-impact. (#127)
-      return { type, destination: str(op.destination) };
+      return { ...base, destination: str(op.destination) };
     case 'setOptions':
-      return { type, ...decodeSetOptions(op) };
+      return { ...base, ...decodeSetOptions(op) };
     case 'invokeHostFunction':
-      return { type, ...decodeInvoke(op) };
+      return { ...base, ...decodeInvoke(op) };
     default:
-      return { type };
+      return base;
   }
 }
 
@@ -102,10 +114,12 @@ function decodeInvoke(op: Record<string, unknown>): Partial<DecodedOp> {
     const inv = func.invokeContract() as {
       contractAddress: () => unknown;
       functionName: () => { toString: () => string };
+      args: () => xdr.ScVal[];
     };
     return {
       contractId: Address.fromScAddress(inv.contractAddress() as never).toString(),
       contractFunction: inv.functionName().toString(),
+      contractArgs: inv.args().map(decodeScVal),
     };
   } catch {
     return {};
@@ -152,6 +166,14 @@ function assetCode(asset: unknown): string | undefined {
   const a = asset as { code?: string; isNative?: () => boolean };
   if (typeof a.isNative === 'function' && a.isNative()) return 'XLM';
   return a.code ?? 'XLM';
+}
+
+// Issuer of a classic asset; undefined for native XLM.
+function assetIssuer(asset: unknown): string | undefined {
+  if (!asset || typeof asset !== 'object') return undefined;
+  const a = asset as { issuer?: unknown; isNative?: () => boolean };
+  if (typeof a.isNative === 'function' && a.isNative()) return undefined;
+  return typeof a.issuer === 'string' ? a.issuer : undefined;
 }
 
 function memoText(memo: Memo | undefined): string | undefined {

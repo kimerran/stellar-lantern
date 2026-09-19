@@ -1,0 +1,36 @@
+$ npm run scan -- --file classic-payment-to-flagged --rpc http://127.0.0.1:9
+Lantern scanner · testnet · fixture classic-payment-to-flagged
+  Classic payment of 5 XLM to the demo flagged address — the one with a live Active entry in the D1 registry (registry-hot-read.json). Screens flagged against the live registry; the QA plan and the demo use it.
+  signer GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK · rpc http://127.0.0.1:9 · registry CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F
+
+INGEST
+  ok · 1 op(s) · classic, no simulation needed
+
+EFFECTS
+  payment · op 0 · 5.0000000 XLM · → GA7Q…VSGZ
+    GAMN…SRNK −5.0000000 XLM
+    GA7Q…VSGZ +5.0000000 XLM
+  net per address
+    GAMN…SRNK XLM: out 5.0000000 · in 0.0000000
+    GA7Q…VSGZ XLM: out 0.0000000 · in 5.0000000
+  coverage full
+
+SCREEN
+  outcome unknown · checked 1
+  UNKNOWN GA7Q…VSGZ · rpc_error
+
+VERDICT
+  risk MEDIUM · action WARN · effects shown, terms not judged
+  [medium] screen_unknown — Couldn’t check the recipient: The reported-address registry couldn’t be reached, so this recipient is unverified.
+  signals (5)
+    ingest · classic · simulation — no simulation needed
+    auth · flat · auth.calls — 0 entries, 0 calls, 0 nested, depth 0
+    effects · coverage_full · effects.coverage — payment
+    screen · unknown · screen — 1 checked, 0 hits, 1 unknown
+    screen · screen_unknown · screen.unknown[0] — GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ: rpc_error
+
+SENTENCE
+  "You are sending 5.0000000 XLM to GA7Q…VSGZ, but the recipient address could not be verified. 5.0000000 XLM will leave your account at GAMN…SRNK."
+  source: explainer · explainer: Lantern API proxy https://lantern-api-production-3fad.up.railway.app/v1/explain
+
+scanned in 1464 ms · nothing was signed or submitted

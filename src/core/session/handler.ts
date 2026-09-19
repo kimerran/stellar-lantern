@@ -1,4 +1,5 @@
 import '@shared/polyfills'; // must be first — sets Buffer/process/global before Stellar loads
+import { track } from '@core/telemetry';
 import { Keypair, Horizon, TransactionBuilder } from '@stellar/stellar-sdk';
 import type { Request, Result, ResponseMap } from '@shared/messages';
 import { getSettings, getVault, setVault, clearVault } from '@shared/storage';
@@ -183,8 +184,14 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
       const tx = TransactionBuilder.fromXDR(req.xdr, req.networkPassphrase);
       tx.sign(session.keypair);
       const server = new Horizon.Server(req.horizonUrl);
-      const res = await server.submitTransaction(tx);
-      return ok<'SIGN_AND_SUBMIT'>({ hash: res.hash });
+      try {
+        const res = await server.submitTransaction(tx);
+        if (__FEATURE_TELEMETRY__) track.txSigned('sign_and_submit', true);
+        return ok<'SIGN_AND_SUBMIT'>({ hash: res.hash });
+      } catch (e) {
+        if (__FEATURE_TELEMETRY__) track.txSigned('sign_and_submit', false);
+        throw e;
+      }
     }
 
     case 'SIGN_ONLY': {
@@ -200,6 +207,7 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
       // submitted. Consumers: guardian recovery (#23), anchor SEP-10 auth (#24).
       const tx = TransactionBuilder.fromXDR(req.xdr, req.networkPassphrase);
       tx.sign(session.keypair);
+      if (__FEATURE_TELEMETRY__) track.txSigned('sign_only', true);
       return ok<'SIGN_ONLY'>({ signedXdr: tx.toXDR() });
     }
 
@@ -212,8 +220,14 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
       // (tx_bad_auth_extra). No unlock needed — this only broadcasts.
       const tx = TransactionBuilder.fromXDR(req.xdr, req.networkPassphrase);
       const server = new Horizon.Server(req.horizonUrl);
-      const res = await server.submitTransaction(tx);
-      return ok<'SUBMIT_ONLY'>({ hash: res.hash });
+      try {
+        const res = await server.submitTransaction(tx);
+        if (__FEATURE_TELEMETRY__) track.txSigned('submit_only', true);
+        return ok<'SUBMIT_ONLY'>({ hash: res.hash });
+      } catch (e) {
+        if (__FEATURE_TELEMETRY__) track.txSigned('submit_only', false);
+        throw e;
+      }
     }
 
     case 'SIGN_MESSAGE': {

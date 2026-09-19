@@ -1,5 +1,5 @@
 import type { DecodedOp, DecodedTx } from './types';
-import { truncateAddress, formatAmount } from '@shared/format';
+import { truncateAddress, formatAmount } from './format';
 import { describeDefiFunction } from './defi';
 
 // Turn a decoded transaction into ONE low-reading-level sentence for the

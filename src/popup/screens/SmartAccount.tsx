@@ -5,6 +5,7 @@
 // only in this popup session's memory (testnet-only; it controls nothing —
 // the smart account answers only to the passkey).
 import { useCallback, useEffect, useState } from 'react';
+import { track } from '@core/telemetry';
 import { Keypair, TransactionBuilder } from '@stellar/stellar-sdk';
 import { NETWORKS } from '@shared/constants';
 import type { PasskeyAccountRecord } from '@shared/types';
@@ -15,8 +16,8 @@ import { finalizePasskeyTransfer, preparePasskeyTransfer } from '@core/passkey/t
 import { sacContractBalance } from '@core/stellar/sac';
 import { getServer, fundWithFriendbot } from '@core/stellar/client';
 import { isValidPublicKey, isValidContractId } from '@core/wallet/wallet';
-import { scan } from '@core/scan/engine';
-import type { ScanVerdict } from '@core/scan/types';
+import { scan } from '@core/scan';
+import type { ScanVerdict } from '@core/scan';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
@@ -139,13 +140,13 @@ export function SmartAccount({ account, onForget }: Props) {
         return;
       }
       // The same pre-sign scan gate as the classic Send screen (no bypass lane).
-      setVerdict(
-        scan({
-          xdr: prepared.xdr,
-          networkPassphrase: NETWORK.passphrase,
-          context: { network: NETWORK.id, fromAddress: account.contractId },
-        }),
-      );
+      const scanVerdict = scan({
+        xdr: prepared.xdr,
+        networkPassphrase: NETWORK.passphrase,
+        context: { network: NETWORK.id, fromAddress: account.contractId },
+      });
+      if (__FEATURE_TELEMETRY__) track.txScanned(scanVerdict);
+      setVerdict(scanVerdict);
       setReview({ xdr: prepared.xdr, latestLedger: prepared.latestLedger, amount, to: dest });
       setConfirmText('');
       setStep('review');

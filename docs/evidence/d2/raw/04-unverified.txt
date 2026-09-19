@@ -1,0 +1,42 @@
+$ npm run scan -- --file unknown-contract
+Lantern scanner · testnet · fixture unknown-contract
+  Call to a contract id that is not deployed: simulation fails, the scanner must not guess.
+  signer GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK · rpc https://soroban-testnet.stellar.org · registry CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F
+
+INGEST
+  FAILED · simulation_reverted · HostError: Error(Storage, MissingValue)
+
+Event log (newest first):
+   0: [Diagnostic Event] topics:[error, Error(Storage, MissingValue)], data:"trying to get non-existing value for contract instance"
+   1: [Diagnostic Event] topics:[fn_call, CBIVCUKRKFIVCUKRKFIVCUKRKFIVCUKRKFIVCUKRKFIVCUKRKFIVCR62, do_thing], data:GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK
+
+
+EFFECTS
+  contract_call · op 0 · do_thing() · → CBIV…CR62
+  unverified contract — semantics unknown: CBIV…CR62.do_thing(GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK) · depth 0
+  coverage partial
+
+SCREEN
+  outcome clean · checked 1
+
+VERDICT
+  risk HIGH · action BLOCK_CONFIRM · effects shown, terms not judged
+  [high] simulation_reverted — This transaction would fail: Simulating this contract call reports it would fail on-chain, so Lantern can’t tell what it does — do not sign unless you’re certain.
+  [medium] unverified_contract — Unverified contract — semantics unknown: This calls “do_thing” on contract CBIV…CR62. Lantern doesn’t know what this function does; simulation shows no balance changes, but that is not a guarantee.
+  signals (5)
+    ingest · fail_closed · simulation — simulation_reverted: HostError: Error(Storage, MissingValue)
+
+Event log (newest first):
+   0: [Diagnostic Event] topics:[error, Error(Storage, MissingValue)], data:"trying to get non-existing value for contract instance"
+   1: [Diagnostic Event] topics:[fn_call, CBIVCUKRKFIVCUKRKFIVCUKRKFIVCUKRKFIVCUKRKFIVCUKRKFIVCR62, do_thing], data:GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK
+
+    auth · flat · auth.calls — 0 entries, 0 calls, 0 nested, depth 0
+    effects · coverage_partial · effects.coverage — contract_call
+    screen · clean · screen — 1 checked, 0 hits, 0 unknown
+    effects · unverified_contract · unverified — do_thing@CBIV…CR62 d0
+
+SENTENCE
+  "This transaction calls a function called "dothing" on an unverified contract at CBIV…CR62, and we cannot determine what it will actually do. The transaction would fail."
+  source: explainer · explainer: Lantern API proxy https://lantern-api-production-3fad.up.railway.app/v1/explain
+
+scanned in 2036 ms · nothing was signed or submitted

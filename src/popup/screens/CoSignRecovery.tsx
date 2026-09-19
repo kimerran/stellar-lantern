@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import { track } from '@core/telemetry';
 import type { NetworkConfig } from '@shared/constants';
 import { sendMessage } from '@shared/messages';
-import { scan } from '@core/scan/engine';
-import type { ScanVerdict } from '@core/scan/types';
+import { scan } from '@core/scan';
+import type { ScanVerdict } from '@core/scan';
 import { recoveryCoSignError } from '@core/recovery/guardians';
 import { isNativePlatform } from '@shared/kv';
 import { Button } from '../components/Button';
@@ -52,7 +53,9 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
       return;
     }
     setError(null);
-    setVerdict(scan({ xdr: xdr.trim(), networkPassphrase: network.passphrase, context: { network: network.id, fromAddress: address } }));
+    const v = scan({ xdr: xdr.trim(), networkPassphrase: network.passphrase, context: { network: network.id, fromAddress: address } });
+    if (__FEATURE_TELEMETRY__) track.txScanned(v);
+    setVerdict(v);
     setConfirmText('');
     setStep('review');
   }

@@ -1,0 +1,21 @@
+{
+  "name": "unknown-contract",
+  "description": "Call to a contract id that is not deployed: simulation fails, the scanner must not guess.",
+  "networkPassphrase": "Test SDF Network ; September 2015",
+  "source": "GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK",
+  "recordedAt": "2026-09-14T02:58:12.621Z",
+  "rpc": "https://soroban-testnet.stellar.org",
+  "xdr": "AAAAAgAAAAAY0gqcnifD/QFRi3Um28AFmWZwoXTXZlkgmYh/UZB/SQAAAGQANjQYAAAATAAAAAEAAAAAAAAAAAAAAABqp2PvAAAAAAAAAAEAAAAAAAAAGAAAAAAAAAABUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVEAAAAIZG9fdGhpbmcAAAABAAAAEgAAAAAAAAAAGNIKnJ4nw/0BUYt1JtvABZlmcKF012ZZIJmIf1GQf0kAAAAAAAAAAAAAAAA=",
+  "simulation": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "error": "HostError: Error(Storage, MissingValue)\n\nEvent log (newest first):\n   0: [Diagnostic Event] topics:[error, Error(Storage, MissingValue)], data:\"trying to get non-existing value for contract instance\"\n   1: [Diagnostic Event] topics:[fn_call, CBIVCUKRKFIVCUKRKFIVCUKRKFIVCUKRKFIVCUKRKFIVCUKRKFIVCR62, do_thing], data:GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK\n",
+      "events": [
+        "AAAAAAAAAAAAAAAAAAAAAgAAAAAAAAADAAAADwAAAAdmbl9jYWxsAAAAAA0AAAAgUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVEAAAAPAAAACGRvX3RoaW5nAAAAEgAAAAAAAAAAGNIKnJ4nw/0BUYt1JtvABZlmcKF012ZZIJmIf1GQf0k=",
+        "AAAAAAAAAAAAAAAAAAAAAgAAAAAAAAACAAAADwAAAAVlcnJvcgAAAAAAAAIAAAADAAAAAwAAAA4AAAA2dHJ5aW5nIHRvIGdldCBub24tZXhpc3RpbmcgdmFsdWUgZm9yIGNvbnRyYWN0IGluc3RhbmNlAAA="
+      ],
+      "latestLedger": 4666221
+    }
+  }
+}
