@@ -13,8 +13,10 @@ import {
   guardianDiff,
   type GuardianConfig,
 } from '@core/recovery/guardians';
-import { scanTx } from '@core/scan/wallet';
+import { scanTx, type WalletScanInput } from '@core/scan/wallet';
 import type { ScanVerdict } from '@core/scan';
+import { useRecheck } from '../hooks/useRecheck';
+import { RecheckNotice } from '../components/RecheckNotice';
 import { isNativePlatform } from '@shared/kv';
 import { formatAmount, truncateAddress } from '@shared/format';
 import { Button } from '../components/Button';
@@ -58,6 +60,9 @@ export function Guardians({ address, network, onBack }: Props) {
   const [verdict, setVerdict] = useState<ScanVerdict | null>(null);
   const [scanning, setScanning] = useState(false);
   const [confirmText, setConfirmText] = useState('');
+  const [scanInput, setScanInput] = useState<WalletScanInput | null>(null);
+  // Re-simulate immediately before submit (#121, SOW §3.9).
+  const recheck = useRecheck();
 
   // The account's existing guardian setup. When recovery is already configured
   // the screen becomes an editor: we prefill the form with the current guardians
@@ -117,6 +122,7 @@ export function Guardians({ address, network, onBack }: Props) {
     setVerdict(null);
     setConfirmText('');
     setError(null);
+    recheck.reset();
   }
 
   async function toReview() {
@@ -167,12 +173,15 @@ export function Guardians({ address, network, onBack }: Props) {
 
       // Lantern pre-sign scan — this is a high-impact account-control change and
       // will surface as high risk with a confirm gate (same as Send).
-      const scanVerdict = await scanTx({
+      const input: WalletScanInput = {
         xdr,
         networkPassphrase: network.passphrase,
         rpcUrl: network.sorobanRpcUrl,
         context: { network: network.id, fromAddress: address },
-      });
+      };
+      const scanVerdict = await scanTx(input);
+      setScanInput(input);
+      recheck.reset();
       if (__FEATURE_TELEMETRY__) track.txScanned(scanVerdict);
 
       setReview({
@@ -198,6 +207,17 @@ export function Guardians({ address, network, onBack }: Props) {
     if (!review) return;
     setSubmitting(true);
     setError(null);
+    // Re-check the exact XDR about to be signed (#121). An escalation aborts
+    // and needs a fresh confirm — the typed CONFIRM never survives it.
+    if (verdict && scanInput) {
+      const rc = await recheck.guard(verdict, scanInput);
+      setVerdict(rc.verdict);
+      if (!rc.proceed) {
+        setConfirmText('');
+        setSubmitting(false);
+        return;
+      }
+    }
     const res = await sendMessage({
       type: 'SIGN_AND_SUBMIT',
       xdr: review.xdr,
@@ -308,6 +328,7 @@ export function Guardians({ address, network, onBack }: Props) {
 
           {/* One-click report to the registry (#120), one row per screened
               counterparty. Testnet only — renders nothing on PUBLIC. */}
+          <RecheckNotice state={recheck.state} />
           {!scanning && verdict && (
             <ReportCounterparties reporter={address} network={network} subjects={counterpartiesOf(verdict, address)} />
           )}

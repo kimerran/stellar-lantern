@@ -7,7 +7,14 @@
 // every screen uses the helper rather than emit() directly.
 
 import { emit } from './index';
-import type { MiniAppId, RegistryReason, RiskLevel, ScanAction, TelemetryEvent } from './events';
+import type {
+  MiniAppId,
+  RecheckDirection,
+  RegistryReason,
+  RiskLevel,
+  ScanAction,
+  TelemetryEvent,
+} from './events';
 
 const MINI_APP_IDS = new Set<MiniAppId>(['stardust-faucet', 'lumen-notes', 'lantern-demo']);
 
@@ -61,6 +68,11 @@ export function registryReportEvent(reason: RegistryReason, ok: boolean): Teleme
   return { name: 'registry_report_submitted', props: { reason, ok } };
 }
 
+// The re-check before submit (#121): whether anything drifted, and which way.
+export function txRecheckedEvent(r: { drifted: boolean; direction: RecheckDirection }): TelemetryEvent {
+  return { name: 'tx_rechecked', props: { drifted: r.drifted, direction: r.direction } };
+}
+
 // Fire-and-forget wrappers. No-ops when telemetry is off or unconsented.
 export const track = {
   walletCreated: (mode: 'create' | 'import' | 'passkey') => emit(walletCreatedEvent(mode)),
@@ -75,6 +87,7 @@ export const track = {
   txSigned: (kind: 'sign_and_submit' | 'sign_only' | 'submit_only', ok: boolean) =>
     emit(txSignedEvent(kind, ok)),
   registryReport: (reason: RegistryReason, ok: boolean) => emit(registryReportEvent(reason, ok)),
+  txRechecked: (r: { drifted: boolean; direction: RecheckDirection }) => emit(txRecheckedEvent(r)),
   guardianAdded: () => emit({ name: 'guardian_added', props: {} }),
   sessionStart: () => emit({ name: 'session_start', props: {} }),
   appFirstOpen: () => emit({ name: 'app_first_open', props: {} }),

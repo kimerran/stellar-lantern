@@ -71,7 +71,7 @@ describe('toScanVerdict — ScanResult → the shape the screens render', () => 
     verdict: {} as ScanResult['verdict'],
     simulation: {} as ScanResult['simulation'],
     auth: {} as ScanResult['auth'],
-    effects: {} as ScanResult['effects'],
+    effects: { net: [], approvals: [] } as unknown as ScanResult['effects'],
     screen: { answers: [] } as unknown as ScanResult['screen'],
   };
 
@@ -96,6 +96,8 @@ describe('toScanVerdict — ScanResult → the shape the screens render', () => 
       tier: 1,
       latencyMs: 413,
       screening: [],
+      net: [],
+      approvals: [],
     });
   });
 

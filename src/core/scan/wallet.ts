@@ -100,6 +100,37 @@ function depsFor(rpcUrl: string): PipelineDeps {
 /** Test seam: forget the cached per-network dependencies. */
 export function resetWalletScanDeps(): void {
   depsByRpc.clear();
+  recheckDepsByRpc.clear();
+}
+
+// The re-check before submit (#121) sits on the critical path of every
+// signature, so it gets its own, tighter dependency set: one simulate attempt
+// with a 2 s deadline, a registry screener with NO TTL cache — the whole
+// point is to see a report that landed after the review, and the shared
+// screener would cheerfully answer from its 60 s cache — and no explainer
+// (the sentence is ignored by the diff and would only add latency). The
+// token-metadata cache is shared: decimals do not change between review and
+// confirm. Nothing here writes to the shared screener's cache.
+export const RECHECK_SIMULATE_TIMEOUT_MS = 2_000;
+export const RECHECK_SCREEN_TIMEOUT_MS = 2_000;
+const recheckDepsByRpc = new Map<string, PipelineDeps>();
+
+export function recheckDepsFor(rpcUrl: string): PipelineDeps {
+  let deps = recheckDepsByRpc.get(rpcUrl);
+  if (!deps) {
+    deps = {
+      simulate: createRpcSimulator({ rpcUrl, timeoutMs: RECHECK_SIMULATE_TIMEOUT_MS, attempts: 1 }),
+      screen: createRegistryScreener({
+        rpcUrl,
+        contractId: TESTNET_REGISTRY_ID,
+        timeoutMs: RECHECK_SCREEN_TIMEOUT_MS,
+        ttlMs: 0,
+      }),
+      resolveToken: depsFor(rpcUrl).resolveToken,
+    };
+    recheckDepsByRpc.set(rpcUrl, deps);
+  }
+  return deps;
 }
 
 // `ScanResult` → the legacy `ScanVerdict` the screens render. Every field the
@@ -118,10 +149,12 @@ export function toScanVerdict(result: ScanResult, latencyMs: number): ScanVerdic
     tier: aiSentence ? 2 : 1,
     latencyMs: Math.max(0, Math.round(latencyMs)),
     screening: result.screen.answers.map((a) => ({ address: a.address, answer: a.answer })),
+    net: result.effects.net.map((n) => ({ ...n, asset: { ...n.asset } })),
+    approvals: result.effects.approvals.map((a) => ({ ...a, asset: { ...a.asset } })),
   };
 }
 
-function usesLegacy(input: WalletScanInput): boolean {
+export function usesLegacy(input: WalletScanInput): boolean {
   if (input.context.network === 'PUBLIC') return true;
   if (__FEATURE_DEMO_AFFORDANCES__ && input.context.forceScenario) return true;
   return false;
