@@ -40,10 +40,16 @@ export interface ReportSubject {
 
 // The counterparties the scan screened, minus the reporter — what the review
 // screens hand to <ReportCounterparties>. Empty when the legacy engine ran.
+//
+// The screener also checks every contract the transaction touches (the DEX
+// router, a Blend pool, a SAC), so on Swap and Earn the list would otherwise
+// offer "Report this address" for infrastructure. A contract is offered only
+// when the registry already flags it; accounts (G…) are always offered.
 export function counterpartiesOf(verdict: ScanVerdict | null, reporter: string): ReportSubject[] {
   if (!verdict?.screening) return [];
   return verdict.screening
     .filter((s) => s.address !== reporter)
+    .filter((s) => !s.address.startsWith('C') || s.answer.outcome === 'flagged')
     .map((s) => ({ address: s.address, screening: s.answer }));
 }
 
@@ -81,7 +87,9 @@ export function ReportAddress({ reporter, network, subject }: Props) {
   const [stage, setStage] = useState<Stage>('entry');
   const [reason, setReason] = useState<RegistryReason>('Scam');
   const [note, setNote] = useState('');
-  const [fee, setFee] = useState<{ status: 'loading' } | { status: 'ok'; fee: ReportFee } | { status: 'unknown' }>({
+  const [fee, setFee] = useState<
+    { status: 'loading' } | { status: 'ok'; fee: ReportFee } | { status: 'unknown' }
+  >({
     status: 'loading',
   });
   const [error, setError] = useState<string | null>(null);
@@ -118,7 +126,9 @@ export function ReportAddress({ reporter, network, subject }: Props) {
       reporter,
       subject: subject.address,
       reason,
-      ...(note.trim() ? { evidence: evidenceHash(note.trim()) } : {}),
+      // The commitment is sha256 of the note exactly as typed; trim only
+      // decides whether there is a note at all.
+      ...(note.trim() ? { evidence: evidenceHash(note) } : {}),
       network,
     });
     if (!built.ok) {
@@ -223,7 +233,9 @@ export function ReportAddress({ reporter, network, subject }: Props) {
       </div>
 
       <label className="block">
-        <span className="mb-1 block text-label-sm uppercase tracking-wide text-on-surface-variant">Reason</span>
+        <span className="mb-1 block text-label-sm uppercase tracking-wide text-on-surface-variant">
+          Reason
+        </span>
         <select
           value={reason}
           disabled={busy}
@@ -246,8 +258,8 @@ export function ReportAddress({ reporter, network, subject }: Props) {
         onChange={(e) => setNote(e.target.value)}
       />
       <p className="text-label-sm text-on-surface-variant">
-        Only a hash of the note goes on chain, as a commitment you can prove later. The note itself is
-        never sent or saved anywhere.
+        Only a hash of the note goes on chain, as a commitment you can prove later. The note itself
+        is never sent or saved anywhere.
       </p>
 
       <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-container-high/60 p-2">
@@ -263,8 +275,8 @@ export function ReportAddress({ reporter, network, subject }: Props) {
 
       {hasEntry && (
         <p className="text-label-sm text-secondary">
-          This address is already on the registry. Reporting again adds to its count and charges the fee
-          again; the first reporter and date stay as they are
+          This address is already on the registry. Reporting again adds to its count and charges the
+          fee again; the first reporter and date stay as they are
           {disputed ? ', and the entry stays marked as disputed' : ''}.
         </p>
       )}
@@ -279,7 +291,13 @@ export function ReportAddress({ reporter, network, subject }: Props) {
         </p>
       )}
 
-      <Button fullWidth onClick={submit} loading={busy} disabled={fee.status === 'loading'} trailingIcon="lock">
+      <Button
+        fullWidth
+        onClick={submit}
+        loading={busy}
+        disabled={fee.status === 'loading'}
+        trailingIcon="lock"
+      >
         {fee.status === 'unknown' ? 'Report anyway' : 'Sign & report'}
       </Button>
     </div>

@@ -25,6 +25,7 @@ import { getLedgerEntries } from '@core/stellar/soroban';
 import {
   contractInstanceKey,
   createRpcTokenResolver,
+  DEFAULT_SCREEN_TIMEOUT_MS,
   entryLedgerKey,
   interpretLedgerEntries,
   TESTNET_REGISTRY_ID,
@@ -34,7 +35,14 @@ import {
 
 // The contract's closed `Reason` set, in declaration order (contracts/
 // blacklist-registry/src/lib.rs). Never free text: the UI picks from this.
-export const REGISTRY_REASONS = ['Scam', 'Phishing', 'Drainer', 'Poisoning', 'Mixer', 'Other'] as const;
+export const REGISTRY_REASONS = [
+  'Scam',
+  'Phishing',
+  'Drainer',
+  'Poisoning',
+  'Mixer',
+  'Other',
+] as const;
 export type RegistryReason = (typeof REGISTRY_REASONS)[number];
 
 export function isRegistryReason(v: unknown): v is RegistryReason {
@@ -70,7 +78,11 @@ export function registryFor(network: NetworkConfig): { contractId: string; rpcUr
 
 export type ReportGuard =
   | { ok: true }
-  | { ok: false; code: 'self_report' | 'invalid_subject' | 'invalid_reporter' | 'no_registry'; error: string };
+  | {
+      ok: false;
+      code: 'self_report' | 'invalid_subject' | 'invalid_reporter' | 'no_registry';
+      error: string;
+    };
 
 // Client-side guards, run before any transaction is built so no fee is spent
 // to learn `SelfReport` (error 2) from the contract.
@@ -85,7 +97,11 @@ export function checkReport(params: {
     return { ok: false, code: 'no_registry', error: 'The registry is only available on Testnet.' };
   }
   if (!isValidPublicKey(reporter)) {
-    return { ok: false, code: 'invalid_reporter', error: 'Your wallet address is not a valid Stellar account.' };
+    return {
+      ok: false,
+      code: 'invalid_reporter',
+      error: 'Your wallet address is not a valid Stellar account.',
+    };
   }
   if (!isValidPublicKey(subject) && !isValidContractId(subject)) {
     return { ok: false, code: 'invalid_subject', error: 'That is not a valid Stellar address.' };
@@ -186,7 +202,8 @@ export function configFromInstance(entryXdr: string): RegistryConfig | null {
       const key = item.key();
       if (key.switch().name !== 'scvVec') continue;
       const head = key.vec()?.[0];
-      if (!head || head.switch().name !== 'scvSymbol' || head.sym().toString() !== 'Config') continue;
+      if (!head || head.switch().name !== 'scvSymbol' || head.sym().toString() !== 'Config')
+        continue;
       const val = item.val();
       if (val.switch().name !== 'scvMap') return null;
       const fields = new Map<string, xdr.ScVal>();
@@ -217,6 +234,30 @@ export interface ReadFeeOptions {
   network: NetworkConfig;
   contractId?: string;
   fetchImpl?: typeof fetch;
+  timeoutMs?: number; // default DEFAULT_SCREEN_TIMEOUT_MS (4 s)
+}
+
+// A deadline for the two fee-free reads. The sheet disables "Sign & report"
+// while the fee is loading and sits on a spinner after a paid submit until
+// the count comes back, so neither read may hang: the signal is passed to
+// `fetchImpl` AND the work is raced against the timer, because a fetch that
+// ignores the signal must still lose. `done()` clears the timer.
+function deadline(fetchImpl: typeof fetch, timeoutMs: number) {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error('timeout'));
+    }, timeoutMs);
+  });
+  // A rejection nobody is racing against (the timer fires between two reads)
+  // must not surface as an unhandled rejection.
+  expired.catch(() => {});
+  const impl: typeof fetch = (input, init) =>
+    fetchImpl(input, { ...init, signal: controller.signal });
+  const race = <T>(work: Promise<T>): Promise<T> => Promise.race([work, expired]);
+  return { impl, race, timedOut: () => controller.signal.aborted, done: () => clearTimeout(timer) };
 }
 
 export interface ReportFee {
@@ -242,32 +283,49 @@ export async function readReportFee(opts: ReadFeeOptions): Promise<ReadFeeResult
   const registry = registryFor(opts.network);
   if (!registry) return { ok: false, error: 'The registry is only available on Testnet.' };
   const contractId = opts.contractId ?? registry.contractId;
-  const fetchImpl = opts.fetchImpl ?? fetch;
-  let config: RegistryConfig | null = null;
+  const dl = deadline(opts.fetchImpl ?? fetch, opts.timeoutMs ?? DEFAULT_SCREEN_TIMEOUT_MS);
   try {
-    const res = await getLedgerEntries([contractInstanceKey(contractId)], {
-      rpcUrl: registry.rpcUrl,
-      fetchImpl,
-    });
-    if (res.ok) {
-      const hit = res.entries.find((e) => e.keyXdr === contractInstanceKey(contractId));
-      if (hit) config = configFromInstance(hit.xdr);
+    let config: RegistryConfig | null = null;
+    try {
+      const res = await dl.race(
+        getLedgerEntries([contractInstanceKey(contractId)], {
+          rpcUrl: registry.rpcUrl,
+          fetchImpl: dl.impl,
+        }),
+      );
+      if (res.ok) {
+        const hit = res.entries.find((e) => e.keyXdr === contractInstanceKey(contractId));
+        if (hit) config = configFromInstance(hit.xdr);
+      }
+    } catch {
+      config = null;
     }
-  } catch {
-    config = null;
-  }
-  if (!config) return { ok: false, error: 'Could not read the registry fee.' };
+    if (dl.timedOut()) return { ok: false, error: 'Timed out reading the registry fee.' };
+    if (!config) return { ok: false, error: 'Could not read the registry fee.' };
 
-  const meta = await createRpcTokenResolver({ rpcUrl: registry.rpcUrl, fetchImpl })(config.feeToken);
-  return {
-    ok: true,
-    fee: {
-      fee: config.fee,
-      feeToken: config.feeToken,
-      treasury: config.treasury,
-      ...(meta ? { code: meta.code, decimals: meta.decimals } : {}),
-    },
-  };
+    // The resolver swallows its own errors (null), so race it too: the token
+    // read shares the one deadline with the config read.
+    let meta: Awaited<ReturnType<ReturnType<typeof createRpcTokenResolver>>> = null;
+    try {
+      meta = await dl.race(
+        createRpcTokenResolver({ rpcUrl: registry.rpcUrl, fetchImpl: dl.impl })(config.feeToken),
+      );
+    } catch {
+      meta = null;
+    }
+    if (dl.timedOut()) return { ok: false, error: 'Timed out reading the registry fee.' };
+    return {
+      ok: true,
+      fee: {
+        fee: config.fee,
+        feeToken: config.feeToken,
+        treasury: config.treasury,
+        ...(meta ? { code: meta.code, decimals: meta.decimals } : {}),
+      },
+    };
+  } finally {
+    dl.done();
+  }
 }
 
 // "10000000" @ 7 → "1"; "12345000" @ 7 → "1.2345". Exact bigint arithmetic.
@@ -303,31 +361,41 @@ export async function readSubject(opts: {
   subject: string;
   contractId?: string;
   fetchImpl?: typeof fetch;
+  timeoutMs?: number; // default DEFAULT_SCREEN_TIMEOUT_MS (4 s)
 }): Promise<ScreenAnswer> {
   const registry = registryFor(opts.network);
   if (!registry) return { outcome: 'unknown', reason: 'no_registry', source: 'registry' };
   const contractId = opts.contractId ?? registry.contractId;
-  const fetchImpl = opts.fetchImpl ?? fetch;
   let keyXdr: string;
   try {
     keyXdr = entryLedgerKey(contractId, opts.subject.trim());
   } catch {
     return { outcome: 'unknown', reason: 'malformed', source: 'registry' };
   }
+  const dl = deadline(opts.fetchImpl ?? fetch, opts.timeoutMs ?? DEFAULT_SCREEN_TIMEOUT_MS);
   try {
-    const res = await fetchImpl(registry.rpcUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'getLedgerEntries',
-        params: { keys: [keyXdr] },
+    const res = await dl.race(
+      dl.impl(registry.rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'getLedgerEntries',
+          params: { keys: [keyXdr] },
+        }),
       }),
-    });
+    );
     if (!res.ok) return { outcome: 'unknown', reason: 'rpc_error', source: 'registry' };
-    return interpretLedgerEntries((await res.json()) as RawLedgerEntriesBody, keyXdr);
+    const body = await dl.race(res.json() as Promise<RawLedgerEntriesBody>);
+    return interpretLedgerEntries(body, keyXdr);
   } catch {
-    return { outcome: 'unknown', reason: 'rpc_error', source: 'registry' };
+    return {
+      outcome: 'unknown',
+      reason: dl.timedOut() ? 'timeout' : 'rpc_error',
+      source: 'registry',
+    };
+  } finally {
+    dl.done();
   }
 }

@@ -37,6 +37,8 @@ import coSignSrc from '../src/popup/screens/CoSignRecovery.tsx?raw';
 import txDetailSrc from '../src/popup/screens/TxDetail.tsx?raw';
 import reportSrc from '../src/popup/components/ReportAddress.tsx?raw';
 import manifestSrc from '../manifest.config.ts?raw';
+import { counterpartiesOf } from '../src/popup/components/ReportAddress';
+import type { ScanVerdict } from '@core/scan';
 
 const REPORTER = 'GDRXE2BQUC3AZNPVFSCEZ76NJ3WWL25FYFK6RGZGIEKWE4SOOHSUJUJ6';
 const SUBJECT = 'GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ';
@@ -334,6 +336,75 @@ describe('readReportFee — config() without a transaction', () => {
   });
 });
 
+describe('the two fee-free reads have a deadline', () => {
+  // A fetch that never settles and ignores the abort signal — the worst case.
+  const hang = (() => new Promise<never>(() => {})) as unknown as typeof fetch;
+  // And one that honours the signal, as the real fetch does.
+  const abortable = ((_: unknown, init?: { signal?: AbortSignal }) =>
+    new Promise<never>((_, reject) =>
+      init?.signal?.addEventListener('abort', () => reject(new Error('aborted'))),
+    )) as unknown as typeof fetch;
+
+  it('readReportFee: the sheet never sits on a disabled button behind a hung RPC', async () => {
+    for (const impl of [hang, abortable]) {
+      const started = Date.now();
+      const r = await readReportFee({ network: TESTNET, fetchImpl: impl, timeoutMs: 50 });
+      expect(Date.now() - started).toBeLessThan(1_000);
+      expect(r).toEqual({ ok: false, error: 'Timed out reading the registry fee.' });
+    }
+  });
+
+  it('readSubject: a paid report never leaves the user on a spinner behind a hung RPC', async () => {
+    for (const impl of [hang, abortable]) {
+      const started = Date.now();
+      const r = await readSubject({ network: TESTNET, subject: SUBJECT, fetchImpl: impl, timeoutMs: 50 });
+      expect(Date.now() - started).toBeLessThan(1_000);
+      expect(r).toEqual({ outcome: 'unknown', reason: 'timeout', source: 'registry' });
+    }
+  });
+
+  it('passes the signal through to fetchImpl', async () => {
+    let seen: AbortSignal | undefined;
+    const impl = ((_: unknown, init?: { signal?: AbortSignal }) => {
+      seen = init?.signal;
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ result: { entries: [] } }) });
+    }) as unknown as typeof fetch;
+    await readSubject({ network: TESTNET, subject: SUBJECT, fetchImpl: impl });
+    expect(seen).toBeInstanceOf(AbortSignal);
+    expect(seen?.aborted).toBe(false);
+  });
+});
+
+describe('counterpartiesOf', () => {
+  const verdict = (screening: ScanVerdict['screening']): ScanVerdict => ({
+    risk: 'low',
+    action: 'allow',
+    reasons: [],
+    explanation: '',
+    checkedBy: 'Lantern',
+    tier: 1,
+    latencyMs: 1,
+    screening,
+  });
+
+  it('drops the reporter and unflagged contracts, keeps accounts and flagged contracts', () => {
+    const src = 'registry';
+    const out = counterpartiesOf(
+      verdict([
+        { address: REPORTER, answer: { outcome: 'not_flagged', source: src } },
+        { address: SUBJECT, answer: { outcome: 'not_flagged', source: src } },
+        { address: XLM_SAC, answer: { outcome: 'not_flagged', source: src } },
+        { address: TESTNET_REGISTRY_ID, answer: { outcome: 'unknown', reason: 'timeout', source: src } },
+        { address: 'CBADCONTRACT', answer: { outcome: 'flagged', source: src } },
+      ]),
+      REPORTER,
+    );
+    expect(out.map((s) => s.address)).toEqual([SUBJECT, 'CBADCONTRACT']);
+    expect(counterpartiesOf(verdict(undefined), REPORTER)).toEqual([]);
+    expect(counterpartiesOf(null, REPORTER)).toEqual([]);
+  });
+});
+
 describe('formatUnits', () => {
   it('scales exactly and trims', () => {
     expect(formatUnits('10000000', 7)).toBe('1');
@@ -397,13 +468,17 @@ describe('entry points', () => {
     expect(reportSrc).toContain('This is public, permanent, and recorded on-chain against your address.');
     expect(reportSrc).toMatch(/break-all font-mono[^>]*>\{subject\.address\}/);
     expect(reportSrc).toContain('could not read the registry fee');
-    expect(reportSrc).toMatch(/charges the fee\s+again/);
+    expect(reportSrc).toMatch(/charges the\s+fee again/);
     expect(reportSrc).toContain('stays marked as disputed');
   });
 
   it('the report sheet signs through SIGN_AND_SUBMIT and the RPC origin is a host permission', () => {
     expect(reportSrc).toContain("type: 'SIGN_AND_SUBMIT'");
     expect(manifestSrc).toContain("'https://soroban-testnet.stellar.org/*'");
+  });
+
+  it('hashes the note exactly as typed; trim only decides whether there is one', () => {
+    expect(reportSrc).toMatch(/note\.trim\(\) \? \{ evidence: evidenceHash\(note\) \}/);
   });
 
   it('never persists the note: no storage write in the component', () => {
