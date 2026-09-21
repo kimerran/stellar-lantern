@@ -1,10 +1,11 @@
 import { defineManifest } from '@crxjs/vite-plugin';
 
 // MV3 manifest. Minimal permissions per SPEC §8 / AGENT §5: only `storage`,
-// and host access limited to the Stellar endpoints (Horizon + friendbot) plus
-// ONE origin of our own — the Lantern API on Railway, which the opt-in
-// telemetry sink posts to (#81 / #88) and which will also serve the scanner's
-// explainer proxy (#84). Nothing else.
+// and host access limited to the Stellar endpoints (Horizon, friendbot and the
+// testnet Soroban RPC the scanner simulates and screens against) plus ONE
+// origin of our own — the Lantern API on Railway, which the opt-in telemetry
+// sink posts to (#81 / #88) and which serves the scanner's explainer proxy
+// (#84). Nothing else.
 export default defineManifest({
   manifest_version: 3,
   name: 'Lantern — Stellar Wallet',
@@ -35,9 +36,14 @@ export default defineManifest({
     'https://horizon-testnet.stellar.org/*',
     'https://horizon.stellar.org/*',
     'https://friendbot.stellar.org/*',
-    // The Lantern API (services/lantern-api): telemetry ingest (#88), and
-    // the explainer proxy once #84 lands. Keep in sync with
-    // VITE_TELEMETRY_INGEST_URL in release.yml / android.yml.
+    // Soroban testnet RPC (#84): the scanner's simulateTransaction and the
+    // registry's getLedgerEntries hot read run from the popup on every review.
+    // Was relying on the RPC's permissive CORS before; granted explicitly so a
+    // CORS policy change upstream can't silently turn every scan `unknown`.
+    'https://soroban-testnet.stellar.org/*',
+    // The Lantern API (services/lantern-api): telemetry ingest (#88) and the
+    // explainer proxy (#84, /v1/explain). Keep in sync with
+    // VITE_TELEMETRY_INGEST_URL / VITE_LANTERN_API_URL in release.yml / android.yml.
     'https://lantern-api-production-3fad.up.railway.app/*',
   ],
   content_security_policy: {

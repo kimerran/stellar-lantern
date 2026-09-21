@@ -3,7 +3,7 @@ import { track } from '@core/telemetry';
 import type { NetworkConfig } from '@shared/constants';
 import { sendMessage } from '@shared/messages';
 import { getServer } from '@core/stellar/client';
-import { scan } from '@core/scan';
+import { scanTx } from '@core/scan/wallet';
 import type { ScanVerdict } from '@core/scan';
 import { isNativePlatform } from '@shared/kv';
 import { formatAmount } from '@shared/format';
@@ -207,9 +207,10 @@ export function Earn({ address, network, onBack, embedded }: Props) {
       }
 
       // Lantern pre-sign scan — advisory, never signs or sends (spec §2).
-      const verdict = scan({
+      const verdict = await scanTx({
         xdr: prepared.xdr,
         networkPassphrase: network.passphrase,
+        rpcUrl: network.sorobanRpcUrl,
         context: { network: network.id, fromAddress: address },
       });
       if (__FEATURE_TELEMETRY__) track.txScanned(verdict);

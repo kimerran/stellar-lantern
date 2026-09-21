@@ -11,8 +11,9 @@ describe('flagDefines (Vite define map)', () => {
     expect(d.__FEATURE_SWAP__).toBe('false'); // env turns a default-on flag off
     expect(d.__FEATURE_EARN_BLEND__).toBe('true'); // untouched default (on)
     expect(d.__FEATURE_DEMO_AFFORDANCES__).toBe('false'); // untouched default (off)
-    // One literal per flag, plus the ingest-URL pin (telemetry defaults off).
-    expect(Object.keys(d)).toHaveLength(FLAG_COUNT + 1);
+    // One literal per flag, plus the ingest-URL and Lantern-API pins (telemetry
+    // and the scanner AI both default off).
+    expect(Object.keys(d)).toHaveLength(FLAG_COUNT + 2);
   });
 
   it('pins import.meta.env.VITE_TELEMETRY_INGEST_URL to "" only when telemetry is off', () => {
@@ -21,9 +22,16 @@ describe('flagDefines (Vite define map)', () => {
     const off = flagDefines({ VITE_FEATURE_TELEMETRY: 'false' });
     expect(off['import.meta.env.VITE_TELEMETRY_INGEST_URL']).toBe('""');
     // On: no pin, so the real env value reaches the bundle.
-    const on = flagDefines({ VITE_FEATURE_TELEMETRY: 'true' });
+    const on = flagDefines({ VITE_FEATURE_TELEMETRY: 'true', VITE_FEATURE_SCANNER_AI: 'true' });
     expect(on['import.meta.env.VITE_TELEMETRY_INGEST_URL']).toBeUndefined();
     expect(Object.keys(on)).toHaveLength(FLAG_COUNT);
+  });
+
+  it('pins import.meta.env.VITE_LANTERN_API_URL to "" only when the scanner AI is off (#84)', () => {
+    const off = flagDefines({ VITE_FEATURE_SCANNER_AI: 'false' });
+    expect(off['import.meta.env.VITE_LANTERN_API_URL']).toBe('""');
+    const on = flagDefines({ VITE_FEATURE_SCANNER_AI: 'true' });
+    expect(on['import.meta.env.VITE_LANTERN_API_URL']).toBeUndefined();
   });
 
   it('allFlagDefinesOn sets every literal to true (used by the test runner)', () => {

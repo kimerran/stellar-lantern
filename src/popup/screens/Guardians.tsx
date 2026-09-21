@@ -13,7 +13,7 @@ import {
   guardianDiff,
   type GuardianConfig,
 } from '@core/recovery/guardians';
-import { scan } from '@core/scan';
+import { scanTx } from '@core/scan/wallet';
 import type { ScanVerdict } from '@core/scan';
 import { isNativePlatform } from '@shared/kv';
 import { formatAmount, truncateAddress } from '@shared/format';
@@ -166,9 +166,10 @@ export function Guardians({ address, network, onBack }: Props) {
 
       // Lantern pre-sign scan — this is a high-impact account-control change and
       // will surface as high risk with a confirm gate (same as Send).
-      const scanVerdict = scan({
+      const scanVerdict = await scanTx({
         xdr,
         networkPassphrase: network.passphrase,
+        rpcUrl: network.sorobanRpcUrl,
         context: { network: network.id, fromAddress: address },
       });
       if (__FEATURE_TELEMETRY__) track.txScanned(scanVerdict);
