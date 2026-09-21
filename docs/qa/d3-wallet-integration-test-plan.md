@@ -63,7 +63,7 @@ These shipped before D3. D3 rewires the signing path — the riskiest thing to t
 | 2.6 Auto-lock | Unlocked | Settings → Auto-lock → **1 min**. Leave the wallet idle for 90 s (extension: keep the popup open in a pinned tab, or reopen after 90 s) | Unlock screen is shown; password required |
 | 2.7 Auto-lock "Never" | Unlocked | Settings → Auto-lock → **Never**; wait 2 min | Still unlocked. Set it back to 5 min afterwards |
 | 2.8 Network switch | Unlocked | Settings → Network → **Mainnet**, then back to **Testnet** | The top-bar badge changes both ways; the balance shown on Mainnet is 0 (the account does not exist there) and returns on Testnet |
-| 2.9 Send (plain) | Testnet, funded | Home → Send → paste the **clean address** (Reference) → 1 XLM → Review → Confirm & Send | Success screen with a **View on stellar.expert** link; opening it shows a 1 XLM payment from your address. Activity shows the payment |
+| 2.9 Send (plain) | Testnet, funded | Home → Send → paste the **clean address** (Reference) → 1 XLM → Review → Confirm & Send | Success screen with a **View on Explorer** button (it opens stellar.expert); opening it shows a 1 XLM payment from your address. Activity shows the payment |
 | 2.10 Receive | Any | Settings → Receive | Your full address and a QR code. The address matches Home |
 | 2.11 Settings survive restart | Any | Change auto-lock to 15 min; switch RPC override (§4.3) to something and back to blank; close and reopen | Values persist exactly as set |
 
@@ -92,7 +92,7 @@ The registry can answer three ways. `unknown` is the one that matters: it must *
 |---|---|---|---|
 | 4.1 `flagged` | Testnet, default RPC | Send → paste the **demo flagged address** → 1 XLM → Review | A red callout: the address is **flagged** in the registry, with reason **Scam**, the report count and status **Active**. Badge *High risk — action needed*. Sign button reads **Sign Anyway** and is gated (§5) |
 | 4.2 `flagged` matches chain | 4.1 open | Open the [registry contract](https://stellar.expert/explorer/testnet/contract/CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F) on stellar.expert and find the entry for `GA7Q…VSGZ` | Reason, status and count match what the wallet shows. Screenshot both side by side |
-| 4.3 `unknown` — **hard blocker** | Testnet | Settings → Network → Advanced → set the **Soroban RPC** override to `http://127.0.0.1:9`. Send → demo flagged address → Review | The wallet says it **could not check** the address (wording such as *couldn't reach the registry / unknown*). Risk is **at least medium**, badge *Caution* or worse. It must **not** say *not flagged*, *clean* or *Checked by Lantern*. Screenshot |
+| 4.3 `unknown` — **hard blocker** | Testnet | Settings → Network → Advanced → set the **Soroban RPC URL** override to `http://127.0.0.1:9`. Send → demo flagged address → Review | The wallet says it **could not check** the address (wording such as *couldn't reach the registry / unknown*). Risk is **at least medium**, badge *Caution* or worse. It must **not** say *not flagged*, *clean* or *Checked by Lantern*. Screenshot |
 | 4.4 `unknown` on a clean address | As 4.3 | Send → clean address → Review | Same *could not check* wording and at least medium. A dead registry treats a clean address and a scam address identically — it does not know which is which |
 | 4.5 Recovery | After 4.3 | Clear the RPC override (blank) → back → Send → clean address → Review | Screening works again: *not flagged*, badge *Checked by Lantern*. **Do this before continuing** |
 | 4.6 `not_flagged` | Default RPC | Send → clean address → Review | The screening line says the address is **not on the registry** (or equivalent). Badge low. This is the only state that may render green |
@@ -103,7 +103,7 @@ The registry can answer three ways. `unknown` is the one that matters: it must *
 | # | Preconditions | Steps | Expected |
 |---|---|---|---|
 | 5.1 Low | Default RPC | 3.1 (clean address, 1 XLM) | Badge *Checked by Lantern*, green callout, button **Confirm & Send**, no extra step |
-| 5.2 Medium | Default RPC | Send → clean address → an amount **larger than half your balance** → Review; or the 4.3 `unknown` case | Amber badge *Caution — review below*; the reason is stated in the callout; button still **Confirm & Send** — medium warns, it does not gate |
+| 5.2 Medium | Default RPC | Send → clean address → **6,000 XLM of a 10,000 XLM Friendbot balance** (between 50 % and 90 % — 90 % or more is *high*) → Review; or the 4.3 `unknown` case | Amber badge *Caution — review below*; the reason is stated in the callout; button still **Confirm & Send** — medium warns, it does not gate |
 | 5.3 High — extension gate | Extension, default RPC | 4.1 (demo flagged address) → try to click **Sign Anyway** *without* typing anything | Button disabled. A field says *To proceed anyway, type CONFIRM below* |
 | 5.4 Gate rejects near-misses | 5.3 | Type `confirm ` (lower-case, trailing space), then `CONFIRN`, then `CONFIRM` | `confirm ` (lower-case, trailing space): **enabled** — the gate is case-insensitive and trims spaces, which is intended; `CONFIRN`: **disabled**; `CONFIRM`: enabled. **Cancel** — do not send |
 | 5.5 High — Android gate | Android, default RPC | Send → demo flagged address → Review → tap **Hold to Sign Anyway** briefly (a tap, < 0.5 s) | Nothing is signed. The button resets. A quick tap is not a hold |
@@ -136,7 +136,7 @@ The registry charges a **fee** per report, paid by the reporter to the project t
 | 7.2 It really is on the registry | 7.1 done | Send → Wallet B's address → Review (in Wallet A, and also in Wallet B's own wallet using any third address as sender if convenient) | Now screens **flagged**, reason **Scam**, count **1**, status **Active** — the same red callout as 4.1. Confirm on stellar.expert's contract page too |
 | 7.3 Fee routed | 7.1 explorer page | Look at the transaction's operations / balance changes | The reporter paid exactly the fee shown in 7.1's sheet; the treasury account received it in the same transaction. Screenshot |
 | 7.4 Fee shown before signing | Any | Start 7.1 again but **cancel** at the sheet | The fee appeared **before** any signature was requested. Nothing was signed; no fee left Wallet A (check the balance) |
-| 7.5 Fee unknown is not "free" | Settings → Advanced → Soroban RPC = `http://127.0.0.1:9` | Send → any address → Review → Report | Either the action is unavailable with an explanation, or the sheet says the fee **could not be read** and asks whether to continue. It must **not** display *free* or `0`. Clear the override afterwards |
+| 7.5 Fee unknown is not "free" | Settings → Network → Advanced → Soroban RPC URL = `http://127.0.0.1:9` | Send → any address → Review → Report | Either the action is unavailable with an explanation, or the sheet says the fee **could not be read** and asks whether to continue. It must **not** display *free* or `0`. Clear the override afterwards |
 | 7.6 Self-report blocked | Wallet A | Send → paste **Wallet A's own address** → Review → look for Report | The action is absent, or pressing it shows *you cannot report your own address* — **before** any sheet or signature. Balance unchanged |
 | 7.7 Repeat report warns and increments | Wallet A, subject Wallet B (already count 1) | Report Wallet B again with reason **Phishing** | The sheet warns that this address is **already reported** and that reporting again **costs the fee again**. After signing: count **2**. On stellar.expert the entry's **reason is still Scam and the original reporter/date are unchanged** — a second reporter cannot rewrite the first report |
 | 7.8 Disputed stays disputed | Ask the dev to set Wallet B's entry to `Disputed` | Report Wallet B once more | The sheet does not claim the report will re-activate or "confirm" the entry. After signing: count increments, status on stellar.expert is **still Disputed**. Ask the dev to `Revoke` or reset the entry afterwards |
@@ -159,7 +159,8 @@ This is the hardest case in the plan and the easiest to skip. **Do not mark it p
    ───────────────────────────────────────────          ───────────────────────────────────────────
    1. Send → SUBJECT (a fresh, never-reported            
       address the dev gives you; NOT Wallet B) → 1 XLM
-      → Review.  Screening says: not flagged.
+      → Review.  Screening says: not flagged;
+      badge Checked by Lantern.
       STOP HERE. Do not press Confirm.  ──────────────►  2. Send → SUBJECT → Review → Report this address
                                                             → Scam → sign.  Wait for the success view
                                                             and the stellar.expert link (≈ 5–10 s).
@@ -169,7 +170,7 @@ This is the hardest case in the plan and the easiest to skip. **Do not mark it p
 
 | # | Preconditions | Steps | Expected on A |
 |---|---|---|---|
-| 8.1.1 Drift — **hard blocker** | Both profiles unlocked, funded, Testnet, default RPC. SUBJECT is a fresh testnet address that has **never** been reported | Follow the diagram exactly; A presses Confirm only after B's success view | The transaction is **not** submitted. A message in plain language says the address was **reported while you were reviewing**. The review re-renders **high** with the flagged callout, and the **CONFIRM gate now appears**. Activity shows **no** payment to SUBJECT. Screenshot |
+| 8.1.1 Drift — **hard blocker** | Both profiles unlocked, funded, Testnet, default RPC. SUBJECT is a fresh testnet address that has **never** been reported. **Fund SUBJECT with Friendbot first** so the baseline review is low / *Checked by Lantern* (an unfunded destination is already medium — *New account, no history*) | Follow the diagram exactly; A presses Confirm only after B's success view | The transaction is **not** submitted. A message in plain language says the address was **reported while you were reviewing**. The review re-renders **high** with the flagged callout, and the **CONFIRM gate now appears**. Activity shows **no** payment to SUBJECT. Screenshot |
 | 8.1.2 No carry-over | 8.1.1 | Without doing anything else, look at the CONFIRM field / hold button | Empty / unarmed. The earlier press of Confirm & Send did **not** satisfy the new gate. To send now you must type CONFIRM afresh — **cancel instead** |
 | 8.1.3 Stale cache defeated | 8.1.1 | Note how long A took to block after Confirm | It blocked. If A had sent the payment, the re-check used a cached "not flagged" — that is the exact bug this section exists to catch, and a blocker |
 
@@ -178,7 +179,7 @@ This is the hardest case in the plan and the easiest to skip. **Do not mark it p
 | # | Preconditions | Steps | Expected |
 |---|---|---|---|
 | 8.2.1 No drift is fast | Default RPC | 2.9 again (clean address). Time from Confirm & Send to the success screen | Submits normally; the re-check adds no more than ~2.5 s. A short, honest progress state (*re-checking…*) is fine; a long spinner is a finding |
-| 8.2.2 Re-scan fails on a **low** transaction | Send → clean address → Review (screening OK). **Then** set Settings → Advanced → Soroban RPC = `http://127.0.0.1:9` **without leaving the review** if the UI allows; otherwise the dev toggles the network for you at the moment you confirm | Press Confirm & Send | Not submitted silently and not blocked silently: a message says it **couldn't re-check just now** and asks for an **explicit confirm**. Cancel. Clear the override |
+| 8.2.2 Re-scan fails on a **low** transaction | Send → clean address → Review (screening OK). **Then** set Settings → Network → Advanced → Soroban RPC URL = `http://127.0.0.1:9` **without leaving the review** if the UI allows; otherwise the dev toggles the network for you at the moment you confirm | Press Confirm & Send | Not submitted silently and not blocked silently: a message says it **couldn't re-check just now** and asks for an **explicit confirm**. Cancel. Clear the override |
 | 8.2.3 Re-scan fails on a **high** transaction | Same setup, but Send → **demo flagged address**, type CONFIRM | Press Sign Anyway | **Refused.** No explicit-confirm offer: on a transaction that was already high, a failed re-check fails closed. Nothing in Activity |
 | 8.2.4 Sentence change alone does nothing | Flag on (§6) | 2.9 with the AI on; the sentence may differ between review and re-check | Submits without any drift message. A changed sentence is never drift |
 
@@ -188,7 +189,7 @@ In every case below the wallet must **say what happened and raise the risk** —
 
 | # | Preconditions | Steps | Expected |
 |---|---|---|---|
-| 9.1 RPC down — **hard blocker** | Settings → Advanced → Soroban RPC = `http://127.0.0.1:9` | Send → clean address → Review | The review says the transaction **could not be simulated / checked**. Risk **high**, sign button gated (**Sign Anyway** + CONFIRM / hold). No *Checked by Lantern*. The review appears within ~10 s — it does not hang |
+| 9.1 RPC down — **hard blocker** | Settings → Network → Advanced → Soroban RPC URL = `http://127.0.0.1:9` | Send → clean address → Review | The review says the transaction **could not be simulated / checked**. Risk **high**, sign button gated (**Sign Anyway** + CONFIRM / hold). No *Checked by Lantern*. The review appears within ~10 s — it does not hang |
 | 9.2 Registry unreachable, RPC up | Only possible if the dev provides a registry-only outage (e.g. a build pointed at a non-existent registry id) | Send → demo flagged address → Review | Screening **unknown** (as 4.3); effects and summary still shown; risk at least **medium** |
 | 9.3 Malformed transaction | Settings → Guardians & recovery → Co-sign | Paste `not-a-transaction` and then a valid XDR with the last 20 characters deleted | Both: **undecodable**, risk **high**, gated or refused. Never a clean verdict for something it could not read |
 | 9.4 Explainer timeout | Flag on, API blocked (6.2) | 3.1 | Fallback sentence, verdict unchanged, review renders within ~5 s. The sentence source is not claimed to be the AI |
@@ -201,11 +202,15 @@ Clear the RPC override before §10.
 
 There is no registry on Mainnet yet. The wallet must not pretend there is.
 
+**Note on 10.1 vs #84.** 10.1 is stricter than #84's PUBLIC carve-out as written: #84 keeps the legacy `scan()` path on Mainnet, and today that path renders the *Checked by Lantern* badge on a low-risk Mainnet payment. #84 must either drop that badge on PUBLIC or label the review *registry not available on Mainnet* — otherwise 10.1 fails by design, and that is a finding against #84, not against this plan.
+
+**Reaching a Mainnet review without real money.** Your Mainnet account is unfunded, so the Send form stops at *Amount exceeds your spendable balance* and no review renders. Use the co-sign paste box instead: **Settings → Guardians & recovery → *Helping someone recover? Co-sign their request*** and paste a **Mainnet-passphrase recovery XDR the dev supplies** (as in 3.7 / 9.3). If the dev prefers, they may instead fund the Mainnet account with a small **real** amount — that is a real-money step; do not do it on your own.
+
 | # | Preconditions | Steps | Expected |
 |---|---|---|---|
-| 10.1 No false reassurance — **hard blocker** | Settings → Network → **Mainnet**. **Do not fund this account** | Send → paste the demo flagged address → 1 XLM → Review (the account has no balance; you only need the review screen) | The review does **not** show *Checked by Lantern*, does **not** show a *not flagged* / clean screening line, and does **not** claim the registry was consulted. It states, or makes obvious, that registry screening is **not available on Mainnet**. Screenshot |
-| 10.2 No report action | Mainnet | Same review; Activity → any TxDetail | No **Report** action anywhere (as 7.10) |
-| 10.3 Basic review still works | Mainnet | Same review | The summary (amount, asset, destination) and a risk verdict still render — the carve-out removes the registry claim, not the review |
+| 10.1 No false reassurance — **hard blocker** | Settings → Network → **Mainnet**. **Do not fund this account.** A Mainnet-passphrase recovery XDR from the dev (see the note above) | Settings → Guardians & recovery → Co-sign → paste the dev's Mainnet XDR → Review | The review does **not** show *Checked by Lantern*, does **not** show a *not flagged* / clean screening line, and does **not** claim the registry was consulted. It states, or makes obvious, that registry screening is **not available on Mainnet**. Screenshot |
+| 10.2 No report action | Mainnet | The same co-sign review as 10.1; also Activity → any TxDetail | No **Report** action anywhere (as 7.10) |
+| 10.3 Basic review still works | Mainnet | The same co-sign review as 10.1 | The summary (amount, asset, destination) and a risk verdict still render — the carve-out removes the registry claim, not the review |
 | 10.4 Back to Testnet | — | Settings → Network → **Testnet**; Send → clean address → Review | *Checked by Lantern* and the screening line return |
 
 ## 11. Metrics (§6.3)
@@ -326,7 +331,8 @@ Every D3 acceptance criterion maps to at least one case a tester can run from th
 | Payment to the demo flagged address screens flagged / high / block_confirm with reporter, reason, count | 4.1, 4.2, 5.3, 5.5 |
 | AI on: API sentence + real latency; API unreachable: rules-based sentence, verdict unchanged | 6.1, 6.2, 6.3, 6.4, 9.4 |
 | Flag off: bundle has no API reference | *code-only (grep `dist/`)* |
-| `PUBLIC` behaviour unchanged / no false reassurance | 10.1, 10.2, 10.3, 10.4 |
+| `PUBLIC` behaviour unchanged | 10.3 |
+| No false reassurance on Mainnet | 10.1, 10.2, 10.4 (stricter than #84 as written — see §10 note) |
 | Latency budget (≤ 2 s typical, ≤ ~10 s dead network, fail-closed high) | 6.6, 9.1 |
 | CI lanes green | *CI-only* |
 
@@ -378,7 +384,7 @@ Every D3 acceptance criterion maps to at least one case a tester can run from th
 - **Testnet resets periodically.** If every screening suddenly comes back *unknown* or the registry page on stellar.expert is empty, that is a reset — tell the dev; they redeploy and give you a new contract id. Do not file it as a wallet bug.
 - **Friendbot** is a public faucet and goes down. Retry; if still down, note it and continue with the cases that don't need funds.
 - **Swap and Earn (3.3, 3.4)** depend on third-party testnet services (DEX liquidity, Blend pools) that are unreliable. If the review step is unreachable because the service is down, record *blocked (environment)* with a screenshot — that is not a fail.
-- **The RPC override** (Settings → Network → Advanced) is your main tool for forcing failures. Always **clear it** (blank) after a case; a stale override makes every later case fail for the wrong reason. 2.11 checks the override persists, so do not assume closing the popup cleared it.
+- **The RPC override** (Settings → Network → Advanced → Soroban RPC URL) is your main tool for forcing failures. Always **clear it** (blank) after a case; a stale override makes every later case fail for the wrong reason. 2.11 checks the override persists, so do not assume closing the popup cleared it.
 - **Every report costs a testnet fee** from the reporting wallet. Refund with Friendbot if a wallet runs low.
 - **Never** report an address that is not yours or the dev's throwaway. The registry is public and permanent.
 - The wallet **must never sign without your gesture**. If anything is signed or submitted that you did not explicitly confirm, stop and file a blocker immediately.
