@@ -39,7 +39,11 @@ export type InvokeArg = {
     | 'i64'
     | 'u128'
     | 'i128'
-    | 'bytes';
+    | 'bytes'
+    // A unit variant of a `#[contracttype] enum` (e.g. the registry's `Reason`),
+    // named by its symbol. Encodes as `scvVec([scvSymbol(name)])` — neither a
+    // bare symbol nor a u32, which is why it has its own arm (#120).
+    | 'enum';
   value: string;
 };
 
@@ -109,6 +113,11 @@ export function argToScVal(arg: InvokeArg): xdr.ScVal {
     case 'i128':
       // 64/128-bit go through XdrLargeInt to preserve full precision.
       return new XdrLargeInt(type, parseIntArg(type, value).toString()).toScVal();
+    case 'enum':
+      if (!SYMBOL_RE.test(value) || value.length > MAX_SYMBOL_LEN) {
+        throw new Error(`Invalid enum variant: "${value}".`);
+      }
+      return xdr.ScVal.scvVec([xdr.ScVal.scvSymbol(value)]);
     case 'bytes': {
       const hex = value.trim();
       if (hex.length % 2 !== 0 || !/^[0-9a-fA-F]*$/.test(hex)) {

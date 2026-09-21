@@ -89,6 +89,9 @@ export interface ScanVerdict {
   checkedBy: 'Lantern';
   tier: 0 | 1 | 2; // which (mocked) tier produced the verdict
   latencyMs: number; // mocked timing, for the "checked in Nms" affordance
+  // Stage 4's per-counterparty registry answers, when the pipeline ran (#120):
+  // what the one-click report hangs off. Absent from the legacy scan().
+  screening?: Array<{ address: string; answer: ScreenAnswer }>;
 }
 
 // ── Paste-to-check (spec §4.5) ───────────────────────────────────────────────

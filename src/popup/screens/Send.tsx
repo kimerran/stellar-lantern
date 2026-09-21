@@ -20,6 +20,7 @@ import { Icon } from '../components/Icon';
 import { ScanBadge } from '../components/ScanBadge';
 import { RiskCallout } from '../components/RiskCallout';
 import { HoldToConfirm } from '../components/HoldToConfirm';
+import { ReportCounterparties, counterpartiesOf } from '../components/ReportAddress';
 
 interface Props {
   address: string;
@@ -303,6 +304,21 @@ export function Send({ address, network, onDone }: Props) {
           )
         ) : null}
         </div>
+
+        {/* One-click report to the registry (#120): the destination, with what
+            the screener said about it. Falls back to the destination alone when
+            the legacy engine ran. Testnet only — renders nothing on PUBLIC. */}
+        {!scanning && verdict && (
+          <ReportCounterparties
+            reporter={address}
+            network={network}
+            subjects={
+              counterpartiesOf(verdict, address).length > 0
+                ? counterpartiesOf(verdict, address)
+                : [{ address: review.destination }]
+            }
+          />
+        )}
 
         <Card className="space-y-3">
           <ReviewRow label="To" value={truncateAddress(review.destination, 6, 6)} mono />

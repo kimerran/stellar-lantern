@@ -19,6 +19,7 @@ import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { ScanBadge } from '../components/ScanBadge';
 import { RiskCallout } from '../components/RiskCallout';
+import { ReportCounterparties, counterpartiesOf } from '../components/ReportAddress';
 import { HoldToConfirm } from '../components/HoldToConfirm';
 
 interface Props {
@@ -335,6 +336,10 @@ export function Swap({ address, network, onBack }: Props) {
               />
             )}
           </div>
+
+          {/* One-click report to the registry (#120), one row per screened
+              counterparty. Testnet only — renders nothing on PUBLIC. */}
+          <ReportCounterparties reporter={address} network={network} subjects={counterpartiesOf(verdict, address)} />
 
           <Card className="space-y-3">
             <Row label="You send" value={`${formatAmount(review.sendAmount)} ${review.sendCode}`} />

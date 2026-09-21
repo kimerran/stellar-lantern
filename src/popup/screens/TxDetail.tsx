@@ -5,14 +5,17 @@ import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { Button } from '../components/Button';
 import { AmountText } from '../components/AmountText';
+import { ReportCounterparties } from '../components/ReportAddress';
 
 interface Props {
   item: HistoryItem;
   network: NetworkConfig;
+  // The wallet's own address: the reporter for the one-click report (#120).
+  address: string;
   onBack: () => void;
 }
 
-export function TxDetail({ item, network, onBack }: Props) {
+export function TxDetail({ item, network, address, onBack }: Props) {
   return (
     <div className="space-y-4 pt-2">
       <button onClick={onBack} className="flex items-center gap-1 text-label-md text-on-surface-variant hover:text-on-surface">
@@ -42,6 +45,17 @@ export function TxDetail({ item, network, onBack }: Props) {
         {item.ledger != null && <DetailRow label="Ledger" value={String(item.ledger)} />}
         <DetailRow label="Tx Hash" value={item.hash} mono />
       </Card>
+
+      {/* Report the counterparty of a transaction that already happened (#120):
+          the realistic case — people work out they were scammed afterwards.
+          Hidden on networks without a registry. */}
+      {item.counterparty && (
+        <ReportCounterparties
+          reporter={address}
+          network={network}
+          subjects={[{ address: item.counterparty }]}
+        />
+      )}
 
       <Button
         fullWidth

@@ -73,7 +73,7 @@ export function Activity({ address, network, onBack, embedded }: Props) {
   const groups = useMemo(() => groupByDate(items), [items]);
 
   if (selected) {
-    const detail = <TxDetail item={selected} network={network} onBack={() => setSelected(null)} />;
+    const detail = <TxDetail item={selected} network={network} address={address} onBack={() => setSelected(null)} />;
     // Embedded: App already provides the scroll container + padding.
     if (embedded) return <div className="pt-2">{detail}</div>;
     return (

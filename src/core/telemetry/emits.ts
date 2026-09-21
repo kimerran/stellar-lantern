@@ -7,7 +7,7 @@
 // every screen uses the helper rather than emit() directly.
 
 import { emit } from './index';
-import type { MiniAppId, RiskLevel, ScanAction, TelemetryEvent } from './events';
+import type { MiniAppId, RegistryReason, RiskLevel, ScanAction, TelemetryEvent } from './events';
 
 const MINI_APP_IDS = new Set<MiniAppId>(['stardust-faucet', 'lumen-notes', 'lantern-demo']);
 
@@ -55,6 +55,12 @@ export function txSignedEvent(
   return { name: 'tx_signed', props: { kind, ok } };
 }
 
+// The registry write (#120). Takes the closed reason and the outcome only —
+// the subject, the fee and any evidence note have no way in.
+export function registryReportEvent(reason: RegistryReason, ok: boolean): TelemetryEvent {
+  return { name: 'registry_report_submitted', props: { reason, ok } };
+}
+
 // Fire-and-forget wrappers. No-ops when telemetry is off or unconsented.
 export const track = {
   walletCreated: (mode: 'create' | 'import' | 'passkey') => emit(walletCreatedEvent(mode)),
@@ -68,6 +74,7 @@ export const track = {
   miniAppOpened: (appId: string, remote = false) => emit(miniAppOpenedEvent(appId, remote)),
   txSigned: (kind: 'sign_and_submit' | 'sign_only' | 'submit_only', ok: boolean) =>
     emit(txSignedEvent(kind, ok)),
+  registryReport: (reason: RegistryReason, ok: boolean) => emit(registryReportEvent(reason, ok)),
   guardianAdded: () => emit({ name: 'guardian_added', props: {} }),
   sessionStart: () => emit({ name: 'session_start', props: {} }),
   appFirstOpen: () => emit({ name: 'app_first_open', props: {} }),

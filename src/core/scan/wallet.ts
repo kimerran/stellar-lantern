@@ -117,6 +117,7 @@ export function toScanVerdict(result: ScanResult, latencyMs: number): ScanVerdic
     checkedBy: 'Lantern',
     tier: aiSentence ? 2 : 1,
     latencyMs: Math.max(0, Math.round(latencyMs)),
+    screening: result.screen.answers.map((a) => ({ address: a.address, answer: a.answer })),
   };
 }
 
