@@ -20,8 +20,12 @@ Lantern's wallet builds carry **opt-in** usage analytics (off by default; one to
 |---|---|---|---|---|
 | Transactions scanned end-to-end | ≥ 60 | 18 | +18 (first data: 16 Sep) | Not yet |
 | Unique wallets that ran a scan | ≥ 15 | 4 | +4 | Not yet |
+| Addresses reported on-chain | ≥ 20 | no reading yet | — | Not yet |
+| On-chain registry executions | ≥ 30 | no reading yet | — | Not yet |
 | Transactions signed | — | 6 across 4 wallets | — | — |
 | Installs reporting | — | 6 (4 with a wallet address) | — | — |
+
+The two registry rows are not analytics: *addresses reported* is the registry contract's `count()` (distinct subjects), and *registry executions* is the number of transactions that invoked the contract, both read from the testnet explorer. Neither had a wallet-side path to move it before Deliverable 3 lands the one-click report; the first reading is taken with the Week 3 report. Reports made during the alpha exercises are **seeded testnet entries** (addresses generated for the exercise, two per tester) and are recorded here as such, not as organic community reports.
 
 Snapshot read from the analytics export on 2026-09-17; window 2026-09-16 → 2026-09-17 (the first day the instrumented builds were in testers' hands). The scanner is a library in Week 2 — every scan above came from the alpha wallet's existing review screen. The SOW's counts are expected to move in Weeks 3 and 4, when the D2 scanner sits in the wallet's pre-sign review (D3) and a public playground opens (D4).
 
