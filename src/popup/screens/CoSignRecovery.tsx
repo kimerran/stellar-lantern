@@ -31,6 +31,9 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
   const [xdr, setXdr] = useState('');
   const [verdict, setVerdict] = useState<ScanVerdict | null>(null);
   const [scanning, setScanning] = useState(false);
+  // Held across the scanTx() await (#84): no double-tap re-running the pipeline
+  // and double-counting tx_scanned, and the button shows the wait.
+  const [reviewing, setReviewing] = useState(false);
   const [confirmText, setConfirmText] = useState('');
   const [signedXdr, setSignedXdr] = useState('');
   const [signing, setSigning] = useState(false);
@@ -45,6 +48,7 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
   }, [step, verdict]);
 
   async function toReview() {
+    if (reviewing) return;
     // One guard covers: unreadable XDR, a tx that modifies the guardian's OWN
     // account (takeover attempt), and anything that isn't a recovery setOptions.
     const guardError = recoveryCoSignError(xdr, network.passphrase, address);
@@ -53,16 +57,21 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
       return;
     }
     setError(null);
-    const v = await scanTx({
-      xdr: xdr.trim(),
-      networkPassphrase: network.passphrase,
-      rpcUrl: network.sorobanRpcUrl,
-      context: { network: network.id, fromAddress: address },
-    });
-    if (__FEATURE_TELEMETRY__) track.txScanned(v);
-    setVerdict(v);
-    setConfirmText('');
-    setStep('review');
+    setReviewing(true);
+    try {
+      const v = await scanTx({
+        xdr: xdr.trim(),
+        networkPassphrase: network.passphrase,
+        rpcUrl: network.sorobanRpcUrl,
+        context: { network: network.id, fromAddress: address },
+      });
+      if (__FEATURE_TELEMETRY__) track.txScanned(v);
+      setVerdict(v);
+      setConfirmText('');
+      setStep('review');
+    } finally {
+      setReviewing(false);
+    }
   }
 
   async function coSign() {
@@ -213,7 +222,13 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
             </p>
           </Card>
         )}
-        <Button fullWidth onClick={toReview} disabled={!xdr.trim()} trailingIcon="arrow_forward">
+        <Button
+          fullWidth
+          onClick={toReview}
+          loading={reviewing}
+          disabled={!xdr.trim() || reviewing}
+          trailingIcon="arrow_forward"
+        >
           Review request
         </Button>
       </div>

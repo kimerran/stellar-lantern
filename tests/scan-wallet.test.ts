@@ -258,6 +258,12 @@ describe('call sites and build plumbing', () => {
     }
   });
 
+  it('CoSignRecovery holds a busy state across the await so a double tap cannot scan twice', () => {
+    const src = screenSrc('CoSignRecovery');
+    expect(src).toMatch(/loading=\{reviewing\}/);
+    expect(src).toMatch(/if \(reviewing\) return;/);
+  });
+
   it('release and Android builds turn the AI sentence on and point at the same Lantern API', () => {
     const API = 'https://lantern-api-production-3fad.up.railway.app';
     for (const [name, yml] of [['release.yml', releaseYml], ['android.yml', androidYml]] as const) {

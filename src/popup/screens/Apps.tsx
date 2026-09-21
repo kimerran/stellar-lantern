@@ -16,7 +16,7 @@ import {
 } from '@core/miniapps/favorites';
 import { onSettingsChanged } from '@shared/storage';
 import { BASE_FEE } from '@stellar/stellar-sdk';
-import { NETWORKS, type NetworkId } from '@shared/constants';
+import type { NetworkConfig, NetworkId } from '@shared/constants';
 import { formatAmount, truncateAddress } from '@shared/format';
 import { sendMessage } from '@shared/messages';
 import { getServer, destinationFunded } from '@core/stellar/client';
@@ -49,7 +49,17 @@ type Open =
   | { kind: 'url'; src: string; title: string; origin: string };
 
 
-export function Apps({ address, network }: { address: string; network: NetworkId }) {
+// `config` is the resolved NetworkConfig (Settings Horizon / RPC overrides
+// applied — #84); `network` stays the id the bridge protocol shares with apps.
+export function Apps({
+  address,
+  network,
+  config,
+}: {
+  address: string;
+  network: NetworkId;
+  config: NetworkConfig;
+}) {
   const [open, setOpen] = useState<Open | null>(null);
   const [urlText, setUrlText] = useState('');
   const [urlError, setUrlError] = useState(false);
@@ -95,7 +105,9 @@ export function Apps({ address, network }: { address: string; network: NetworkId
   }
 
   if (open) {
-    return <Browser open={open} address={address} network={network} onClose={() => setOpen(null)} />;
+    return (
+      <Browser open={open} address={address} network={network} config={config} onClose={() => setOpen(null)} />
+    );
   }
 
   const favoriteApps = orderedFavoriteApps(favorites);
@@ -258,11 +270,13 @@ function Browser({
   open,
   address,
   network,
+  config,
   onClose,
 }: {
   open: Open;
   address: string;
   network: NetworkId;
+  config: NetworkConfig;
   onClose: () => void;
 }) {
   const [reloadKey, setReloadKey] = useState(0);
@@ -313,7 +327,7 @@ function Browser({
     const intent = validated.value;
     postToApp({ type: 'lantern:signing' }); // ack so the dApp waits for review
     try {
-      const cfg = NETWORKS[network];
+      const cfg = config;
       const server = getServer(cfg);
       const destFunded = await destinationFunded(cfg, intent.destination);
       // A non-native asset can't fund a brand-new account (mirrors Send.tsx).
@@ -399,7 +413,7 @@ function Browser({
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open.src, address, network]);
+  }, [open.src, address, network, config]);
 
   function approveConnect() {
     granted.current = true;
@@ -416,7 +430,7 @@ function Browser({
     submittingRef.current = true;
     setSubmitting(true);
     setSignErr(null);
-    const cfg = NETWORKS[network];
+    const cfg = config;
     const res = await sendMessage({
       type: 'SIGN_AND_SUBMIT',
       xdr: signReq.xdr,
