@@ -1,6 +1,6 @@
 // Dead-code-elimination proof for build-time feature flags (#81).
 //
-// Builds the extension bundle twice and asserts the DEMO_AFFORDANCES-gated demo
+// Builds the extension bundle several times and asserts the DEMO_AFFORDANCES-gated demo
 // forced-verdict / "preview warnings" gallery is STRIPPED when the flag is off
 // and PRESENT when on — i.e. the `__FEATURE_DEMO_AFFORDANCES__` define actually
 // removes code + its imports (a store build can't be told to fake a verdict),
@@ -86,6 +86,32 @@ console.log('Building with VITE_FEATURE_TELEMETRY=false …');
 buildTelemetry(false);
 const telemetryOffHas = bundleHas(TELEMETRY_MARKER) || bundleHas('/v1/telemetry');
 
+// Scanner AI (#84): the explainer endpoint must leave the bundle with the flag
+// off. The wallet adapter reads VITE_LANTERN_API_URL only inside the
+// `__FEATURE_SCANNER_AI__` guard, so a flag-off build carries neither the
+// `/v1/explain` path nor the API base it was given.
+const SCANNER_API = 'https://explain.lantern.invalid';
+function buildScannerAi(on) {
+  execSync('npx vite build', {
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      VITE_FEATURE_DEMO_AFFORDANCES: 'false',
+      VITE_FEATURE_TELEMETRY: 'false',
+      VITE_FEATURE_SCANNER_AI: on ? 'true' : 'false',
+      VITE_LANTERN_API_URL: SCANNER_API,
+    },
+  });
+}
+
+console.log('Building with VITE_FEATURE_SCANNER_AI=true …');
+buildScannerAi(true);
+const scannerOnHas = bundleHas('/v1/explain') && bundleHas(SCANNER_API);
+
+console.log('Building with VITE_FEATURE_SCANNER_AI=false …');
+buildScannerAi(false);
+const scannerOffHas = bundleHas('/v1/explain') || bundleHas(SCANNER_API);
+
 // Leave dist/ in the default (flag-off) state.
 build(false);
 
@@ -115,6 +141,18 @@ if (!identityOnHas) {
   failed = true;
 } else {
   console.log('✓ alpha-identity copy present with TELEMETRY_IDENTITY=true (sanity check).');
+}
+if (scannerOffHas) {
+  console.error('✗ FAIL: the explainer endpoint is in the bundle with SCANNER_AI=false.');
+  failed = true;
+} else {
+  console.log('✓ explainer endpoint ABSENT with SCANNER_AI=false (dead-code-eliminated).');
+}
+if (!scannerOnHas) {
+  console.error('✗ FAIL: explainer endpoint absent with SCANNER_AI=true — the marker or gate is wrong.');
+  failed = true;
+} else {
+  console.log('✓ explainer endpoint present with SCANNER_AI=true (sanity check).');
 }
 if (offHas) {
   console.error(

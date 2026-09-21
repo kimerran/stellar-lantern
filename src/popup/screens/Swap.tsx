@@ -9,7 +9,7 @@ import { buildPathPaymentStrictSendXdr, destMinFromQuote } from '@core/stellar/s
 import { fetchStrictSendPaths } from '@core/stellar/paths';
 import { fetchSoroswapQuote, buildSoroswapSwapXdr, pickBestEngine, type SoroswapConfig } from '@core/stellar/soroswap';
 import { computeMaxXlm, type AssetRef } from '@core/stellar/tx';
-import { scan } from '@core/scan';
+import { scanTx } from '@core/scan/wallet';
 import type { ScanVerdict } from '@core/scan';
 import { FLAGS } from '@shared/flags';
 import { isNativePlatform } from '@shared/kv';
@@ -210,9 +210,10 @@ export function Swap({ address, network, onBack }: Props) {
         });
       }
 
-      const verdict = scan({
+      const verdict = await scanTx({
         xdr,
         networkPassphrase: network.passphrase,
+        rpcUrl: network.sorobanRpcUrl,
         context: {
           network: network.id,
           fromAddress: address,

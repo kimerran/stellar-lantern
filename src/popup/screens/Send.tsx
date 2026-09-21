@@ -11,7 +11,7 @@ import { isValidPublicKey } from '@core/wallet/wallet';
 import { isNativePlatform } from '@shared/kv';
 import { MAX_MEMO_BYTES } from '@shared/constants';
 import { formatAmount, truncateAddress } from '@shared/format';
-import { scan } from '@core/scan';
+import { scanTx } from '@core/scan/wallet';
 import type { ScanVerdict } from '@core/scan';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
@@ -173,9 +173,10 @@ export function Send({ address, network, onDone }: Props) {
 
       // Lantern pre-sign scan — runs between "initiate" and the Sign affordance.
       // Advisory only; it never signs or sends (spec §2).
-      const scanVerdict = scan({
+      const scanVerdict = await scanTx({
         xdr,
         networkPassphrase: network.passphrase,
+        rpcUrl: network.sorobanRpcUrl,
         context: {
           network: network.id,
           fromAddress: address,

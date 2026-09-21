@@ -23,6 +23,11 @@ export function flagDefines(env: Record<string, string | undefined>): Record<str
   if (out[FLAG_DEFS.telemetry.literal] === 'false') {
     out['import.meta.env.VITE_TELEMETRY_INGEST_URL'] = '""';
   }
+  // Same for the Lantern API base the scanner's explainer proxy hangs off
+  // (#84): a SCANNER_AI-off build carries no reference to the endpoint.
+  if (out[FLAG_DEFS.scannerAi.literal] === 'false') {
+    out['import.meta.env.VITE_LANTERN_API_URL'] = '""';
+  }
   return out;
 }
 

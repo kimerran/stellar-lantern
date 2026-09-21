@@ -39,6 +39,9 @@ jobs:
           VITE_FEATURE_TELEMETRY: 'true'
           VITE_FEATURE_TELEMETRY_IDENTITY: 'true' # #100 — ALPHA ONLY; 'false' before any store submission
           VITE_TELEMETRY_INGEST_URL: 'https://lantern-api-production-3fad.up.railway.app/v1/telemetry'
+          # Scanner in the pre-sign review (#84): the AI sentence via the Lantern API.
+          VITE_FEATURE_SCANNER_AI: 'true'
+          VITE_LANTERN_API_URL: 'https://lantern-api-production-3fad.up.railway.app'
 
       - name: Setup JDK 21
         uses: actions/setup-java@v4

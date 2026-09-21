@@ -16,7 +16,7 @@ import { finalizePasskeyTransfer, preparePasskeyTransfer } from '@core/passkey/t
 import { sacContractBalance } from '@core/stellar/sac';
 import { getServer, fundWithFriendbot } from '@core/stellar/client';
 import { isValidPublicKey, isValidContractId } from '@core/wallet/wallet';
-import { scan } from '@core/scan';
+import { scanTx } from '@core/scan/wallet';
 import type { ScanVerdict } from '@core/scan';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
@@ -140,9 +140,10 @@ export function SmartAccount({ account, onForget }: Props) {
         return;
       }
       // The same pre-sign scan gate as the classic Send screen (no bypass lane).
-      const scanVerdict = scan({
+      const scanVerdict = await scanTx({
         xdr: prepared.xdr,
         networkPassphrase: NETWORK.passphrase,
+        rpcUrl: NETWORK.sorobanRpcUrl,
         context: { network: NETWORK.id, fromAddress: account.contractId },
       });
       if (__FEATURE_TELEMETRY__) track.txScanned(scanVerdict);

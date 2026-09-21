@@ -27,7 +27,7 @@ import {
   intentAssetCode,
   type PaymentIntent,
 } from '@core/miniapps/bridge';
-import { scan } from '@core/scan';
+import { scanTx } from '@core/scan/wallet';
 import type { ScanVerdict } from '@core/scan';
 import { Icon } from '../components/Icon';
 import { Card } from '../components/Card';
@@ -343,9 +343,10 @@ function Browser({
         amount: intent.amount,
         memo: intent.memo,
       });
-      const verdict = scan({
+      const verdict = await scanTx({
         xdr,
         networkPassphrase: cfg.passphrase,
+        rpcUrl: cfg.sorobanRpcUrl,
         context: { network, fromAddress: address, destinationFunded: destFunded, origin: open.title },
       });
       setConfirmText('');
