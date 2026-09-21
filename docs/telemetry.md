@@ -97,6 +97,7 @@ data" discards it as before.
 | `tx_signed` | `kind: sign_and_submit \| sign_only \| submit_only`, `ok: boolean` | Q4 |
 | `tx_scanned` | `risk`, `action: allow \| warn \| block_confirm` | Q4 |
 | `high_risk_gated` | `risk` | Q4 |
+| `registry_report_submitted` | `reason: Scam \| Phishing \| Drainer \| Poisoning \| Mixer \| Other`, `ok: boolean` (the one-click registry report, #120 — no subject, fee or note) | Q4 / §6.3 registry targets |
 | `consent_granted` / `consent_revoked` | — | audit |
 
 Each flush sends one envelope:

@@ -8,6 +8,8 @@ export type Platform = 'extension' | 'android';
 export type Network = 'testnet' | 'public';
 export type RiskLevel = 'low' | 'medium' | 'high';
 export type ScanAction = 'allow' | 'warn' | 'block_confirm';
+// Mirrors the registry contract's `Reason` enum (src/core/registry/report.ts).
+export type RegistryReason = 'Scam' | 'Phishing' | 'Drainer' | 'Poisoning' | 'Mixer' | 'Other';
 
 // Bundled mini-app ids only (src/core/miniapps/directory.ts) — never a URL.
 // Anything not in this list is reported as 'other'.
@@ -35,6 +37,10 @@ export type TelemetryEvent =
     }
   | { name: 'tx_scanned'; props: { risk: RiskLevel; action: ScanAction } }
   | { name: 'high_risk_gated'; props: { risk: RiskLevel } }
+  // The one-click registry report (#120) — the counter behind §6.3's registry
+  // targets. The reason is the contract's closed enum; no address, no fee
+  // amount, no note has a slot here.
+  | { name: 'registry_report_submitted'; props: { reason: RegistryReason; ok: boolean } }
   // Consent lifecycle
   | { name: 'consent_granted'; props: Record<string, never> }
   | { name: 'consent_revoked'; props: Record<string, never> };
@@ -56,6 +62,10 @@ export const EVENT_SCHEMA: Record<EventName, Record<string, readonly string[] | 
   tx_signed: { kind: ['sign_and_submit', 'sign_only', 'submit_only'], ok: 'boolean' },
   tx_scanned: { risk: ['low', 'medium', 'high'], action: ['allow', 'warn', 'block_confirm'] },
   high_risk_gated: { risk: ['low', 'medium', 'high'] },
+  registry_report_submitted: {
+    reason: ['Scam', 'Phishing', 'Drainer', 'Poisoning', 'Mixer', 'Other'],
+    ok: 'boolean',
+  },
   consent_granted: {},
   consent_revoked: {},
 };

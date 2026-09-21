@@ -22,6 +22,7 @@ import { Input } from '../components/Input';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { RiskCallout } from '../components/RiskCallout';
+import { ReportCounterparties, counterpartiesOf } from '../components/ReportAddress';
 import { HoldToConfirm } from '../components/HoldToConfirm';
 import { CoSignRecovery } from './CoSignRecovery';
 import { RecoverAccount } from './RecoverAccount';
@@ -304,6 +305,12 @@ export function Guardians({ address, network, onBack }: Props) {
               />
             ) : null}
           </div>
+
+          {/* One-click report to the registry (#120), one row per screened
+              counterparty. Testnet only — renders nothing on PUBLIC. */}
+          {!scanning && verdict && (
+            <ReportCounterparties reporter={address} network={network} subjects={counterpartiesOf(verdict, address)} />
+          )}
 
           {changes && (changes.added.length > 0 || changes.removed.length > 0) && (
             <Card className="space-y-1.5">

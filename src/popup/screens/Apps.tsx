@@ -32,6 +32,7 @@ import type { ScanVerdict } from '@core/scan';
 import { Icon } from '../components/Icon';
 import { Card } from '../components/Card';
 import { RiskCallout } from '../components/RiskCallout';
+import { ReportCounterparties, counterpartiesOf } from '../components/ReportAddress';
 import { ScanBadge } from '../components/ScanBadge';
 import { HoldToConfirm } from '../components/HoldToConfirm';
 import { isNativePlatform } from '@shared/kv';
@@ -739,6 +740,18 @@ function Browser({
                 whatToDo={isHigh ? 'A dApp requested this. If you didn’t expect it, reject — signing can’t be undone.' : undefined}
               />
             )}
+
+            {/* One-click report to the registry (#120): the dApp's destination
+                and any other screened counterparty. Testnet only. */}
+            <ReportCounterparties
+              reporter={address}
+              network={config}
+              subjects={
+                counterpartiesOf(signReq.verdict, address).length > 0
+                  ? counterpartiesOf(signReq.verdict, address)
+                  : [{ address: signReq.intent.destination }]
+              }
+            />
 
             <div className="flex items-center justify-between text-label-sm text-on-surface-variant">
               <span>Network fee</span>

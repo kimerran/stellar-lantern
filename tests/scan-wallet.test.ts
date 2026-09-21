@@ -72,7 +72,7 @@ describe('toScanVerdict — ScanResult → the shape the screens render', () => 
     simulation: {} as ScanResult['simulation'],
     auth: {} as ScanResult['auth'],
     effects: {} as ScanResult['effects'],
-    screen: {} as ScanResult['screen'],
+    screen: { answers: [] } as unknown as ScanResult['screen'],
   };
 
   it('maps a low result', () => {
@@ -95,7 +95,25 @@ describe('toScanVerdict — ScanResult → the shape the screens render', () => 
       checkedBy: 'Lantern',
       tier: 1,
       latencyMs: 413,
+      screening: [],
     });
+  });
+
+  it('carries stage 4\'s per-counterparty answers for the one-click report (#120)', () => {
+    const answer = { outcome: 'flagged' as const, source: 'registry' };
+    const v = toScanVerdict(
+      {
+        ...base,
+        screen: { answers: [{ address: 'GABC', answer }] } as unknown as ScanResult['screen'],
+        risk: 'high',
+        action: 'block_confirm',
+        reasons: [],
+        explanation: 'x',
+        explanationSource: 'fallback',
+      },
+      1,
+    );
+    expect(v.screening).toEqual([{ address: 'GABC', answer }]);
   });
 
   it('maps a medium result, copying every reason', () => {
