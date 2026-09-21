@@ -73,7 +73,7 @@ writeFileSync(HTML, html);
 
 const chrome = process.env.CHROME
   ?? ['/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'].find(existsSync);
-if (!chrome) {
+if (!chrome || !existsSync(chrome)) {
   console.error(`wrote ${HTML}; no Chromium found for the PDF step — set CHROME=`);
   process.exit(1);
 }

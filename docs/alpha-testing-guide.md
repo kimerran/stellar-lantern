@@ -34,7 +34,7 @@ Lantern is a **non-custodial Stellar wallet** built around one idea: you should 
 
 The files above are the **alpha build**: it is the only build that can tell us which tester did what. A generic release build looks identical but reports nothing useful. Two ways to check, once your wallet exists (Part 2):
 
-- **Settings → Privacy**: the switch is titled **Share usage data (alpha)**, and the "we collect" list includes *your public wallet address (alpha builds only)*. If the switch says "Share **anonymous** usage data" instead, you have the wrong build — stop and tell us.
+- **Settings → Privacy**: the switch is titled **Share usage data (alpha)**, and the "we collect" list includes *your public wallet address (alpha builds only)*. If the switch's title says "Share **anonymous** usage data" instead, you have the wrong build — stop and tell us.
 - **Settings**, bottom of the page: the version number. Put it in your answers file.
 
 ---
@@ -59,7 +59,7 @@ You can turn it off, and ask us to delete everything from your install, at any t
 
 **How to turn it on.** Lantern only offers the switch once a wallet exists (the address it attaches doesn't exist before then), so the moment is right after Part 2, step 6:
 
-1. On your first arrival at **Home**, a card titled **Share usage data (alpha)** appears. Tap **Share**.
+1. On your first arrival at **Home**, a card titled **Share usage data (alpha)?** appears. Tap the button labelled **Share anonymous usage data** (that button reads the same on every build; the card title is what identifies the alpha build).
 2. If you dismissed it, or it didn't appear: **Settings → Privacy → Share usage data (alpha)** → switch it on. You'll see *"Thanks — sharing anonymous usage data."*
 3. Below the switch an **Analytics ID** appears. Tap it to copy it, and paste it at the top of your answers file.
 
@@ -104,7 +104,7 @@ You'll install **both** eventually. Install your **main** platform now (either o
 3. Tick the acknowledgement box and continue.
 4. Lantern asks you to **type a few of the words back** to confirm you saved them. Enter the requested word numbers.
 5. Set a password. This encrypts the wallet on your device. **Remember it** — there's no reset, and you'll need it every time the wallet locks.
-6. You land on the **Home** screen, showing a **Testnet** badge and a balance of zero. **Now do Part 0** — tap **Share** on the card, then come back here.
+6. You land on the **Home** screen, showing a **Testnet** badge and a balance of zero. **Now do Part 0** — accept the card, then come back here.
 
 ### Get test funds
 
@@ -285,7 +285,7 @@ Answer these in writing, or book a 20-minute call — whichever you prefer. **Sh
 Now install Lantern on the **other** platform, following the matching section of Part 1.
 
 1. On the welcome screen choose **Import** instead of Create, and enter the 12 words from Part 2. You should land on Home with the **same address and balance** as your main platform. Note how long it took and anything confusing.
-2. When the **Share usage data (alpha)** card appears, tap **Share** here too (each install has its own switch).
+2. When the **Share usage data (alpha)?** card appears, tap **Share anonymous usage data** here too (each install has its own switch).
 3. Repeat **exercise 1** — the 1 XLM payment to the Lantern test address — and sign it.
 4. Repeat **exercise 2** — the payment to the reported address — and cancel at the warning. Notice the extra step is different here: press-and-hold on the phone, type CONFIRM in Chrome.
 

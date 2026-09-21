@@ -5,8 +5,10 @@
 // only to grow the table (pass a larger count); never to reshuffle rows that
 // testers already hold, or two testers end up reporting the same subject.
 import { writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { Keypair } from '@stellar/stellar-sdk';
 
+const OUT = resolve(import.meta.dirname, '../docs/alpha-tester-assignments.md');
 const count = Number(process.argv[2] ?? 20);
 const rows = Array.from({ length: count }, (_, i) => {
   const [n, r1, r2] = [0, 1, 2].map(() => Keypair.random().publicKey());
@@ -30,7 +32,7 @@ ${rows.join('\n')}
 
 ## Why two report subjects each
 
-The SOW counts two different things: **distinct addresses on the registry** (target ≥ 20) and **registry transactions** (target ≥ 30). A repeat report of an address that is already on the registry is one more transaction but **not** one more address. So each tester reports two addresses nobody else has (→ distinct entries) and then reports one of them a second time (→ an extra transaction, and a real test of the repeat-report warning). Fifteen testers × 2 subjects = 30 entries; × 3 transactions = 45 executions.
+The SOW counts two different things: **distinct addresses on the registry** (target ≥ 20) and **registry transactions** (target ≥ 30). A repeat report of an address that is already on the registry is one more transaction but **not** one more address. So each tester reports two addresses nobody else has (→ distinct entries) and then reports one of them a second time (→ an extra transaction, and a real test of the repeat-report warning). Fifteen testers is the minimum cohort that clears both targets: 15 × 2 subjects = 30 entries (target 20); × 3 transactions = 45 executions (target 30). The table has 20 rows so there is room for a larger cohort and for dropouts.
 `;
-writeFileSync('docs/alpha-tester-assignments.md', md);
-console.log(`wrote docs/alpha-tester-assignments.md (${count} rows)`);
+writeFileSync(OUT, md);
+console.log(`wrote ${OUT} (${count} rows)`);
