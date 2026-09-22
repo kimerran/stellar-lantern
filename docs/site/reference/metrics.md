@@ -14,7 +14,7 @@ Lantern's wallet builds carry **opt-in** usage analytics (off by default; one to
 | Transactions scanned end-to-end | Count of `tx_scanned` events across all installs in the window |
 | Unique wallets that ran a scan | Distinct wallet addresses with at least one `tx_scanned` event in the window |
 | Transactions signed | Count of `tx_signed` events (context only; not an SOW target) |
-| Download intents | Clicks on `/download/android` and `/download/extension` — a server log, not analytics; counts a click, not a completed install (context only; #131) |
+| Download intents | Clicks on `/download/android` and `/download/extension` — a server log, not analytics; counts a click, not a completed install (context only) |
 
 ## Snapshot
 
@@ -26,7 +26,7 @@ Lantern's wallet builds carry **opt-in** usage analytics (off by default; one to
 | On-chain registry executions | ≥ 30 | no reading yet | — | Not yet |
 | Transactions signed | — | 6 across 4 wallets | — | — |
 | Installs reporting | — | 6 (4 with a wallet address) | — | — |
-| Download intents | — | no reading yet (links live with #131) | — | — |
+| Download intents | — | no reading yet (links are live) | — | — |
 
 The download row is the context that makes the wallet numbers legible: *60 clicks, 15 wallets scanning* and *16 clicks, 15 wallets scanning* are very different results, and only the second is a good one. It is a click count from our own redirect links, with no identity and no consent behind it, so it is never joined to the analytics rows — only shown next to them.
 

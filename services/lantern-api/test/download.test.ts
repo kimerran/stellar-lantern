@@ -193,6 +193,15 @@ describe('GET /download/<target>', () => {
     h.advance(10 * 60_000); // past the 5-minute TTL
     expect((await h.get('/download/android')).headers.get('location')).toBe(APK);
     expect(h.downloads.rows).toHaveLength(2);
+    // The failed refresh is not retried on every click: within the retry
+    // interval the stale answer serves without a second fetch, then a retry.
+    const fetched = calls.length;
+    h.advance(10_000);
+    expect((await h.get('/download/android')).headers.get('location')).toBe(APK);
+    expect(calls).toHaveLength(fetched);
+    h.advance(30_000);
+    await h.get('/download/android');
+    expect(calls).toHaveLength(fetched + 1);
 
     // 2. Cold cache + API down + pinned fallback from the environment.
     const cold = harness(

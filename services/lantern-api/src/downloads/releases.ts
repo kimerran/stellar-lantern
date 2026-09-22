@@ -36,6 +36,9 @@ export interface Resolved {
 }
 
 export const DEFAULT_RELEASES_TTL_MS = 5 * 60_000;
+// After a failed refresh the stale answer is served for this long before the
+// next attempt, so an outage costs one 4 s fetch per 30 s, not one per click.
+export const STALE_RETRY_MS = 30_000;
 const TAG_RE = /^v(\d+\.\d+\.\d+)-testnet\.\d+$/;
 const ASSET_RE: Record<DownloadTarget, RegExp> = {
   android: /^lantern-\d+\.\d+\.\d+-testnet\.apk$/,
@@ -121,7 +124,10 @@ export function createReleaseResolver(opts: ReleaseResolverOptions): ReleaseReso
       cached = { releases: fresh, at: t };
       return { releases: fresh, source: 'api' };
     }
-    if (cached) return { releases: cached.releases, source: 'stale' };
+    if (cached) {
+      cached.at = t - ttlMs + Math.min(STALE_RETRY_MS, ttlMs);
+      return { releases: cached.releases, source: 'stale' };
+    }
     return null;
   }
 
