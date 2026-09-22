@@ -14,11 +14,11 @@
 //   - `PUBLIC`. The registry and the recorded token contracts are testnet-only
 //     and mainnet has no `sorobanRpcUrl`, so the pipeline would answer
 //     `unknown` for every counterparty and warn on every mainnet payment.
-//     Mainnet behaviour is byte-identical to before this slice.
-//     TODO(#84 follow-up): drop this carve-out once a mainnet registry is
-//     deployed and `NETWORKS.PUBLIC.sorobanRpcUrl` is set — and, per the D3 QA
-//     plan §10, stop rendering "Checked by Lantern" on a review that had no
-//     registry behind it.
+//     The verdict is the legacy one, marked `registry: 'unavailable'` with
+//     the sentence saying so, so the review never claims a check it did not
+//     make — no "Checked by Lantern" badge, no clean screening line (D3 QA
+//     plan §10.1). TODO: drop this carve-out once a mainnet registry is
+//     deployed and `NETWORKS.PUBLIC.sorobanRpcUrl` is set.
 //   - `forceScenario` on a DEMO_AFFORDANCES build: the legacy engine owns the
 //     forced verdicts, so demo builds keep working through the adapter rather
 //     than the pipeline.
@@ -148,10 +148,19 @@ export function toScanVerdict(result: ScanResult, latencyMs: number): ScanVerdic
     checkedBy: 'Lantern',
     tier: aiSentence ? 2 : 1,
     latencyMs: Math.max(0, Math.round(latencyMs)),
+    registry: 'checked',
     screening: result.screen.answers.map((a) => ({ address: a.address, answer: a.answer })),
     net: result.effects.net.map((n) => ({ ...n, asset: { ...n.asset } })),
     approvals: result.effects.approvals.map((a) => ({ ...a, asset: { ...a.asset } })),
   };
+}
+
+// The sentence every review renders, on both the allow and the callout path,
+// so the absence of registry screening is stated wherever the verdict is.
+export const REGISTRY_UNAVAILABLE_SENTENCE = 'Registry screening is not available on Mainnet.';
+
+export function withoutRegistry(v: ScanVerdict): ScanVerdict {
+  return { ...v, registry: 'unavailable', explanation: `${v.explanation} ${REGISTRY_UNAVAILABLE_SENTENCE}` };
 }
 
 export function usesLegacy(input: WalletScanInput): boolean {
@@ -174,7 +183,8 @@ export async function scanTx(
   depsOverride?: PipelineDeps,
 ): Promise<ScanVerdict> {
   if (usesLegacy(input)) {
-    return scan({ xdr: input.xdr, networkPassphrase: input.networkPassphrase, context: input.context });
+    const legacy = scan({ xdr: input.xdr, networkPassphrase: input.networkPassphrase, context: input.context });
+    return input.context.network === 'PUBLIC' ? withoutRegistry(legacy) : legacy;
   }
   const started = performance.now();
   // No RPC (a network without Soroban and no override) → the pipeline's

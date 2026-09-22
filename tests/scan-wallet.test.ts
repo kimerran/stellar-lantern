@@ -1,8 +1,21 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Networks } from '@stellar/stellar-sdk';
 import { scan, type RawSimulation, type ScanResult } from '@lantern/scanner';
-import { scanTx, toScanVerdict, resetWalletScanDeps } from '@core/scan/wallet';
+import {
+  scanTx,
+  toScanVerdict,
+  resetWalletScanDeps,
+  withoutRegistry,
+  REGISTRY_UNAVAILABLE_SENTENCE,
+} from '@core/scan/wallet';
+import { badgeStyle } from '../src/popup/components/ScanBadge';
+import { decideRecheck, recheckTx } from '@core/scan/recheck';
 import manifestSrc from '../manifest.config.ts?raw';
+import sendSrc from '../src/popup/screens/Send.tsx?raw';
+import appsSrc from '../src/popup/screens/Apps.tsx?raw';
+import swapSrc from '../src/popup/screens/Swap.tsx?raw';
+import earnSrc from '../src/popup/screens/Earn.tsx?raw';
+import smartSrc from '../src/popup/screens/SmartAccount.tsx?raw';
 import releaseYml from '../.github/workflows/release.yml?raw';
 import androidYml from '../.github/workflows/android.yml?raw';
 import envExample from '../.env.example?raw';
@@ -95,13 +108,14 @@ describe('toScanVerdict — ScanResult → the shape the screens render', () => 
       checkedBy: 'Lantern',
       tier: 1,
       latencyMs: 413,
+      registry: 'checked',
       screening: [],
       net: [],
       approvals: [],
     });
   });
 
-  it('carries stage 4\'s per-counterparty answers for the one-click report (#120)', () => {
+  it("carries stage 4's per-counterparty answers for the one-click report (#120)", () => {
     const answer = { outcome: 'flagged' as const, source: 'registry' };
     const v = toScanVerdict(
       {
@@ -119,9 +133,22 @@ describe('toScanVerdict — ScanResult → the shape the screens render', () => 
   });
 
   it('maps a medium result, copying every reason', () => {
-    const reason = { code: 'new_account', severity: 'medium' as const, title: 'New', detail: 'd', ref: 'ops[0]' };
+    const reason = {
+      code: 'new_account',
+      severity: 'medium' as const,
+      title: 'New',
+      detail: 'd',
+      ref: 'ops[0]',
+    };
     const v = toScanVerdict(
-      { ...base, risk: 'medium', action: 'warn', reasons: [reason], explanation: 'x', explanationSource: 'fallback' },
+      {
+        ...base,
+        risk: 'medium',
+        action: 'warn',
+        reasons: [reason],
+        explanation: 'x',
+        explanationSource: 'fallback',
+      },
       10,
     );
     expect(v.risk).toBe('medium');
@@ -136,7 +163,9 @@ describe('toScanVerdict — ScanResult → the shape the screens render', () => 
         ...base,
         risk: 'high',
         action: 'block_confirm',
-        reasons: [{ code: 'reported_address', severity: 'high', title: 'Reported address', detail: 'd' }],
+        reasons: [
+          { code: 'reported_address', severity: 'high', title: 'Reported address', detail: 'd' },
+        ],
         explanation: 'x',
         explanationSource: 'explainer',
       },
@@ -149,13 +178,26 @@ describe('toScanVerdict — ScanResult → the shape the screens render', () => 
 
   it('tier is 2 only when the explainer wrote the sentence (flag ON under test)', () => {
     expect(__FEATURE_SCANNER_AI__).toBe(true);
-    const r = { ...base, risk: 'low' as const, action: 'allow' as const, reasons: [], explanation: 'x' };
+    const r = {
+      ...base,
+      risk: 'low' as const,
+      action: 'allow' as const,
+      reasons: [],
+      explanation: 'x',
+    };
     expect(toScanVerdict({ ...r, explanationSource: 'explainer' }, 1).tier).toBe(2);
     expect(toScanVerdict({ ...r, explanationSource: 'fallback' }, 1).tier).toBe(1);
   });
 
   it('latency is a real, non-negative integer', () => {
-    const r = { ...base, risk: 'low' as const, action: 'allow' as const, reasons: [], explanation: 'x', explanationSource: 'fallback' as const };
+    const r = {
+      ...base,
+      risk: 'low' as const,
+      action: 'allow' as const,
+      reasons: [],
+      explanation: 'x',
+      explanationSource: 'fallback' as const,
+    };
     expect(toScanVerdict(r, -3).latencyMs).toBe(0);
     expect(toScanVerdict(r, 1999.5).latencyMs).toBe(2000);
   });
@@ -190,7 +232,11 @@ describe('scanTx on testnet runs the pipeline', () => {
     const f = fixture('classic-payment');
     const v = await scanTx(testnetInput(f, { destinationFunded: true }), {
       simulate: recorded(f),
-      screen: async () => ({ outcome: 'unknown' as const, reason: 'rpc_error', source: 'registry' }),
+      screen: async () => ({
+        outcome: 'unknown' as const,
+        reason: 'rpc_error',
+        source: 'registry',
+      }),
     });
     expect(v.risk).not.toBe('low');
     expect(v.reasons.some((r) => r.code === 'screen_unknown')).toBe(true);
@@ -221,15 +267,18 @@ describe('scanTx on testnet runs the pipeline', () => {
       xdr: 'not-a-transaction',
       networkPassphrase: Networks.TESTNET,
       rpcUrl: 'https://rpc.invalid',
-      context: { network: 'TESTNET', fromAddress: 'GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK' },
+      context: {
+        network: 'TESTNET',
+        fromAddress: 'GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK',
+      },
     });
     expect(v.risk).toBe('high');
     expect(v.action).toBe('block_confirm');
   });
 });
 
-describe('PUBLIC keeps the legacy scan() path, byte-identical', () => {
-  it('returns exactly what scan() returns for a mainnet payment', async () => {
+describe('PUBLIC keeps the legacy scan() path, and never claims a registry check', () => {
+  it('returns the legacy verdict marked registry: unavailable, with the sentence saying so', async () => {
     const f = fixture('classic-payment');
     const input = {
       xdr: f.xdr,
@@ -243,13 +292,64 @@ describe('PUBLIC keeps the legacy scan() path, byte-identical', () => {
       },
     });
     const legacy = scan(input);
-    expect(JSON.stringify(viaAdapter)).toBe(JSON.stringify(legacy));
+    // Same risk, action and reasons as the legacy engine — the carve-out
+    // removes the registry CLAIM, not the review (D3 QA plan §10.1 / §10.3).
+    expect(viaAdapter).toEqual(withoutRegistry(legacy));
+    expect(viaAdapter.risk).toBe(legacy.risk);
+    expect(viaAdapter.action).toBe(legacy.action);
+    expect(viaAdapter.reasons).toEqual(legacy.reasons);
+    expect(viaAdapter.registry).toBe('unavailable');
+    expect(viaAdapter.explanation).toBe(`${legacy.explanation} ${REGISTRY_UNAVAILABLE_SENTENCE}`);
+    expect(viaAdapter.screening).toBeUndefined();
+  });
+
+  it('the mark survives the re-check before submit — the badge cannot flip back at signing', async () => {
+    const f = fixture('classic-payment');
+    const input = {
+      xdr: f.xdr,
+      networkPassphrase: Networks.PUBLIC,
+      context: { network: 'PUBLIC' as const, fromAddress: f.source, destinationFunded: true },
+    };
+    // The real sequence a screen runs: review, then confirm.
+    const reviewed = await scanTx(input);
+    const result = await recheckTx(reviewed, input);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const decision = decideRecheck(reviewed, result, false);
+    // Nothing changed, so it proceeds — with the mark and the sentence intact.
+    expect(decision.proceed).toBe(true);
+    expect(result.drift).toEqual({ drifted: false });
+    expect(decision.verdict.registry).toBe('unavailable');
+    expect(decision.verdict.explanation).toContain(REGISTRY_UNAVAILABLE_SENTENCE);
+    expect(badgeStyle(decision.verdict.risk, decision.verdict.registry).label).not.toMatch(
+      /checked/i,
+    );
+  });
+
+  it('a low Mainnet verdict never renders "Checked by Lantern" (§10.1 hard blocker)', () => {
+    const mainnet = badgeStyle('low', 'unavailable');
+    expect(mainnet.label).toBe('Reviewed — registry not available on Mainnet');
+    expect(mainnet.label).not.toMatch(/checked/i);
+    // Testnet (registry consulted) keeps the badge; medium/high are about the
+    // verdict, not the registry, and are unchanged either way.
+    expect(badgeStyle('low', 'checked').label).toBe('Checked by Lantern');
+    expect(badgeStyle('low', undefined).label).toBe('Checked by Lantern');
+    expect(badgeStyle('high', 'unavailable').label).toBe('High risk — action needed');
+    // Every screen that renders the low badge passes the verdict's registry flag.
+    for (const [name, src] of Object.entries({ sendSrc, appsSrc, swapSrc, earnSrc, smartSrc })) {
+      expect(src, name).toMatch(
+        /<ScanBadge risk="low"[^>]*registry=\{[a-zA-Z.]*verdict\.registry\}/,
+      );
+    }
   });
 
   it('forceScenario (demo builds) also goes through the legacy engine', async () => {
     const f = fixture('classic-payment');
     const v = await scanTx(
-      { ...testnetInput(f), context: { network: 'TESTNET', fromAddress: f.source, forceScenario: 'high' } },
+      {
+        ...testnetInput(f),
+        context: { network: 'TESTNET', fromAddress: f.source, forceScenario: 'high' },
+      },
       {
         simulate: async () => {
           throw new Error('pipeline must not run for a forced scenario');
@@ -262,7 +362,11 @@ describe('PUBLIC keeps the legacy scan() path, byte-identical', () => {
 
 describe('call sites and build plumbing', () => {
   const SCREENS = ['Send', 'Apps', 'Swap', 'Earn', 'Guardians', 'SmartAccount', 'CoSignRecovery'];
-  const SRC = import.meta.glob<string>('../src/popup/screens/*.tsx', { eager: true, query: '?raw', import: 'default' });
+  const SRC = import.meta.glob<string>('../src/popup/screens/*.tsx', {
+    eager: true,
+    query: '?raw',
+    import: 'default',
+  });
   const screenSrc = (name: string): string => {
     const hit = Object.entries(SRC).find(([p]) => p.endsWith(`/${name}.tsx`));
     if (!hit) throw new Error(`no screen ${name}`);
@@ -286,7 +390,10 @@ describe('call sites and build plumbing', () => {
 
   it('release and Android builds turn the AI sentence on and point at the same Lantern API', () => {
     const API = 'https://lantern-api-production-3fad.up.railway.app';
-    for (const [name, yml] of [['release.yml', releaseYml], ['android.yml', androidYml]] as const) {
+    for (const [name, yml] of [
+      ['release.yml', releaseYml],
+      ['android.yml', androidYml],
+    ] as const) {
       expect(yml, name).toMatch(/VITE_FEATURE_SCANNER_AI:\s*'true'/);
       expect(yml, name).toContain(`VITE_LANTERN_API_URL: '${API}'`);
     }
@@ -295,6 +402,8 @@ describe('call sites and build plumbing', () => {
 
   it('the manifest grants the Soroban testnet RPC the scanner simulates and screens against', () => {
     expect(manifestSrc).toContain(`'https://soroban-testnet.stellar.org/*'`);
-    expect(manifestSrc).not.toMatch(/limited to the Stellar endpoints \(Horizon \+ friendbot\) plus/);
+    expect(manifestSrc).not.toMatch(
+      /limited to the Stellar endpoints \(Horizon \+ friendbot\) plus/,
+    );
   });
 });

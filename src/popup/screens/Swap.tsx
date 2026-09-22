@@ -345,7 +345,7 @@ export function Swap({ address, network, onBack }: Props) {
             {verdict.action === 'allow' ? (
               <div className="flex items-center justify-between rounded-2xl border border-tertiary-container/20 bg-surface-container p-3.5">
                 <p className="pr-2 text-label-md text-on-surface">{verdict.explanation}</p>
-                <ScanBadge risk="low" latencyMs={verdict.latencyMs} />
+                <ScanBadge risk="low" latencyMs={verdict.latencyMs} registry={verdict.registry} />
               </div>
             ) : (
               <RiskCallout
