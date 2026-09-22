@@ -17,11 +17,19 @@ export interface Env {
   retentionDays: number;
   // Shown on the /admin report's Q4 tile (#104); the deployed testnet registry.
   registryId: string;
+  // /download (#131): the public repo whose Releases carry the builds, a
+  // daily cap for the redirect, and optional pinned fallback asset URLs.
+  downloadsRepo: string;
+  downloadsDailyCap: number;
+  downloadFallbackAndroidUrl?: string;
+  downloadFallbackExtensionUrl?: string;
 }
 
 export const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 // The deployed testnet blacklist registry (same default as scripts/report-activity.ts).
 export const DEFAULT_REGISTRY = 'CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F';
+// The public mirror: its Releases are downloadable signed out (#130).
+export const DEFAULT_DOWNLOADS_REPO = 'kimerran/stellar-lantern';
 
 function int(name: string, raw: string | undefined, dflt: number): number {
   if (raw === undefined || raw === '') return dflt;
@@ -50,5 +58,13 @@ export function readEnv(source: Record<string, string | undefined> = process.env
     telemetryDailyCap: int('TELEMETRY_DAILY_CAP', source.TELEMETRY_DAILY_CAP, 50_000),
     retentionDays: int('TELEMETRY_RETENTION_DAYS', source.TELEMETRY_RETENTION_DAYS, 90),
     registryId: source.BLACKLIST_REGISTRY_ID || DEFAULT_REGISTRY,
+    downloadsRepo: source.DOWNLOADS_REPO || DEFAULT_DOWNLOADS_REPO,
+    downloadsDailyCap: int('DOWNLOADS_DAILY_CAP', source.DOWNLOADS_DAILY_CAP, 5_000),
+    ...(source.DOWNLOAD_FALLBACK_ANDROID_URL
+      ? { downloadFallbackAndroidUrl: source.DOWNLOAD_FALLBACK_ANDROID_URL }
+      : {}),
+    ...(source.DOWNLOAD_FALLBACK_EXTENSION_URL
+      ? { downloadFallbackExtensionUrl: source.DOWNLOAD_FALLBACK_EXTENSION_URL }
+      : {}),
   };
 }

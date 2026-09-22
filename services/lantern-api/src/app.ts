@@ -8,12 +8,19 @@ import { explainRoute } from './routes/explain';
 import { healthRoute } from './routes/health';
 import { telemetryRoutes } from './routes/telemetry';
 import { adminRoutes } from './routes/admin';
+import { downloadRoutes } from './routes/download';
+import { createReleaseResolver, type ReleaseResolver } from './downloads/releases';
+import type { DownloadStore } from './downloads/store';
 import type { TelemetryStore } from './telemetry/store';
 
 export interface AppOptions {
   env: Env;
   // Telemetry store (#85); null when no DATABASE_URL is configured.
   store?: TelemetryStore | null;
+  // The download log (#131); null → /download still redirects, logs nothing.
+  downloads?: DownloadStore | null;
+  // Injectable so tests never reach api.github.com.
+  releaseResolver?: ReleaseResolver;
   nowDate?: () => Date;
   // /admin session nonce (#104); tests inject one, production mints at boot.
   adminSessionNonce?: string;
@@ -33,6 +40,7 @@ export function createApp(opts: AppOptions): Hono {
     ...(opts.now ? { now: opts.now } : {}),
   });
   const store = opts.store ?? null;
+  const downloads = opts.downloads ?? null;
   const telemetryLimiter = createRateLimiter({
     perMinute: env.rateLimitPerMin,
     dailyCap: env.telemetryDailyCap,
@@ -82,10 +90,40 @@ export function createApp(opts: AppOptions): Hono {
     '/',
     adminRoutes({
       store,
+      downloads,
       ...(env.telemetryAdminToken ? { adminToken: env.telemetryAdminToken } : {}),
       registryId: env.registryId,
       ...(opts.nowDate ? { now: opts.nowDate } : {}),
       ...(opts.adminSessionNonce ? { sessionNonce: opts.adminSessionNonce } : {}),
+      log,
+    }),
+  );
+  // /download (#131): a redirect per click, on its own limiter so a tester
+  // push can neither starve nor be starved by the explainer.
+  const downloadLimiter = createRateLimiter({
+    perMinute: env.rateLimitPerMin,
+    dailyCap: env.downloadsDailyCap,
+    ...(opts.now ? { now: opts.now } : {}),
+  });
+  app.use('/download/*', downloadLimiter.middleware);
+  app.route(
+    '/',
+    downloadRoutes({
+      resolver:
+        opts.releaseResolver ??
+        createReleaseResolver({
+          repo: env.downloadsRepo,
+          ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}),
+          ...(opts.now ? { now: opts.now } : {}),
+          fallback: {
+            ...(env.downloadFallbackAndroidUrl ? { android: env.downloadFallbackAndroidUrl } : {}),
+            ...(env.downloadFallbackExtensionUrl
+              ? { extension: env.downloadFallbackExtensionUrl }
+              : {}),
+          },
+        }),
+      store: downloads,
+      ...(opts.nowDate ? { now: opts.nowDate } : {}),
       log,
     }),
   );

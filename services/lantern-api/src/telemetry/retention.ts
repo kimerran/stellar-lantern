@@ -3,9 +3,12 @@
 // retried next tick; nothing depends on it succeeding right now.
 
 import type { TelemetryStore } from './store';
+import type { DownloadStore } from '../downloads/store';
 
 export interface RetentionOptions {
   store: TelemetryStore;
+  // The download log (#131) ages out on the same window, in the same sweep.
+  downloads?: DownloadStore | null;
   retentionDays: number;
   now?: () => Date;
   setTimer?: (fn: () => void, ms: number) => unknown;
@@ -19,14 +22,16 @@ export async function purgeOnce(opts: RetentionOptions): Promise<number> {
   const cutoff = new Date(now().getTime() - opts.retentionDays * DAY_MS);
   try {
     const n = await opts.store.purgeBefore(cutoff);
+    const d = opts.downloads ? await opts.downloads.purgeDownloadsBefore(cutoff) : 0;
     opts.log({
       route: 'retention',
       status: 200,
       code: 'ok',
       rows: n,
+      downloads: d,
       cutoff: cutoff.toISOString(),
     });
-    return n;
+    return n + d;
   } catch {
     opts.log({ route: 'retention', status: 503, code: 'store_error' });
     return 0;
