@@ -15,6 +15,11 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: true
 
+# `contents: write` is what creating the GitHub Release needs (#130); nothing
+# else here writes to the repo.
+permissions:
+  contents: write
+
 # Working-feature flag set for the release build. Set explicitly (not relying on
 # the source defaults) so what ships from main is reproducible and reviewable
 # here. Flip a flag ON once its feature is verified end-to-end.
@@ -103,7 +108,44 @@ jobs:
       - name: Build debug APK
         run: cd android && ./gradlew assembleDebug --no-daemon
 
-      # ── Publish both release artifacts ──
+      # ── Stage the release assets under human names (#130) ──
+      # The packager writes release/<name>-<version>.zip; the APK comes out of
+      # Gradle as app-debug.apk. stage-release.mjs copies both to release/assets/
+      # as lantern-<version>-testnet.apk + lantern-extension-<version>.zip,
+      # writes SHA256SUMS.txt and RELEASE_NOTES.md (version, commit, the
+      # VITE_FEATURE_* set above), and prints the tag/name for the step below.
+      - name: Stage release assets
+        id: stage
+        run: |
+          ZIP=$(ls release/*.zip | head -n 1)
+          node scripts/stage-release.mjs \
+            --apk android/app/build/outputs/apk/debug/app-debug.apk \
+            --zip "$ZIP" --out release/assets \
+            --sha "${{ github.sha }}" --run "${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          cat release/assets/SHA256SUMS.txt
+
+      # ── Publish: a GitHub Release with directly downloadable assets ──
+      # GitHub serves each asset under its own name with no re-zipping, so the
+      # APK downloads as an .apk and installs on tap, needs no login on the
+      # public mirror, and never expires. Tagged v<version>-testnet.<run> so
+      # repeated merges of one version don't collide. Pre-release: it is the
+      # alpha (debug-signed APK, telemetry identity on).
+      - name: Create GitHub Release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.stage.outputs.tag }}
+          name: ${{ steps.stage.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          body_path: release/assets/RELEASE_NOTES.md
+          prerelease: true
+          fail_on_unmatched_files: true
+          files: |
+            release/assets/lantern-*-testnet.apk
+            release/assets/lantern-extension-*.zip
+            release/assets/SHA256SUMS.txt
+
+      # ── Keep the run artifacts too (debugging a specific run; not distribution) ──
       - name: Upload extension zip
         uses: actions/upload-artifact@v4
         with:
