@@ -1,8 +1,20 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Networks } from '@stellar/stellar-sdk';
 import { scan, type RawSimulation, type ScanResult } from '@lantern/scanner';
-import { scanTx, toScanVerdict, resetWalletScanDeps } from '@core/scan/wallet';
+import {
+  scanTx,
+  toScanVerdict,
+  resetWalletScanDeps,
+  withoutRegistry,
+  REGISTRY_UNAVAILABLE_SENTENCE,
+} from '@core/scan/wallet';
+import { badgeStyle } from '../src/popup/components/ScanBadge';
 import manifestSrc from '../manifest.config.ts?raw';
+import sendSrc from '../src/popup/screens/Send.tsx?raw';
+import appsSrc from '../src/popup/screens/Apps.tsx?raw';
+import swapSrc from '../src/popup/screens/Swap.tsx?raw';
+import earnSrc from '../src/popup/screens/Earn.tsx?raw';
+import smartSrc from '../src/popup/screens/SmartAccount.tsx?raw';
 import releaseYml from '../.github/workflows/release.yml?raw';
 import androidYml from '../.github/workflows/android.yml?raw';
 import envExample from '../.env.example?raw';
@@ -95,6 +107,7 @@ describe('toScanVerdict — ScanResult → the shape the screens render', () => 
       checkedBy: 'Lantern',
       tier: 1,
       latencyMs: 413,
+      registry: 'checked',
       screening: [],
       net: [],
       approvals: [],
@@ -228,8 +241,8 @@ describe('scanTx on testnet runs the pipeline', () => {
   });
 });
 
-describe('PUBLIC keeps the legacy scan() path, byte-identical', () => {
-  it('returns exactly what scan() returns for a mainnet payment', async () => {
+describe('PUBLIC keeps the legacy scan() path, and never claims a registry check', () => {
+  it('returns the legacy verdict marked registry: unavailable, with the sentence saying so', async () => {
     const f = fixture('classic-payment');
     const input = {
       xdr: f.xdr,
@@ -243,7 +256,30 @@ describe('PUBLIC keeps the legacy scan() path, byte-identical', () => {
       },
     });
     const legacy = scan(input);
-    expect(JSON.stringify(viaAdapter)).toBe(JSON.stringify(legacy));
+    // Same risk, action and reasons as the legacy engine — the carve-out
+    // removes the registry CLAIM, not the review (D3 QA plan §10.1 / §10.3).
+    expect(viaAdapter).toEqual(withoutRegistry(legacy));
+    expect(viaAdapter.risk).toBe(legacy.risk);
+    expect(viaAdapter.action).toBe(legacy.action);
+    expect(viaAdapter.reasons).toEqual(legacy.reasons);
+    expect(viaAdapter.registry).toBe('unavailable');
+    expect(viaAdapter.explanation).toBe(`${legacy.explanation} ${REGISTRY_UNAVAILABLE_SENTENCE}`);
+    expect(viaAdapter.screening).toBeUndefined();
+  });
+
+  it('a low Mainnet verdict never renders "Checked by Lantern" (§10.1 hard blocker)', () => {
+    const mainnet = badgeStyle('low', 'unavailable');
+    expect(mainnet.label).toBe('Reviewed — registry not available on Mainnet');
+    expect(mainnet.label).not.toMatch(/checked/i);
+    // Testnet (registry consulted) keeps the badge; medium/high are about the
+    // verdict, not the registry, and are unchanged either way.
+    expect(badgeStyle('low', 'checked').label).toBe('Checked by Lantern');
+    expect(badgeStyle('low', undefined).label).toBe('Checked by Lantern');
+    expect(badgeStyle('high', 'unavailable').label).toBe('High risk — action needed');
+    // Every screen that renders the low badge passes the verdict's registry flag.
+    for (const [name, src] of Object.entries({ sendSrc, appsSrc, swapSrc, earnSrc, smartSrc })) {
+      expect(src, name).toMatch(/<ScanBadge risk="low"[^>]*registry=\{[a-zA-Z.]*verdict\.registry\}/);
+    }
   });
 
   it('forceScenario (demo builds) also goes through the legacy engine', async () => {

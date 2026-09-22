@@ -202,7 +202,7 @@ Clear the RPC override before §10.
 
 There is no registry on Mainnet yet. The wallet must not pretend there is.
 
-**Note on 10.1 vs #84.** 10.1 is stricter than #84's PUBLIC carve-out as written: #84 keeps the legacy `scan()` path on Mainnet, and today that path renders the *Checked by Lantern* badge on a low-risk Mainnet payment. #84 must either drop that badge on PUBLIC or label the review *registry not available on Mainnet* — otherwise 10.1 fails by design, and that is a finding against #84, not against this plan.
+**Note on 10.1 vs #84.** 10.1 was stricter than #84's PUBLIC carve-out as first written (Mainnet byte-identical to the legacy path, *Checked by Lantern* included). Resolved in #84's favour of this plan: on Mainnet the verdict is marked `registry: 'unavailable'`, the badge reads **Reviewed — registry not available on Mainnet**, and every review's sentence ends with *Registry screening is not available on Mainnet.* The risk verdict itself is unchanged (10.3).
 
 **Reaching a Mainnet review without real money.** Your Mainnet account is unfunded, so the Send form stops at *Amount exceeds your spendable balance* and no review renders. Use the co-sign paste box instead: **Settings → Guardians & recovery → *Helping someone recover? Co-sign their request*** and paste a **Mainnet-passphrase recovery XDR the dev supplies** (as in 3.7 / 9.3). If the dev prefers, they may instead fund the Mainnet account with a small **real** amount — that is a real-money step; do not do it on your own.
 
