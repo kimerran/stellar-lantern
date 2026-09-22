@@ -44,7 +44,13 @@ import {
   type ScanResult,
   type ScanVerdict,
 } from '@lantern/scanner';
-import { recheckDepsFor, toScanVerdict, usesLegacy, type WalletScanInput } from './wallet';
+import {
+  recheckDepsFor,
+  toScanVerdict,
+  usesLegacy,
+  withoutRegistry,
+  type WalletScanInput,
+} from './wallet';
 
 // ── The diff ─────────────────────────────────────────────────────────────────
 
@@ -318,13 +324,17 @@ export async function recheckTx(
   const done = () => Math.max(0, Math.round(now() - started));
 
   // The legacy engine (PUBLIC, demo forceScenario) is synchronous and reads
-  // nothing live: nothing can have drifted. Same verdict back, immediately.
+  // nothing live: nothing can have drifted. Same verdict back, immediately —
+  // marked exactly as scanTx() marks it, because the screens render THIS
+  // verdict after a re-check. Without the mark the badge would flip back to
+  // "Checked by Lantern" at the moment of signing (D3 QA plan §10.1).
   if (usesLegacy(input)) {
-    const verdict = scan({
+    const legacy = scan({
       xdr: input.xdr,
       networkPassphrase: input.networkPassphrase,
       context: input.context,
     });
+    const verdict = input.context.network === 'PUBLIC' ? withoutRegistry(legacy) : legacy;
     return { ok: true, verdict, drift: diffVerdicts(reviewed, verdict), latencyMs: done() };
   }
 
