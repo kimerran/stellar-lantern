@@ -1,0 +1,10 @@
+{
+  "name": "classic-account-merge",
+  "description": "accountMerge: the entire XLM balance leaves and the source account closes.",
+  "networkPassphrase": "Test SDF Network ; September 2015",
+  "source": "GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK",
+  "recordedAt": null,
+  "rpc": null,
+  "xdr": "AAAAAgAAAAAY0gqcnifD/QFRi3Um28AFmWZwoXTXZlkgmYh/UZB/SQAAAGQAAAAA/N5BswAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAACAAAAADqSmxj4pxSCr71UHsTLsX5lUd2rr6+e5JCHuppFEbSLAAAAAAAAAAA",
+  "simulation": null
+}

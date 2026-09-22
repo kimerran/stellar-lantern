@@ -1,0 +1,33 @@
+$ npm run scan -- --file classic-payment
+Lantern scanner · testnet · fixture classic-payment
+  Classic payment: 25 XLM to an ordinary funded account, text memo.
+  signer GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK · rpc https://soroban-testnet.stellar.org · registry CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F
+
+INGEST
+  ok · 1 op(s) · classic, no simulation needed
+
+EFFECTS
+  payment · op 0 · 25.0000000 XLM · → GDVE…ZA57
+    GAMN…SRNK −25.0000000 XLM
+    GDVE…ZA57 +25.0000000 XLM
+  net per address
+    GAMN…SRNK XLM: out 25.0000000 · in 0.0000000
+    GDVE…ZA57 XLM: out 0.0000000 · in 25.0000000
+  coverage full
+
+SCREEN
+  outcome clean · checked 1
+
+VERDICT
+  risk LOW · action ALLOW · effects shown, terms not judged
+  signals (4)
+    ingest · classic · simulation — no simulation needed
+    auth · flat · auth.calls — 0 entries, 0 calls, 0 nested, depth 0
+    effects · coverage_full · effects.coverage — payment
+    screen · clean · screen — 1 checked, 0 hits, 0 unknown
+
+SENTENCE
+  "You are sending 25.0000000 XLM to GDVE…ZA57."
+  source: explainer · explainer: Lantern API proxy https://lantern-api-production-3fad.up.railway.app/v1/explain
+
+scanned in 1941 ms · nothing was signed or submitted

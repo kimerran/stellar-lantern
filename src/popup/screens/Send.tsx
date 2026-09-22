@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { track } from '@core/telemetry';
 import { BASE_FEE } from '@stellar/stellar-sdk';
 import type { NetworkConfig } from '@shared/constants';
 import type { AssetBalance } from '@shared/types';
@@ -10,8 +11,10 @@ import { isValidPublicKey } from '@core/wallet/wallet';
 import { isNativePlatform } from '@shared/kv';
 import { MAX_MEMO_BYTES } from '@shared/constants';
 import { formatAmount, truncateAddress } from '@shared/format';
-import { scan } from '@core/scan/engine';
-import type { ScanVerdict } from '@core/scan/types';
+import { scanTx, type WalletScanInput } from '@core/scan/wallet';
+import type { ScanVerdict } from '@core/scan';
+import { useRecheck } from '../hooks/useRecheck';
+import { RecheckNotice } from '../components/RecheckNotice';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { Card } from '../components/Card';
@@ -19,6 +22,7 @@ import { Icon } from '../components/Icon';
 import { ScanBadge } from '../components/ScanBadge';
 import { RiskCallout } from '../components/RiskCallout';
 import { HoldToConfirm } from '../components/HoldToConfirm';
+import { ReportCounterparties, counterpartiesOf } from '../components/ReportAddress';
 
 interface Props {
   address: string;
@@ -56,8 +60,11 @@ export function Send({ address, network, onDone }: Props) {
 
   // ── Lantern pre-sign scan state ──
   const [verdict, setVerdict] = useState<ScanVerdict | null>(null);
+  const [scanInput, setScanInput] = useState<WalletScanInput | null>(null);
   const [scanning, setScanning] = useState(false);
   const [confirmText, setConfirmText] = useState('');
+  // Re-simulate immediately before submit (#121, SOW §3.9).
+  const recheck = useRecheck();
 
   // Reveal the verdict after a short, latency-shaped delay so the scan reads as
   // "checked just now" (approval UI shown immediately, low risk resolves fast).
@@ -73,6 +80,7 @@ export function Send({ address, network, onDone }: Props) {
     setVerdict(null);
     setConfirmText('');
     setError(null);
+    recheck.reset();
   }
 
   useEffect(() => {
@@ -172,16 +180,20 @@ export function Send({ address, network, onDone }: Props) {
 
       // Lantern pre-sign scan — runs between "initiate" and the Sign affordance.
       // Advisory only; it never signs or sends (spec §2).
-      const scanVerdict = scan({
+      const input: WalletScanInput = {
         xdr,
         networkPassphrase: network.passphrase,
+        rpcUrl: network.sorobanRpcUrl,
         context: {
           network: network.id,
           fromAddress: address,
           destinationFunded: destFunded,
           spendableXlm: selected.isNative ? spendable : undefined,
         },
-      });
+      };
+      const scanVerdict = await scanTx(input);
+      setScanInput(input);
+      recheck.reset();
 
       setReview({
         xdr,
@@ -191,6 +203,7 @@ export function Send({ address, network, onDone }: Props) {
         memo: memo.trim(),
         fee: formatAmount(String(Number(baseFee) / 1e7)),
       });
+      if (__FEATURE_TELEMETRY__) track.txScanned(scanVerdict);
       setVerdict(scanVerdict);
       setConfirmText('');
       setStep('review');
@@ -205,6 +218,17 @@ export function Send({ address, network, onDone }: Props) {
     if (!review) return;
     setSubmitting(true);
     setError(null);
+    // Re-check the exact XDR about to be signed (#121). An escalation aborts
+    // and needs a fresh confirm — the typed CONFIRM never survives it.
+    if (verdict && scanInput) {
+      const rc = await recheck.guard(verdict, scanInput);
+      setVerdict(rc.verdict);
+      if (!rc.proceed) {
+        setConfirmText('');
+        setSubmitting(false);
+        return;
+      }
+    }
     const res = await sendMessage({
       type: 'SIGN_AND_SUBMIT',
       xdr: review.xdr,
@@ -300,6 +324,23 @@ export function Send({ address, network, onDone }: Props) {
           )
         ) : null}
         </div>
+
+        <RecheckNotice state={recheck.state} />
+
+        {/* One-click report to the registry (#120): the destination, with what
+            the screener said about it. Falls back to the destination alone when
+            the legacy engine ran. Testnet only — renders nothing on PUBLIC. */}
+        {!scanning && verdict && (
+          <ReportCounterparties
+            reporter={address}
+            network={network}
+            subjects={
+              counterpartiesOf(verdict, address).length > 0
+                ? counterpartiesOf(verdict, address)
+                : [{ address: review.destination }]
+            }
+          />
+        )}
 
         <Card className="space-y-3">
           <ReviewRow label="To" value={truncateAddress(review.destination, 6, 6)} mono />

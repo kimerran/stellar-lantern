@@ -1,10 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { Account, Contract, nativeToScVal, Networks, Operation, TransactionBuilder } from '@stellar/stellar-sdk';
-import { scan, DEMO_FLAGGED_ADDRESSES, isReportedAddress, sampleVerdict } from '@core/scan/engine';
+import {
+  scan,
+  DEMO_FLAGGED_ADDRESSES,
+  isReportedAddress,
+  sampleVerdict,
+  analyzeMessage,
+  decodeTransaction,
+  explainTransaction,
+} from '@lantern/scanner';
 import { buildTransferXdr } from '@core/stellar/tx';
-import { analyzeMessage } from '@core/scan/paste';
-import { decodeTransaction } from '@core/scan/decode';
-import { explainTransaction } from '@core/scan/explainer';
 
 const SOURCE = 'GDRXE2BQUC3AZNPVFSCEZ76NJ3WWL25FYFK6RGZGIEKWE4SOOHSUJUJ6';
 // A normal (NOT deny-listed) destination.

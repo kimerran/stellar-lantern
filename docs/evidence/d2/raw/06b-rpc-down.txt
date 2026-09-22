@@ -1,0 +1,35 @@
+$ npm run scan -- --file sep41-approve --rpc http://127.0.0.1:9
+Lantern scanner · testnet · fixture sep41-approve
+  SEP-41 `approve(from, spender, amount, expiration_ledger)` on the USDC SAC — the "unlimited approval" shape.
+  signer GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK · rpc http://127.0.0.1:9 · registry CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F
+
+INGEST
+  FAILED · rpc_transport · Soroban RPC unreachable: fetch failed
+
+EFFECTS
+  contract_call · op 0 · approve() · → CAQC…RCJU
+  unverified contract — semantics unknown: CAQC…RCJU.approve(GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK, GBVG3DQJNAYAPTB4FKPLL65BUNF76K2TKPTK72LDIAJKRATGRY5BFJBP, 170141183460469231731687303715884105727, 5666220) · depth 0
+  coverage partial
+
+SCREEN
+  outcome unknown · checked 1
+  UNKNOWN CAQC…RCJU · rpc_error
+
+VERDICT
+  risk HIGH · action BLOCK_CONFIRM · effects shown, terms not judged
+  [high] rpc_unreachable — Couldn’t reach the network: Soroban RPC couldn’t be reached, so this contract call is unverified — this is a connection problem, not a verdict on the transaction — do not sign unless you’re certain.
+  [medium] screen_unknown — Couldn’t check the recipient: The reported-address registry couldn’t be reached, so this recipient is unverified.
+  [medium] unverified_contract — Unverified contract — semantics unknown: This calls “approve” on contract CAQC…RCJU. Lantern doesn’t know what this function does; simulation shows no balance changes, but that is not a guarantee.
+  signals (6)
+    ingest · fail_closed · simulation — rpc_transport: Soroban RPC unreachable: fetch failed
+    auth · flat · auth.calls — 0 entries, 0 calls, 0 nested, depth 0
+    effects · coverage_partial · effects.coverage — contract_call
+    screen · unknown · screen — 1 checked, 0 hits, 1 unknown
+    screen · screen_unknown · screen.unknown[0] — CAQCFVLOBK5GIULPNZRGATJJMIZL5BSP7X5YJVMGCPTUEPFM4AVSRCJU: rpc_error
+    effects · unverified_contract · unverified — approve@CAQC…RCJU d0
+
+SENTENCE
+  "This transaction calls "approve" on an unverified contract at CAQC…RCJU, but we couldn't reach the network to check the recipient or determine what this contract actually does. The transaction cannot proceed."
+  source: explainer · explainer: Lantern API proxy https://lantern-api-production-3fad.up.railway.app/v1/explain
+
+scanned in 2334 ms · nothing was signed or submitted

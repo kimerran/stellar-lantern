@@ -15,6 +15,11 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: true
 
+# `contents: write` is what creating the GitHub Release needs (#130); nothing
+# else here writes to the repo.
+permissions:
+  contents: write
+
 # Working-feature flag set for the release build. Set explicitly (not relying on
 # the source defaults) so what ships from main is reproducible and reviewable
 # here. Flip a flag ON once its feature is verified end-to-end.
@@ -28,6 +33,15 @@ env:
   VITE_FEATURE_GEOVELOCITY: 'false'    # #70 — no code (closed not-planned)
   VITE_FEATURE_DEMO_AFFORDANCES: 'false' # demo-only bits — never in a release build
   VITE_FEATURE_PASSKEY: 'false'        # #53 — passkey smart accounts; experimental, testnet-only, off in release
+  VITE_FEATURE_SCANNER_AI: 'true'      # #59 / #84 — the hosted explainer's sentence, served by the Lantern API; no key ships (the key stays server-side)
+  VITE_FEATURE_TELEMETRY: 'true'       # #81 — opt-in usage analytics (#88); consent-gated in-app, default OFF for the user
+  VITE_FEATURE_TELEMETRY_IDENTITY: 'true' # #100 — ALPHA ONLY: attaches the wallet address to telemetry. Set to 'false' before any store submission.
+  # Telemetry ingest (a URL, not a secret): the Lantern API on Railway. Its
+  # origin is also in manifest host_permissions. Change both together.
+  VITE_TELEMETRY_INGEST_URL: 'https://lantern-api-production-3fad.up.railway.app/v1/telemetry'
+  # The Lantern API base (#84): the scanner's explainer proxy at /v1/explain. Same
+  # origin as the ingest URL, so the manifest already grants it.
+  VITE_LANTERN_API_URL: 'https://lantern-api-production-3fad.up.railway.app'
   # Soroswap aggregator config (values/secrets, not feature flags). The API key is
   # a secret; the referral wallet + fee are optional — revenue share is only
   # charged when BOTH are set. All unset → the aggregator falls back to native SDEX.
@@ -70,6 +84,11 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # Same pin as android.yml (#74): the action's default package list
+          # requests the legacy `tools` package the SDK repository no longer
+          # serves, and sdkmanager exits 1 before Gradle runs.
+          packages: 'platform-tools platforms;android-36 build-tools;35.0.0'
 
       - name: Cache Gradle
         uses: actions/cache@v4
@@ -89,7 +108,44 @@ jobs:
       - name: Build debug APK
         run: cd android && ./gradlew assembleDebug --no-daemon
 
-      # ── Publish both release artifacts ──
+      # ── Stage the release assets under human names (#130) ──
+      # The packager writes release/<name>-<version>.zip; the APK comes out of
+      # Gradle as app-debug.apk. stage-release.mjs copies both to release/assets/
+      # as lantern-<version>-testnet.apk + lantern-extension-<version>.zip,
+      # writes SHA256SUMS.txt and RELEASE_NOTES.md (version, commit, the
+      # VITE_FEATURE_* set above), and prints the tag/name for the step below.
+      - name: Stage release assets
+        id: stage
+        run: |
+          ZIP=$(ls release/*.zip | head -n 1)
+          node scripts/stage-release.mjs \
+            --apk android/app/build/outputs/apk/debug/app-debug.apk \
+            --zip "$ZIP" --out release/assets \
+            --sha "${{ github.sha }}" --run "${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          cat release/assets/SHA256SUMS.txt
+
+      # ── Publish: a GitHub Release with directly downloadable assets ──
+      # GitHub serves each asset under its own name with no re-zipping, so the
+      # APK downloads as an .apk and installs on tap, needs no login on the
+      # public mirror, and never expires. Tagged v<version>-testnet.<run> so
+      # repeated merges of one version don't collide. Pre-release: it is the
+      # alpha (debug-signed APK, telemetry identity on).
+      - name: Create GitHub Release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.stage.outputs.tag }}
+          name: ${{ steps.stage.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          body_path: release/assets/RELEASE_NOTES.md
+          prerelease: true
+          fail_on_unmatched_files: true
+          files: |
+            release/assets/lantern-*-testnet.apk
+            release/assets/lantern-extension-*.zip
+            release/assets/SHA256SUMS.txt
+
+      # ── Keep the run artifacts too (debugging a specific run; not distribution) ──
       - name: Upload extension zip
         uses: actions/upload-artifact@v4
         with:
@@ -103,3 +159,31 @@ jobs:
           name: app-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+  # The Lantern API deploys with the clients (#104). Before this, the server was
+  # deployed by hand and lagged the clients (#100: the old validator rejected the
+  # new envelopes). Same staged `railway up` as scripts/deploy-lantern-api.sh;
+  # the script waits on /healthz so a broken deploy fails the run. Needs the
+  # RAILWAY_TOKEN repository secret (a Railway project token for the `lantern`
+  # project); without it the job is skipped, not failed.
+  deploy-api:
+    needs: release-build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      - name: Deploy lantern-api
+        if: env.RAILWAY_TOKEN != ''
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: bash scripts/deploy-lantern-api.sh
+      - name: Skipped (no RAILWAY_TOKEN)
+        if: env.RAILWAY_TOKEN == ''
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: echo "RAILWAY_TOKEN secret not set — API not deployed from CI; run scripts/deploy-lantern-api.sh by hand."

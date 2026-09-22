@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { track } from '@core/telemetry';
 import {
   MINI_APPS,
   miniAppSrc,
@@ -15,7 +16,7 @@ import {
 } from '@core/miniapps/favorites';
 import { onSettingsChanged } from '@shared/storage';
 import { BASE_FEE } from '@stellar/stellar-sdk';
-import { NETWORKS, type NetworkId } from '@shared/constants';
+import type { NetworkConfig, NetworkId } from '@shared/constants';
 import { formatAmount, truncateAddress } from '@shared/format';
 import { sendMessage } from '@shared/messages';
 import { getServer, destinationFunded } from '@core/stellar/client';
@@ -26,11 +27,14 @@ import {
   intentAssetCode,
   type PaymentIntent,
 } from '@core/miniapps/bridge';
-import { scan } from '@core/scan/engine';
-import type { ScanVerdict } from '@core/scan/types';
+import { scanTx, type WalletScanInput } from '@core/scan/wallet';
+import { useRecheck } from '../hooks/useRecheck';
+import { RecheckNotice } from '../components/RecheckNotice';
+import type { ScanVerdict } from '@core/scan';
 import { Icon } from '../components/Icon';
 import { Card } from '../components/Card';
 import { RiskCallout } from '../components/RiskCallout';
+import { ReportCounterparties, counterpartiesOf } from '../components/ReportAddress';
 import { ScanBadge } from '../components/ScanBadge';
 import { HoldToConfirm } from '../components/HoldToConfirm';
 import { isNativePlatform } from '@shared/kv';
@@ -48,7 +52,17 @@ type Open =
   | { kind: 'url'; src: string; title: string; origin: string };
 
 
-export function Apps({ address, network }: { address: string; network: NetworkId }) {
+// `config` is the resolved NetworkConfig (Settings Horizon / RPC overrides
+// applied — #84); `network` stays the id the bridge protocol shares with apps.
+export function Apps({
+  address,
+  network,
+  config,
+}: {
+  address: string;
+  network: NetworkId;
+  config: NetworkConfig;
+}) {
   const [open, setOpen] = useState<Open | null>(null);
   const [urlText, setUrlText] = useState('');
   const [urlError, setUrlError] = useState(false);
@@ -66,6 +80,7 @@ export function Apps({ address, network }: { address: string; network: NetworkId
   }
 
   function launchApp(app: MiniApp) {
+    if (__FEATURE_TELEMETRY__) track.miniAppOpened(app.id, isRemoteMiniApp(app));
     // Remote apps load in the opaque-origin sandbox (like the URL bar), reaching
     // the wallet only through the scan-gated postMessage bridge. Bundled apps are
     // first-party pages. Either way, "favoriting" changes nothing about this.
@@ -93,7 +108,9 @@ export function Apps({ address, network }: { address: string; network: NetworkId
   }
 
   if (open) {
-    return <Browser open={open} address={address} network={network} onClose={() => setOpen(null)} />;
+    return (
+      <Browser open={open} address={address} network={network} config={config} onClose={() => setOpen(null)} />
+    );
   }
 
   const favoriteApps = orderedFavoriteApps(favorites);
@@ -256,11 +273,13 @@ function Browser({
   open,
   address,
   network,
+  config,
   onClose,
 }: {
   open: Open;
   address: string;
   network: NetworkId;
+  config: NetworkConfig;
   onClose: () => void;
 }) {
   const [reloadKey, setReloadKey] = useState(0);
@@ -283,7 +302,16 @@ function Browser({
   // user's review. The dApp sends an *intent* (destination/amount/memo) — Lantern
   // builds, scans, signs and submits, so the secret never leaves and every send
   // goes through the same security review as the wallet's own Send flow.
-  const [signReq, setSignReq] = useState<{ intent: PaymentIntent; xdr: string; verdict: ScanVerdict; fee: string } | null>(null);
+  const [signReq, setSignReq] = useState<{
+    intent: PaymentIntent;
+    xdr: string;
+    verdict: ScanVerdict;
+    fee: string;
+    scanInput: WalletScanInput;
+  } | null>(null);
+  // Re-simulate immediately before submit (#121, SOW §3.9). A dApp-initiated
+  // payment is the case where the wait between review and confirm is longest.
+  const recheck = useRecheck();
   const [submitting, setSubmitting] = useState(false);
   const [signErr, setSignErr] = useState<string | null>(null);
   const [confirmText, setConfirmText] = useState('');
@@ -311,7 +339,7 @@ function Browser({
     const intent = validated.value;
     postToApp({ type: 'lantern:signing' }); // ack so the dApp waits for review
     try {
-      const cfg = NETWORKS[network];
+      const cfg = config;
       const server = getServer(cfg);
       const destFunded = await destinationFunded(cfg, intent.destination);
       // A non-native asset can't fund a brand-new account (mirrors Send.tsx).
@@ -341,14 +369,18 @@ function Browser({
         amount: intent.amount,
         memo: intent.memo,
       });
-      const verdict = scan({
+      const scanInput: WalletScanInput = {
         xdr,
         networkPassphrase: cfg.passphrase,
+        rpcUrl: cfg.sorobanRpcUrl,
         context: { network, fromAddress: address, destinationFunded: destFunded, origin: open.title },
-      });
+      };
+      const verdict = await scanTx(scanInput);
       setConfirmText('');
       setSignErr(null);
-      setSignReq({ intent, xdr, verdict, fee: formatAmount(String(Number(baseFee) / 1e7)) });
+      recheck.reset();
+      if (__FEATURE_TELEMETRY__) track.txScanned(verdict);
+      setSignReq({ intent, xdr, verdict, fee: formatAmount(String(Number(baseFee) / 1e7)), scanInput });
     } catch {
       postToApp({ type: 'lantern:txError', error: 'Could not prepare the transaction.' });
     }
@@ -395,7 +427,7 @@ function Browser({
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open.src, address, network]);
+  }, [open.src, address, network, config]);
 
   function approveConnect() {
     granted.current = true;
@@ -412,7 +444,21 @@ function Browser({
     submittingRef.current = true;
     setSubmitting(true);
     setSignErr(null);
-    const cfg = NETWORKS[network];
+    // Re-check the exact XDR about to be signed (#121). An escalation aborts
+    // and needs a fresh confirm — the typed CONFIRM never survives it.
+    const rc = await recheck.guard(signReq.verdict, signReq.scanInput);
+    // Functional update, keyed to the xdr: a second intent posted during the
+    // re-check must not be overwritten by the old request with a fresh verdict.
+    setSignReq((cur) =>
+      cur && cur.xdr === signReq.xdr ? { ...cur, verdict: rc.verdict } : cur,
+    );
+    if (!rc.proceed) {
+      setConfirmText('');
+      submittingRef.current = false;
+      setSubmitting(false);
+      return;
+    }
+    const cfg = config;
     const res = await sendMessage({
       type: 'SIGN_AND_SUBMIT',
       xdr: signReq.xdr,
@@ -432,6 +478,7 @@ function Browser({
     postToApp({ type: 'lantern:txRejected' });
     setSignReq(null);
     setSignErr(null);
+    recheck.reset();
   }
 
   // Make the sign & submit sheet a real modal dialog (#127): trap Tab focus,
@@ -721,6 +768,20 @@ function Browser({
                 whatToDo={isHigh ? 'A dApp requested this. If you didn’t expect it, reject — signing can’t be undone.' : undefined}
               />
             )}
+
+            <RecheckNotice state={recheck.state} />
+
+            {/* One-click report to the registry (#120): the dApp's destination
+                and any other screened counterparty. Testnet only. */}
+            <ReportCounterparties
+              reporter={address}
+              network={config}
+              subjects={
+                counterpartiesOf(signReq.verdict, address).length > 0
+                  ? counterpartiesOf(signReq.verdict, address)
+                  : [{ address: signReq.intent.destination }]
+              }
+            />
 
             <div className="flex items-center justify-between text-label-sm text-on-surface-variant">
               <span>Network fee</span>

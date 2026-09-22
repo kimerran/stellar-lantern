@@ -1,8 +1,8 @@
 import { Account, BASE_FEE, Operation, TransactionBuilder, WebAuth } from '@stellar/stellar-sdk';
 import { isValidPublicKey } from '@core/wallet/wallet';
 import type { AccountSigner, AccountThresholds } from '@shared/types';
-import type { DecodedOp, DecodedTx } from '@core/scan/types';
-import { decodeTransaction } from '@core/scan/decode';
+import { decodeTransaction } from '@core/scan';
+import type { DecodedOp, DecodedTx } from '@core/scan';
 
 // Guardian social recovery — builds the on-chain weighted-multisig transactions
 // (#23, Milestone 1): the guardian *setup* and the *recovery* that installs a

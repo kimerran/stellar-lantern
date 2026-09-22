@@ -5,6 +5,7 @@
 // only in this popup session's memory (testnet-only; it controls nothing —
 // the smart account answers only to the passkey).
 import { useCallback, useEffect, useState } from 'react';
+import { track } from '@core/telemetry';
 import { Keypair, TransactionBuilder } from '@stellar/stellar-sdk';
 import { NETWORKS } from '@shared/constants';
 import type { PasskeyAccountRecord } from '@shared/types';
@@ -15,8 +16,10 @@ import { finalizePasskeyTransfer, preparePasskeyTransfer } from '@core/passkey/t
 import { sacContractBalance } from '@core/stellar/sac';
 import { getServer, fundWithFriendbot } from '@core/stellar/client';
 import { isValidPublicKey, isValidContractId } from '@core/wallet/wallet';
-import { scan } from '@core/scan/engine';
-import type { ScanVerdict } from '@core/scan/types';
+import { scanTx, type WalletScanInput } from '@core/scan/wallet';
+import { useRecheck } from '../hooks/useRecheck';
+import { RecheckNotice } from '../components/RecheckNotice';
+import type { ScanVerdict } from '@core/scan';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
@@ -77,6 +80,9 @@ export function SmartAccount({ account, onForget }: Props) {
   const [review, setReview] = useState<{ xdr: string; latestLedger: number; amount: string; to: string } | null>(null);
   const [verdict, setVerdict] = useState<ScanVerdict | null>(null);
   const [confirmText, setConfirmText] = useState('');
+  const [scanInput, setScanInput] = useState<WalletScanInput | null>(null);
+  // Re-simulate immediately before submit (#121, SOW §3.9).
+  const recheck = useRecheck();
   const [txHash, setTxHash] = useState<string | null>(null);
   const showToast = useToast();
 
@@ -139,13 +145,17 @@ export function SmartAccount({ account, onForget }: Props) {
         return;
       }
       // The same pre-sign scan gate as the classic Send screen (no bypass lane).
-      setVerdict(
-        scan({
-          xdr: prepared.xdr,
-          networkPassphrase: NETWORK.passphrase,
-          context: { network: NETWORK.id, fromAddress: account.contractId },
-        }),
-      );
+      const input: WalletScanInput = {
+        xdr: prepared.xdr,
+        networkPassphrase: NETWORK.passphrase,
+        rpcUrl: NETWORK.sorobanRpcUrl,
+        context: { network: NETWORK.id, fromAddress: account.contractId },
+      };
+      const scanVerdict = await scanTx(input);
+      setScanInput(input);
+      recheck.reset();
+      if (__FEATURE_TELEMETRY__) track.txScanned(scanVerdict);
+      setVerdict(scanVerdict);
       setReview({ xdr: prepared.xdr, latestLedger: prepared.latestLedger, amount, to: dest });
       setConfirmText('');
       setStep('review');
@@ -160,6 +170,17 @@ export function SmartAccount({ account, onForget }: Props) {
     if (!review) return;
     setBusy(true);
     setError(null);
+    // Re-check the exact XDR about to be signed (#121). An escalation aborts
+    // and needs a fresh confirm — the typed CONFIRM never survives it.
+    if (verdict && scanInput) {
+      const rc = await recheck.guard(verdict, scanInput);
+      setVerdict(rc.verdict);
+      if (!rc.proceed) {
+        setConfirmText('');
+        setBusy(false);
+        return;
+      }
+    }
     try {
       // The passkey prompt IS the signature: it signs the auth-entry payload.
       const finalized = await finalizePasskeyTransfer({
@@ -235,7 +256,10 @@ export function SmartAccount({ account, onForget }: Props) {
       <Shell>
         <div className="space-y-4 pt-2">
           <button
-            onClick={() => setStep('home')}
+            onClick={() => {
+              setStep('home');
+              recheck.reset();
+            }}
             className="flex items-center gap-1 text-label-md text-on-surface-variant hover:text-on-surface"
           >
             <Icon name="arrow_back" size={18} /> Edit
@@ -266,6 +290,8 @@ export function SmartAccount({ account, onForget }: Props) {
               )
             ) : null}
           </div>
+
+          <RecheckNotice state={recheck.state} />
 
           <Card className="space-y-3">
             <ReviewRow label="From" value={truncateAddress(account.contractId, 6, 6)} mono />

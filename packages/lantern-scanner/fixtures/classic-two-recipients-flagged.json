@@ -1,0 +1,10 @@
+{
+  "name": "classic-two-recipients-flagged",
+  "description": "Two recipients in one transaction: 25 XLM to DEST (clean) and 5 XLM to the demo flagged address. Screening must check every counterparty, not just the first (QA plan 6.4).",
+  "networkPassphrase": "Test SDF Network ; September 2015",
+  "source": "GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK",
+  "recordedAt": null,
+  "rpc": null,
+  "xdr": "AAAAAgAAAAAY0gqcnifD/QFRi3Um28AFmWZwoXTXZlkgmYh/UZB/SQAAAMgAAAAA/N5BswAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAQAAAADqSmxj4pxSCr71UHsTLsX5lUd2rr6+e5JCHuppFEbSLAAAAAAAAAAADuaygAAAAAAAAAABAAAAAD8MNL+TrQ2ZcdBMzJD3BVEcg4qtlzSkovsNegP8f+iaAAAAAAAAAAAC+vCAAAAAAAAAAAA=",
+  "simulation": null
+}

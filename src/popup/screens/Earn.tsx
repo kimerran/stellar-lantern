@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { track } from '@core/telemetry';
 import type { NetworkConfig } from '@shared/constants';
 import { sendMessage } from '@shared/messages';
 import { getServer } from '@core/stellar/client';
-import { scan } from '@core/scan/engine';
-import type { ScanVerdict } from '@core/scan/types';
+import { scanTx, type WalletScanInput } from '@core/scan/wallet';
+import type { ScanVerdict } from '@core/scan';
+import { useRecheck } from '../hooks/useRecheck';
+import { RecheckNotice } from '../components/RecheckNotice';
 import { isNativePlatform } from '@shared/kv';
 import { formatAmount } from '@shared/format';
 import {
@@ -26,6 +29,7 @@ import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { ScanBadge } from '../components/ScanBadge';
 import { RiskCallout } from '../components/RiskCallout';
+import { ReportCounterparties, counterpartiesOf } from '../components/ReportAddress';
 import { HoldToConfirm } from '../components/HoldToConfirm';
 
 interface Props {
@@ -68,6 +72,9 @@ export function Earn({ address, network, onBack, embedded }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [confirmText, setConfirmText] = useState('');
+  const [scanInput, setScanInput] = useState<WalletScanInput | null>(null);
+  // Re-simulate immediately before submit (#121, SOW §3.9).
+  const recheck = useRecheck();
   // True when the withdraw amount was prefilled via "Withdraw all" — submit sends the
   // full-balance sentinel (leaves no dust) instead of the displayed underlying, which
   // keeps accruing between quote and submit. Cleared the moment the user edits.
@@ -139,6 +146,7 @@ export function Earn({ address, network, onBack, embedded }: Props) {
     setReview(null);
     setConfirmText('');
     setError(null);
+    recheck.reset();
   }
 
   // "Done" / close. In overlay mode this closes the screen; embedded as a tab
@@ -206,11 +214,16 @@ export function Earn({ address, network, onBack, embedded }: Props) {
       }
 
       // Lantern pre-sign scan — advisory, never signs or sends (spec §2).
-      const verdict = scan({
+      const input: WalletScanInput = {
         xdr: prepared.xdr,
         networkPassphrase: network.passphrase,
+        rpcUrl: network.sorobanRpcUrl,
         context: { network: network.id, fromAddress: address },
-      });
+      };
+      const verdict = await scanTx(input);
+      setScanInput(input);
+      recheck.reset();
+      if (__FEATURE_TELEMETRY__) track.txScanned(verdict);
       setReview({ xdr: prepared.xdr, verdict });
       setConfirmText('');
       setStep('review');
@@ -225,6 +238,17 @@ export function Earn({ address, network, onBack, embedded }: Props) {
     if (!review) return;
     setSubmitting(true);
     setError(null);
+    // Re-check the exact XDR about to be signed (#121). An escalation aborts
+    // and needs a fresh confirm — the typed CONFIRM never survives it.
+    if (scanInput) {
+      const rc = await recheck.guard(review.verdict, scanInput);
+      setReview({ ...review, verdict: rc.verdict });
+      if (!rc.proceed) {
+        setConfirmText('');
+        setSubmitting(false);
+        return;
+      }
+    }
     const res = await sendMessage({
       type: 'SIGN_AND_SUBMIT',
       xdr: review.xdr,
@@ -233,6 +257,7 @@ export function Earn({ address, network, onBack, embedded }: Props) {
     });
     setSubmitting(false);
     if (res.ok) {
+      if (__FEATURE_TELEMETRY__ && sel) track.earnAction(sel.action);
       setTxHash(res.data.hash);
       setStep('success');
     } else if (res.code === 'LOCKED') {
@@ -319,6 +344,11 @@ export function Earn({ address, network, onBack, embedded }: Props) {
               />
             )}
           </div>
+
+          {/* One-click report to the registry (#120), one row per screened
+              counterparty. Testnet only — renders nothing on PUBLIC. */}
+          <RecheckNotice state={recheck.state} />
+          <ReportCounterparties reporter={address} network={network} subjects={counterpartiesOf(verdict, address)} />
 
           <Card className="space-y-3">
             <Row label="Action" value={`${actionVerb(sel.action)} to earn yield`} />

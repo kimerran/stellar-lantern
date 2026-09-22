@@ -1,0 +1,28 @@
+# Lantern — Instawards Phase 1
+
+> Evidence site for Lantern's Stellar Development Foundation Instawards sprint: weekly reports, deliverable traceability, and an index of every on-chain and off-chain artifact.
+
+- [Lantern — Instawards Phase 1](https://lantern.artisam.xyz/docs/index.md)
+- [Statement of Work](https://lantern.artisam.xyz/docs/sow.md)
+
+## Weekly reports
+
+- [Week 1 — 7–13 Sep](https://lantern.artisam.xyz/docs/weekly/week-1.md)
+- [Week 2 — 14–20 Sep](https://lantern.artisam.xyz/docs/weekly/week-2.md)
+- [Week 3 — 21–27 Sep](https://lantern.artisam.xyz/docs/weekly/week-3.md)
+- [Week 4 — 28 Sep – 4 Oct](https://lantern.artisam.xyz/docs/weekly/week-4.md)
+
+## Deliverables
+
+- [D1 — On-chain blacklist registry](https://lantern.artisam.xyz/docs/deliverables/d1.md)
+- [D2 — Transaction security scanner](https://lantern.artisam.xyz/docs/deliverables/d2.md)
+- [D3 — Scanner in the wallet](https://lantern.artisam.xyz/docs/deliverables/d3.md)
+- [D4 — Public demo](https://lantern.artisam.xyz/docs/deliverables/d4.md)
+
+## Reference
+
+- [Scanner package](https://lantern.artisam.xyz/docs/reference/scanner.md)
+- [Registry contract](https://lantern.artisam.xyz/docs/reference/registry.md)
+- [Metrics](https://lantern.artisam.xyz/docs/reference/metrics.md)
+- [Evidence index](https://lantern.artisam.xyz/docs/reference/evidence.md)
+- [Full changelog](https://lantern.artisam.xyz/docs/reference/changelog.md)

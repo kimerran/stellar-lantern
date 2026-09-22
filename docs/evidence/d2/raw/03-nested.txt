@@ -1,0 +1,42 @@
+$ npm run scan -- --file nested-subinvocation
+Lantern scanner · testnet · fixture nested-subinvocation
+  Blend `submit` supply of 1 XLM on the Lantern Earn pool: the pool calls the XLM SAC `transfer` as a nested sub-invocation, so the auth tree has depth > 1.
+  signer GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK · rpc https://soroban-testnet.stellar.org · registry CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F
+
+INGEST
+  ok · 1 op(s) · simulated via RPC
+  1 authorization entry
+
+EFFECTS
+  contract_call · op 0 · submit() · → CC4K…HBOH
+    GAMN…SRNK −1.0000000 XLM · depth 1
+    CC4K…HBOH +1.0000000 XLM · depth 1
+  net per address
+    GAMN…SRNK XLM: out 1.0000000 · in 0.0000000
+    CC4K…HBOH XLM: out 0.0000000 · in 1.0000000
+  unverified contract — semantics unknown: CC4K…HBOH.submit(GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK, GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK, GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK, vec) · depth 0
+  balance changes the simulation observed
+    GAMN…SRNK −1.0000000 XLM
+    CC4K…HBOH +1.0000000 XLM
+  coverage partial
+
+SCREEN
+  outcome clean · checked 2
+
+VERDICT
+  risk MEDIUM · action WARN · effects shown, terms not judged
+  [medium] unverified_contract — Unverified contract — semantics unknown: This calls “submit” on contract CC4K…HBOH. Lantern doesn’t know what this function does; simulation shows 2 balance changes — review them before signing.
+  signals (7)
+    ingest · simulated · simulation — 1 auth entries
+    auth · nested_invocations · auth.calls — 1 entries, 2 calls, 1 nested, depth 1
+    effects · coverage_partial · effects.coverage — contract_call
+    screen · clean · screen — 2 checked, 0 hits, 0 unknown
+    effects · nested_outflow · deltas[0] — 1.0000000 XLM leaves via a depth-1 call
+    effects · unverified_contract · unverified — submit@CC4K…HBOH d0
+    effects · observed_balance_changes · observed — out 1.0000000 XLM GAMN…SRNK, in 1.0000000 XLM CC4K…HBOH
+
+SENTENCE
+  "This transaction sends 1.0000000 XLM to CC4K…HBOH and calls a "submit" function on an unverified contract at that address, but the contract's actual behavior cannot be determined from available information."
+  source: explainer · explainer: Lantern API proxy https://lantern-api-production-3fad.up.railway.app/v1/explain
+
+scanned in 3059 ms · nothing was signed or submitted

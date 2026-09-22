@@ -42,3 +42,16 @@ jobs:
 
       - name: Test
         run: npm test
+
+      # The Instawards evidence site (homepage/docs) is generated from
+      # docs/site by scripts/build-docs-site.mjs and committed. Rebuild and
+      # fail on any difference, a dangling internal link, or an internal
+      # issue number on a public page.
+      - name: Evidence site is up to date
+        run: npm run docs:build -- --check
+
+      # Flag dead-code-elimination proof (#81 / #88): builds with the demo
+      # and telemetry flags on and off and asserts the telemetry module and
+      # the ingest origin are ABSENT from a flag-off bundle.
+      - name: Prove flag-off bundles carry no telemetry
+        run: npm run verify:flags

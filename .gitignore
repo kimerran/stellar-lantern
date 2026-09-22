@@ -1,6 +1,8 @@
 node_modules
 dist
 dist-mobile
+# Generated activity reports contain real user activity — never committed (#81).
+dist-report
 *.local
 .DS_Store
 .vite
@@ -10,6 +12,7 @@ SPEC.md
 BRAND.md
 *-spec.md
 *-plan.md
+!docs/qa/*-plan.md
 
 # Packaged extension artifacts
 release
@@ -27,3 +30,6 @@ instawards/
 
 # Soroban contract build output
 contracts/blacklist-registry/target/
+
+# Tester label maps for `report:activity --map` hold install IDs — never committed (#98).
+reports/

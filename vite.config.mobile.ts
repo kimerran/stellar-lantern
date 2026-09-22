@@ -20,6 +20,9 @@ export default defineConfig(({ mode }) => ({
       '@core': fileURLToPath(new URL('./src/core', import.meta.url)),
       '@shared': fileURLToPath(new URL('./src/shared', import.meta.url)),
       '@popup': fileURLToPath(new URL('./src/popup', import.meta.url)),
+      // The scanner package (#50). Same alias in every config so the extension,
+      // mobile and test builds resolve it identically (no drift).
+      '@lantern/scanner': fileURLToPath(new URL('./packages/lantern-scanner/src/index.ts', import.meta.url)),
     },
   },
   build: {

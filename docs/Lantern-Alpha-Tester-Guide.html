@@ -1,0 +1,379 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Lantern — Alpha Tester Guide</title><style>
+@page { size: A4; margin: 18mm 16mm 20mm 16mm; }
+body { font-family: "DejaVu Sans", "Segoe UI", system-ui, sans-serif; font-size: 10.5pt; line-height: 1.5; color: #1a1a1a; margin: 0; }
+.hero { background: #0f1729; color: #fff; padding: 22px 28px 18px; border-bottom: 4px solid #f5b400; margin-bottom: 22px; }
+.hero .tag { display: inline-block; background: #f5b400; color: #0f1729; font-weight: 700; letter-spacing: .12em; font-size: 8.5pt; padding: 3px 9px; border-radius: 3px; }
+.hero h1 { margin: 14px 0 6px; font-size: 24pt; line-height: 1.15; }
+.hero .sub { color: #c9d1e0; margin: 0 0 14px; font-size: 11pt; }
+.hero .meta { color: #c9d1e0; font-size: 9pt; border-top: 1px solid #2a3550; padding-top: 10px; }
+.hero .meta strong { color: #fff; }
+h2 { font-size: 15.5pt; margin: 26px 0 8px; padding-bottom: 5px; border-bottom: 2px solid #f5b400; page-break-after: avoid; }
+h3 { font-size: 11.5pt; margin: 16px 0 6px; page-break-after: avoid; }
+p, li { margin: 4px 0; }
+ol, ul { padding-left: 22px; }
+code { font-family: "DejaVu Sans Mono", Menlo, monospace; font-size: 9.3pt; background: #f2f3f6; padding: 1px 4px; border-radius: 3px; overflow-wrap: anywhere; }
+pre { background: #f6f7fa; border-left: 3px solid #b9c2d6; padding: 10px 12px; font-size: 9.3pt; white-space: pre-wrap; margin: 6px 0 12px; page-break-inside: avoid; }
+pre code { background: none; padding: 0; }
+table { border-collapse: collapse; width: 100%; margin: 8px 0 14px; font-size: 9.5pt; page-break-inside: avoid; }
+th, td { border: 1px solid #d8dde8; padding: 5px 8px; text-align: left; vertical-align: top; }
+th { background: #f4f6fa; }
+blockquote { margin: 12px 0; padding: 10px 14px; border-radius: 6px; page-break-inside: avoid; }
+blockquote p { margin: 3px 0; }
+blockquote.warn { background: #fff4f2; border: 1.5px solid #e2544a; }
+blockquote.note { background: #fff9e8; border-left: 4px solid #f5b400; border-radius: 0 6px 6px 0; }
+blockquote.shot { background: #0f1729; color: #fff; border-radius: 6px; }
+blockquote.shot strong { color: #f5b400; letter-spacing: .06em; }
+blockquote.shot code { background: #223; color: #fff; }
+hr { border: 0; border-top: 1px solid #d8dde8; margin: 22px 0; }
+a { color: #1a1a1a; }
+em { color: #444; }
+</style></head><body>
+<div class="hero"><span class="tag">ALPHA · CONFIDENTIAL</span><h1>Lantern<br>Alpha Tester Guide</h1><p class="sub">A security-first Stellar wallet. You're one of a small group looking at this before anyone else.</p><div class="meta"><p><strong>Time needed:</strong> about 70 minutes · <strong>Platforms:</strong> Android APK <strong>and</strong> Chrome extension — please test both · <strong>Network:</strong> Stellar Testnet only<br><strong>What we need back:</strong> one ZIP file — 12 screenshots from your main platform, 2 from the second, three stellar.expert links, and honest answers to 5 questions.</p></div></div>
+<p>Lantern is a <strong>non-custodial Stellar wallet</strong> built around one idea: you should never sign something you don't understand. Every time you are about to sign, Lantern shows a <strong>review screen</strong> that says in plain words what the transaction does, checks who it pays against an on-chain scam registry, and gives it a risk level. That review screen is what this round of testing is about: <strong>we need you to make it run, six times, in six different places in the app</strong>, then <strong>report two addresses to that registry yourself</strong> (Part 8), and tell us where it helped, confused, or got it wrong.</p>
+<blockquote class="warn">
+<p>⚠️ <strong>Read this first — Testnet only</strong></p>
+<p>This build runs on <strong>Stellar Testnet</strong>. The XLM in it is <strong>play money with no value</strong>, handed out for free by a faucet.</p>
+<ul>
+<li><strong>Do not import a real wallet.</strong> Never paste a recovery phrase or secret key that holds real funds into an alpha build — not this one, not any.</li>
+<li><strong>Do not send real money</strong> to any address you see in this app or in this guide.</li>
+<li>Create a <strong>brand-new wallet</strong> for testing, as Part 2 instructs. <strong>One wallet per person, please</strong> — we count how many different people's wallets ran the security check, and that number is only honest if each of you is one wallet. (Using the <em>same</em> wallet on your phone and in Chrome is fine and expected; creating extra wallets to look busy is not.)</li>
+</ul>
+<p>This is alpha software. Expect rough edges — finding them is the point.</p>
+</blockquote>
+<h3>What you'll need</h3>
+<ul>
+<li>Your <strong>tester number</strong> — it's in the message that sent you this guide. You'll need it in Part 3.</li>
+<li>An Android phone (Android 8 or newer) and the Android build: <strong><a href="https://lantern-api-production-3fad.up.railway.app/download/android?src=guide">https://lantern-api-production-3fad.up.railway.app/download/android?src=guide</a></strong></li>
+<li>Desktop Chrome, Edge, Brave or another Chromium browser, and the extension build: <strong><a href="https://lantern-api-production-3fad.up.railway.app/download/extension?src=guide">https://lantern-api-production-3fad.up.railway.app/download/extension?src=guide</a></strong></li>
+</ul>
+<p>Each link always points at the newest alpha build (<code>lantern-0.1.0-testnet.apk</code> and <code>lantern-extension-0.1.0.zip</code> at the time of writing — the version number may be higher). They land on a GitHub <strong>Release</strong> page's file, which sits next to a <code>SHA256SUMS.txt</code> and the hashes printed in the release notes. If you know how to check a file's SHA-256, do — you're about to sideload an app and load an unpacked extension, and a matching hash is how you know you got what we published. If you don't, skip it; nothing else depends on it.</p>
+<ul>
+<li>Somewhere to save screenshots.</li>
+</ul>
+<p><strong>We'd like you to test both platforms.</strong> Pick one as your <em>main</em> platform and do everything on it (Parts 0–5). Then, in Part 7, install the other, import the same wallet, and repeat two short steps — about 10 extra minutes. The same wallet on two screens is exactly the comparison we can't make ourselves. If you truly can't do both, one is still valuable — tell us which.</p>
+<h3>Make sure you have the alpha build</h3>
+<p>The files above are the <strong>alpha build</strong>: it is the only build that can tell us which tester did what. A generic release build looks identical but reports nothing useful. Two ways to check, once your wallet exists (Part 2):</p>
+<ul>
+<li><strong>Settings → Privacy</strong>: the switch is titled <strong>Share usage data (alpha)</strong>, and the &quot;we collect&quot; list includes <em>your public wallet address (alpha builds only)</em>. If the switch's title says &quot;Share <strong>anonymous</strong> usage data&quot; instead, you have the wrong build — stop and tell us.</li>
+<li><strong>Settings</strong>, bottom of the page: the version number. Put it in your answers file.</li>
+<li><strong>A review screen</strong> (exercise 1) shows a <strong>Report this address</strong> row under Lantern's check. If it doesn't, the build is older than this guide — stop and tell us.</li>
+</ul>
+<hr>
+<h2>Part 0 — Turn usage sharing on (the first thing you do)</h2>
+<p>This is the step everything else depends on, so it comes first.</p>
+<p>We measure whether the security check is actually being used by counting, across all testers, how many times the review screen ran and how many different wallets ran it. Those counts come from <strong>usage sharing</strong>, and it is <strong>off by default</strong>. If it stays off, you can do every exercise in this guide perfectly and, as far as our numbers are concerned, you were never here.</p>
+<p><strong>So for this round, turning it on is not optional — we're asking every tester to do it, and we'd rather say that plainly than bury it.</strong> Here is exactly what it sends and what it never sends, so you can decide with your eyes open:</p>
+<table>
+<thead>
+<tr>
+<th>It sends</th>
+<th>It never sends</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>a random install id</td>
+<td>your secret keys</td>
+</tr>
+<tr>
+<td>your <strong>public</strong> wallet address (alpha builds only — so we can match your feedback to your usage)</td>
+<td>your recovery phrase or password</td>
+</tr>
+<tr>
+<td>which features you used, and how often</td>
+<td>amounts, asset codes, memos or transaction hashes</td>
+</tr>
+<tr>
+<td>whether a scan warned you, and how risky it said the transaction was</td>
+<td>the text of any message you check</td>
+</tr>
+<tr>
+<td>your platform (Android / Chrome) and the app version</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>You can turn it off, and ask us to delete everything from your install, at any time under <strong>Settings → Privacy → Delete my data</strong>.</p>
+<p><strong>How to turn it on.</strong> Lantern only offers the switch once a wallet exists (the address it attaches doesn't exist before then), so the moment is right after Part 2, step 6:</p>
+<ol>
+<li>On your first arrival at <strong>Home</strong>, a card titled <strong>Share usage data (alpha)?</strong> appears. Tap the button labelled <strong>Share anonymous usage data</strong> (that button reads the same on every build; the card title is what identifies the alpha build).</li>
+<li>If you dismissed it, or it didn't appear: <strong>Settings → Privacy → Share usage data (alpha)</strong> → switch it on. You'll see <em>&quot;Thanks — sharing anonymous usage data.&quot;</em></li>
+<li>Below the switch an <strong>Analytics ID</strong> appears. Tap it to copy it, and paste it at the top of your answers file.</li>
+</ol>
+<blockquote class="shot">
+<p>📸 <strong>SCREENSHOT 1</strong> — Settings → Privacy with the switch <strong>on</strong> and the Analytics ID visible.</p>
+</blockquote>
+<p>If you are not comfortable with this, that is a legitimate answer — tell us, and skip the rest of the guide rather than testing with it off. We'd rather have your honest &quot;no&quot; than silent zeros.</p>
+<hr>
+<h2>Part 1 — Install</h2>
+<p>You'll install <strong>both</strong> eventually. Install your <strong>main</strong> platform now (either one); the second one comes at Part 7.</p>
+<h3>Android APK</h3>
+<ol>
+<li>On the phone, open the Android link above. It downloads <code>lantern-0.1.0-testnet.apk</code> straight away — an <code>.apk</code>, no unzipping.</li>
+<li>Open your <strong>Files</strong> app and tap the APK.</li>
+<li>Android will warn you the app is from an unknown source. That's expected — this is a test build not yet on the Play Store. Tap <strong>Settings</strong> → enable <strong>Allow from this source</strong> → go back and tap <strong>Install</strong>.</li>
+<li>You may also see &quot;Play Protect doesn't recognize this developer&quot;. Tap <strong>Install anyway</strong>. (Expected for a pre-release build — but don't do this for apps from people you don't know.)</li>
+<li>Open <strong>Lantern</strong> from your app drawer.</li>
+</ol>
+<blockquote class="note">
+<p><strong>If it won't install:</strong> the most common cause is an older Lantern already on the phone. Uninstall it first and try again.</p>
+</blockquote>
+<h3>Chrome extension</h3>
+<ol>
+<li>Open the extension link above to download <code>lantern-extension-0.1.0.zip</code>, and unzip it somewhere you'll leave it — your Documents folder, not Downloads. <strong>Chrome loads the extension from this folder every time, so don't delete or move it after installing.</strong></li>
+<li>Go to <code>chrome://extensions</code>.</li>
+<li>Turn on <strong>Developer mode</strong> (toggle, top right).</li>
+<li>Click <strong>Load unpacked</strong>.</li>
+<li>Select the folder you unzipped — the folder itself, not a file inside it.</li>
+<li>Lantern appears in your extension list. Click the puzzle-piece icon in the toolbar and <strong>pin</strong> Lantern.</li>
+<li>Click the Lantern icon to open it.</li>
+</ol>
+<blockquote class="note">
+<p><strong>If Chrome shows an error:</strong> make sure the folder you selected contains <code>manifest.json</code> directly inside it. If you unzipped into a folder-inside-a-folder, go one level deeper.</p>
+</blockquote>
+<hr>
+<h2>Part 2 — Create your wallet</h2>
+<ol>
+<li>On the welcome screen, tap <strong>Create Wallet</strong>.</li>
+<li>Lantern shows you a <strong>12-word recovery phrase</strong>. Write it on paper or save it in a note — you'll need it in a moment, and again in Part 7 on your second platform. <em>This is a test wallet with no real value, so you don't need to be precious about it. With a real wallet, you would never store these words digitally.</em></li>
+<li>Tick the acknowledgement box and continue.</li>
+<li>Lantern asks you to <strong>type a few of the words back</strong> to confirm you saved them. Enter the requested word numbers.</li>
+<li>Set a password. This encrypts the wallet on your device. <strong>Remember it</strong> — there's no reset, and you'll need it every time the wallet locks.</li>
+<li>You land on the <strong>Home</strong> screen, showing a <strong>Testnet</strong> badge and a balance of zero. <strong>Now do Part 0</strong> — accept the card, then come back here.</li>
+</ol>
+<h3>Get test funds</h3>
+<p>Your new account isn't active until it's funded.</p>
+<ol start="7">
+<li>On the Home screen, tap <strong>Fund with Friendbot</strong> — the free Testnet faucet.</li>
+<li>Wait a few seconds. Your balance should jump to around 10,000 XLM of play money.</li>
+</ol>
+<blockquote class="note">
+<p><strong>If Friendbot fails:</strong> it's a public faucet and it does go down. Wait a minute and tap again. If it still fails, note it in your feedback; you can still do Part 5 (the message checker) without funds, but everything in Part 3 needs a balance — come back when it works.</p>
+</blockquote>
+<blockquote class="shot">
+<p>📸 <strong>SCREENSHOT 2</strong> — Your funded Home screen, showing the balance and the Testnet badge.</p>
+</blockquote>
+<p><strong>Please also note:</strong> roughly how long did the whole create-wallet flow take, and did you hesitate anywhere?</p>
+<hr>
+<h2>Part 3 — Six transactions through the security check ⭐</h2>
+<p><strong>This is the heart of the test.</strong> Each exercise below makes Lantern's review screen run in a different part of the app. Do all six, in order. Some you will sign; two you will <strong>cancel</strong> at the review screen — cancelling still counts, because the check ran.</p>
+<p>At every review screen, before you do anything else, read it and ask: <em>does it say, in one plain sentence, what is about to happen? Would I have understood it if I weren't a crypto person?</em> Then look for the <strong>badge</strong>: <strong>Checked by Lantern</strong> (low risk), <strong>Caution — review below</strong> (medium) or <strong>High risk — action needed</strong> (high).</p>
+<p>You'll need your <strong>tester number</strong> and the <a href="https://github.com/kimerran/stellar-lantern/blob/develop/docs/alpha-tester-assignments.md">assignment table</a> for exercise 3 and for Part 8.</p>
+<h3>Exercise 1 — An ordinary payment (baseline)</h3>
+<ol>
+<li>On <strong>Home</strong>, tap <strong>Send</strong>.</li>
+<li>As the recipient, paste the Lantern test address:
+<code>GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK</code>
+It's an ordinary, funded Testnet account we control. This is what a routine payment to someone you know should look like.</li>
+<li>Enter <strong>1 XLM</strong> and continue to the review step.</li>
+<li>Expect a sentence like <em>&quot;This sends 1 XLM to GAMN…SRNK&quot;</em>, the <strong>Checked by Lantern</strong> badge, and no warning.</li>
+<li><strong>Confirm &amp; Send.</strong> It should complete within a few seconds, with a link to view it on stellar.expert.</li>
+</ol>
+<blockquote class="shot">
+<p>📸 <strong>SCREENSHOT 3</strong> — The review screen before you sign.</p>
+</blockquote>
+<h3>Exercise 2 — A payment to a reported address (cancel this one)</h3>
+<p>This is the screen we most want your reaction to.</p>
+<ol>
+<li><strong>Send</strong> again. As the recipient, paste this address exactly:
+<code>GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ</code>
+It's a Testnet address that has been reported as a scam on the registry. (No money is at risk — but treat it as if there were.)</li>
+<li>Enter <strong>1 XLM</strong> and continue to the review step.</li>
+<li>Lantern should warn you that the recipient is a <strong>reported address</strong>, show the badge <strong>High risk — action needed</strong>, and change the button to <strong>Sign Anyway</strong> behind an extra step: on Android you must <strong>press and hold</strong>; in Chrome you must <strong>type CONFIRM</strong> into a box first.</li>
+<li><strong>Read the warning, then cancel.</strong> Do not confirm.</li>
+</ol>
+<p>Ask yourself: did you understand <em>why</em> it was warning you? If this had been real money and a message from someone you half-trusted, would this screen have stopped you?</p>
+<blockquote class="shot">
+<p>📸 <strong>SCREENSHOT 4</strong> — The high-risk review screen with the warning.</p>
+</blockquote>
+<h3>Exercise 3 — A payment to a brand-new account</h3>
+<p>Find your <strong>tester number</strong> in the <a href="https://github.com/kimerran/stellar-lantern/blob/develop/docs/alpha-tester-assignments.md">assignment table</a> and copy the address in the <strong>New account</strong> column of your row. Nobody has ever paid this address — it doesn't exist on the network yet.</p>
+<ol>
+<li><strong>Send</strong> → paste your assigned address → enter <strong>2 XLM</strong> (a new account needs at least 1 XLM to exist; 2 leaves room for the fee).</li>
+<li>At the review, look for how Lantern describes paying an account that <strong>doesn't exist yet</strong>. Does it tell you? Does it read as more or less risky than exercise 1, and does that match your gut?</li>
+<li><strong>Confirm &amp; Send.</strong></li>
+</ol>
+<blockquote class="shot">
+<p>📸 <strong>SCREENSHOT 5</strong> — The review screen for the new account.</p>
+</blockquote>
+<h3>Exercise 4 — A payment asked for by an app</h3>
+<p>Apps can ask Lantern to pay on their behalf — and Lantern must show you the same review before anything is signed.</p>
+<ol>
+<li>Open the <strong>Apps</strong> tab and open <strong>Lantern Demo App</strong> (it has a <em>Demo</em> chip).</li>
+<li>Inside it, <strong>connect</strong> your wallet, then use its send / pay button to request a small payment (<strong>1 XLM</strong> or the app's default).</li>
+<li>Lantern's own review screen should appear over the app — the same layout as exercise 1, not something drawn by the app. Check that the amount and recipient the app asked for are what the review shows.</li>
+<li><strong>Confirm &amp; Send</strong> (or cancel if anything about it makes you uneasy — and say why).</li>
+</ol>
+<blockquote class="shot">
+<p>📸 <strong>SCREENSHOT 6</strong> — The review screen as it appeared over the app.</p>
+</blockquote>
+<h3>Exercise 5 — Put some XLM into an Earn pool</h3>
+<ol>
+<li>From <strong>Home</strong>, open <strong>Earn</strong>.</li>
+<li>Pick the <strong>Lantern Earn</strong> pool, choose <strong>XLM</strong>, and <strong>Supply</strong> a small amount — <strong>10 XLM</strong>.</li>
+<li>At the review, notice that this is a <em>contract call</em>, not a payment to a person. Does Lantern make clear where your XLM is going and that you can withdraw it? Is the risk level what you'd expect for putting money into a pool?</li>
+<li><strong>Confirm.</strong> (You can withdraw it afterwards from the same screen if you like — that runs the review once more.)</li>
+</ol>
+<blockquote class="note">
+<p><strong>If Earn shows an error before you reach the review</strong> (the pool didn't load, the network timed out): the pool is a third-party testnet service and does go down. Try once more a minute later; if it still fails, screenshot the error, write <em>&quot;Earn unavailable&quot;</em> in your answers, and move on. That is a finding, not your fault.</p>
+</blockquote>
+<blockquote class="shot">
+<p>📸 <strong>SCREENSHOT 7</strong> — The Earn review screen.</p>
+</blockquote>
+<h3>Exercise 6 — Add a recovery guardian</h3>
+<p>A guardian is a trusted address that can help you recover the account if you lose your phrase. Adding one changes your account's signing rules, which is a very different kind of transaction from a payment.</p>
+<ol>
+<li>Open <strong>Settings → Guardians &amp; recovery</strong>.</li>
+<li>Under <strong>Set Up Recovery</strong>, paste the Lantern test address from exercise 1 (<code>GAMN…SRNK</code>) as the guardian. Leave the threshold at its default.</li>
+<li>Tap <strong>Review</strong>. This review is about <em>who can sign for your account</em>, not about money moving. Does it say so in words you'd understand? Would you know, from this screen, what you are agreeing to?</li>
+<li><strong>Hold to Set Up Recovery</strong> (Android) / <strong>Set Up Recovery</strong> (Chrome).</li>
+</ol>
+<blockquote class="shot">
+<p>📸 <strong>SCREENSHOT 8</strong> — The recovery review screen.</p>
+</blockquote>
+<h3>After the six</h3>
+<p>Open <strong>Activity</strong>. Exercises 1, 3, 4, 5 and 6 should be listed; exercise 2 should not. Tap one for detail.</p>
+<ul>
+<li>Does the history make sense at a glance? Could you tell money-in from money-out without thinking?</li>
+<li>Across the six review screens: <strong>which one was clearest, and which one would you not have understood without this guide?</strong> That answer is worth more to us than any bug.</li>
+</ul>
+<blockquote class="note">
+<p><strong>A note on Swap and Cash In / Cash Out.</strong> You'll see both in the app. Swap needs a second asset in your wallet, which this build can't yet add, so please leave it. Cash In / Cash Out depends on external services that aren't part of this test. Everything else — Send, Apps, Earn, Guardians — is in scope and is exactly where we want you.</p>
+</blockquote>
+<hr>
+<h2>Part 4 — Lock and unlock</h2>
+<p>Close Lantern and reopen it, or wait for auto-lock. Unlock with your password. Confirm your balance is still there.</p>
+<p>While you're there: open <strong>Settings</strong> and glance over it — network, auto-lock time, and the <strong>Security</strong> section. Anything that reads strangely is a finding.</p>
+<hr>
+<h2>Part 5 — The scam-message checker</h2>
+<p>Lantern can also check a suspicious message — a DM, an offer, a &quot;support&quot; message — for scam patterns, entirely on your device. The message is never sent anywhere or stored. This part is about the quality of its verdicts; it is quick, and we still want your opinion on it.</p>
+<p>Open <strong>Settings → Security &amp; scam check</strong>. You'll see a box labelled <strong>Check a message</strong>. Paste each message below, tap <strong>Check message</strong>, read the result.</p>
+<p><strong>5.1 — Fake support asking for your phrase</strong></p>
+<pre><code>Hi, this is the Lantern support team. Your account has been locked
+due to unusual activity. To verify your wallet and restore access,
+reply with your 12-word recovery phrase immediately.
+</code></pre>
+<p><strong>5.2 — The giveaway scam</strong></p>
+<pre><code>🚀 XLM GIVEAWAY! Send any amount to the address below and we will
+double your balance instantly. Limited spots – click here to claim
+before it expires today: https://stellar-rewards-claim.example
+</code></pre>
+<p><strong>5.3 — An ordinary, harmless message</strong></p>
+<pre><code>Hey, thanks for covering lunch yesterday. I'll send you the 20 XLM
+I owe you tonight once I'm home.
+</code></pre>
+<p><strong>5.4 — Bring your own (required).</strong> Find a <strong>real</strong> scam or spam message you've received — DMs, SMS, spam folder, email. Everyone has one. Paste it in. This is the most valuable test of all, because we didn't write it. If Lantern stays quiet on something obviously dodgy, that is exactly what we need to hear — say what tipped <em>you</em> off.</p>
+<blockquote class="warn">
+<p>⚠️ <strong>Before screenshotting a real message, blur or crop out the sender's name, phone number and any personal details.</strong> We want the scam text, not anybody's identity.</p>
+</blockquote>
+<blockquote class="shot">
+<p>📸 <strong>SCREENSHOTS 9–10</strong> — Two of the four, your pick — ideally one Lantern got right and one you'd argue with. Label them 5.1–5.4.</p>
+</blockquote>
+<p>For each verdict: <strong>was it right?</strong> Did it flag what you'd flag, and stay quiet on 5.3? <strong>A wrong verdict is the single most useful thing you can report</strong>, in either direction.</p>
+<hr>
+<h2>Part 6 — Feedback interview</h2>
+<p>Answer these in writing, or book a 20-minute call — whichever you prefer. <strong>Short, blunt answers are more useful than polite ones.</strong> If something was bad, say it was bad.</p>
+<ol>
+<li>
+<p><strong>Walk us through the moment you first saw a warning — exercise 2, or a message in Part 5. What did you think it meant, and what would you have done next if this had been your real money?</strong>
+<em>We want your reaction in your own words — not whether you thought the feature was &quot;good&quot;.</em></p>
+</li>
+<li>
+<p><strong>Of the six review screens in Part 3, which was clearest and which was least clear? Name the exercise number and say what was missing.</strong>
+<em>The review screen is the product. Every place it fell short is a finding.</em></p>
+</li>
+<li>
+<p><strong>Where did you get stuck, confused or annoyed? Name the specific screen.</strong>
+<em>Every single spot. Small irritations count. If you had to re-read something twice, that's a finding.</em></p>
+</li>
+<li>
+<p><strong>Would you put real money in this today? If not — what specifically is missing, and what would have to be true for you to change your mind?</strong>
+<em>A &quot;no&quot; is a useful answer. We need the reason, not the verdict.</em></p>
+</li>
+<li>
+<p><strong>Did the review screen or the message checker ever get it wrong — flagged something harmless, or stayed quiet on something you'd have flagged? Which one, and what did you expect instead?</strong>
+<em>If it never got it wrong in your testing, say so — that's a data point too.</em></p>
+</li>
+</ol>
+<p><strong>Optional — anything else?</strong> Bugs, crashes, a word that read strangely, something that felt untrustworthy, something you loved. All welcome.</p>
+<hr>
+<h2>Part 7 — The second platform (about 10 minutes)</h2>
+<p>Now install Lantern on the <strong>other</strong> platform, following the matching section of Part 1.</p>
+<ol>
+<li>On the welcome screen choose <strong>Import</strong> instead of Create, and enter the 12 words from Part 2. You should land on Home with the <strong>same address and balance</strong> as your main platform. Note how long it took and anything confusing.</li>
+<li>When the <strong>Share usage data (alpha)?</strong> card appears, tap <strong>Share anonymous usage data</strong> here too (each install has its own switch).</li>
+<li>Repeat <strong>exercise 1</strong> — the 1 XLM payment to the Lantern test address — and sign it.</li>
+<li>Repeat <strong>exercise 2</strong> — the payment to the reported address — and cancel at the warning. Notice the extra step is different here: press-and-hold on the phone, type CONFIRM in Chrome.</li>
+</ol>
+<blockquote class="shot">
+<p>📸 <strong>SCREENSHOTS 11–12</strong> — The imported Home screen, and the high-risk review screen on this platform.</p>
+</blockquote>
+<p>Then tell us: did anything look, read or behave <strong>differently</strong> between the phone and the browser? Same wallet, two screens — differences are findings.</p>
+<hr>
+<h2>Part 8 — Report two addresses to the registry (about 10 minutes)</h2>
+<p>The registry that flagged exercise 2's address is public and on-chain, and this build lets you <strong>add an address to it yourself</strong> with a one-click report. Your row in the <a href="https://github.com/kimerran/stellar-lantern/blob/develop/docs/alpha-tester-assignments.md">assignment table</a> holds two addresses for this, <strong>R1</strong> and <strong>R2</strong>. They were generated for the exercise and belong to nobody — you are seeding test entries on a test network, not accusing anyone.</p>
+<p>Four things to know before you start:</p>
+<ul>
+<li><strong>Reporting costs 1 XLM</strong> (Testnet money — Friendbot covered it). The fee is shown on the sheet before you sign; if it ever says <em>Unknown</em>, stop and tell us.</li>
+<li><strong>Your address is recorded on-chain as the reporter.</strong> The sheet says so. That's the point of the registry — reports are attributable — and it's why we ask you to report only your two assigned rows.</li>
+<li><strong>You can't report your own address</strong>, and you don't need to send any money to report: you'll do it from the review screen, then cancel the payment.</li>
+<li><strong>Report exactly what this part asks for: R1, then R2, then R1 again.</strong> The order matters for what we're measuring (see 8.4).</li>
+</ul>
+<h3>8.1 — Report R1</h3>
+<ol>
+<li>On <strong>Home</strong>, tap <strong>Send</strong>. Paste your <strong>R1</strong> address, enter <strong>2 XLM</strong>, and continue to the review step. (Nobody has funded R1, so it reads as a brand-new account, like exercise 3. You're not going to send this.)</li>
+<li>Under Lantern's check, find the row <strong>Report this address</strong> and tap it.</li>
+<li>A sheet opens. Check it against this list — every item should be there:
+<ul>
+<li>the <strong>full address</strong>, not shortened (compare it to your row — every character);</li>
+<li>a <strong>Reason</strong> picker — choose <strong>Scam</strong>;</li>
+<li>an optional <strong>Note</strong> box — type a few words if you like. Only a fingerprint (hash) of the note goes on-chain; the note itself never leaves your device and isn't saved anywhere;</li>
+<li><strong>Report fee: 1 XLM</strong>;</li>
+<li>the sentence <em>&quot;This is public, permanent, and recorded on-chain against your address.&quot;</em></li>
+</ul>
+</li>
+<li>Tap <strong>Sign &amp; report</strong>. Within a few seconds the row turns into <strong>Reported to the registry — This address now has 1 report.</strong></li>
+<li>Tap <strong>View report on stellar.expert</strong>. The page that opens is the transaction you just made.</li>
+</ol>
+<blockquote class="shot">
+<p>📸 <strong>SCREENSHOT 13</strong> — The stellar.expert page for the report transaction. <strong>Copy its URL into your answers file too.</strong></p>
+</blockquote>
+<h3>8.2 — Watch Lantern catch it</h3>
+<p>Stay on the same review screen — the one you opened before reporting. It still shows the check from <em>before</em> your report.</p>
+<ol>
+<li>Tap <strong>Confirm &amp; Send</strong> as if you'd changed your mind and wanted to pay R1 after all.</li>
+<li>Lantern re-checks the payment right before signing. Expect a red box — <strong>Something changed while you were reviewing</strong> — saying R1 <em>was reported as scam while you were reviewing</em>, and the badge switching to <strong>High risk — action needed</strong> with the extra step from exercise 2 (press-and-hold, or type CONFIRM).</li>
+<li><strong>Nothing was signed. Cancel.</strong></li>
+</ol>
+<p>That is the whole loop in one screen: an address gets reported, and the next person about to pay it is warned — even if their review was already open.</p>
+<blockquote class="shot">
+<p>📸 <strong>SCREENSHOT 14</strong> — The <em>Something changed</em> box with the high-risk badge.</p>
+</blockquote>
+<h3>8.3 — Report R2</h3>
+<p>Same as 8.1 with your <strong>R2</strong> address: <strong>Send</strong> → paste R2 → 2 XLM → review → <strong>Report this address</strong> → reason <strong>Phishing</strong> this time → <strong>Sign &amp; report</strong> → <em>now has 1 report</em> → then <strong>cancel</strong> the payment. No screenshot needed, but note the stellar.expert URL.</p>
+<h3>8.4 — Report R1 a second time</h3>
+<ol>
+<li><strong>Send</strong> → paste <strong>R1</strong> again → 2 XLM → review. This time the review should <strong>already</strong> warn you: R1 is a reported address now, exactly like exercise 2. (Lantern remembers a registry check for about a minute — if it still says clean, go back, wait a minute, and open the review again.)</li>
+<li>The report row now reads <strong>Report it too · 1 report on chain</strong>. Tap it.</li>
+<li>The sheet adds a warning: <em>This address is already on the registry. Reporting again adds to its count and charges the fee again; the first reporter and date stay as they are.</em> Read it, then <strong>Sign &amp; report</strong>.</li>
+<li>Expect <strong>This address now has 2 reports.</strong> Then <strong>cancel</strong> the payment.</li>
+</ol>
+<p><strong>Why we ask for this.</strong> A second report of an address is a real transaction (the network fee and the 1 XLM fee are both charged again) and it raises that address's count — but it does <strong>not</strong> create a second registry entry, and it doesn't change who reported it first. The sprint is measured on both numbers: <em>how many distinct addresses are on the registry</em> (your R1 and R2 each add one) and <em>how many report transactions were made</em> (your three reports add three). Thirty testers reporting the same address would score thirty transactions and one entry — which is why every tester has their own two rows.</p>
+<p>Tell us afterwards: did the sheet make it clear that this would cost you money and be recorded against your address? Would you have reported a real scammer with this, and what would have stopped you?</p>
+<hr>
+<h2>Sending it back</h2>
+<p>Put everything in <strong>one ZIP file</strong> named</p>
+<pre><code>&lt;YOUR_NAME&gt;-lantern-&lt;DATE&gt;.zip        e.g. maria-lantern-2026-09-24.zip
+</code></pre>
+<p>containing:</p>
+<ul>
+<li><strong>Your screenshots</strong> — 1 through 14, named by number (<code>01-privacy.png</code>, <code>03-exercise-1.png</code>, …).</li>
+<li><strong>Your answers</strong> to the five questions and the Part 7 differences, as a text or document file (<code>answers.txt</code> / <code>answers.docx</code>).</li>
+<li><strong>At the top of the answers file:</strong> your tester number, which platform was your main one, your phone model and browser version, the <strong>app version</strong> from Settings, and your <strong>Analytics ID</strong> from Part 0.</li>
+<li><strong>Your wallet address</strong> (the <code>G…</code> address from <strong>Receive</strong>) — paste it under your platform details. This is how we match your answers to your usage.</li>
+<li><strong>The stellar.expert URLs</strong> of your three report transactions from Part 8.</li>
+</ul>
+<p>If you hit a crash or something clearly broken, tell us <strong>what you did immediately before it happened</strong>. That one sentence saves us hours.</p>
+<p><strong>Email the ZIP to:</strong> lantern@artisam.xyz</p>
+
+</body></html>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { track } from '@core/telemetry';
 import { BASE_FEE } from '@stellar/stellar-sdk';
 import type { NetworkConfig } from '@shared/constants';
 import { sendMessage } from '@shared/messages';
@@ -12,8 +13,10 @@ import {
   guardianDiff,
   type GuardianConfig,
 } from '@core/recovery/guardians';
-import { scan } from '@core/scan/engine';
-import type { ScanVerdict } from '@core/scan/types';
+import { scanTx, type WalletScanInput } from '@core/scan/wallet';
+import type { ScanVerdict } from '@core/scan';
+import { useRecheck } from '../hooks/useRecheck';
+import { RecheckNotice } from '../components/RecheckNotice';
 import { isNativePlatform } from '@shared/kv';
 import { formatAmount, truncateAddress } from '@shared/format';
 import { Button } from '../components/Button';
@@ -21,6 +24,7 @@ import { Input } from '../components/Input';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { RiskCallout } from '../components/RiskCallout';
+import { ReportCounterparties, counterpartiesOf } from '../components/ReportAddress';
 import { HoldToConfirm } from '../components/HoldToConfirm';
 import { CoSignRecovery } from './CoSignRecovery';
 import { RecoverAccount } from './RecoverAccount';
@@ -56,6 +60,9 @@ export function Guardians({ address, network, onBack }: Props) {
   const [verdict, setVerdict] = useState<ScanVerdict | null>(null);
   const [scanning, setScanning] = useState(false);
   const [confirmText, setConfirmText] = useState('');
+  const [scanInput, setScanInput] = useState<WalletScanInput | null>(null);
+  // Re-simulate immediately before submit (#121, SOW §3.9).
+  const recheck = useRecheck();
 
   // The account's existing guardian setup. When recovery is already configured
   // the screen becomes an editor: we prefill the form with the current guardians
@@ -115,6 +122,7 @@ export function Guardians({ address, network, onBack }: Props) {
     setVerdict(null);
     setConfirmText('');
     setError(null);
+    recheck.reset();
   }
 
   async function toReview() {
@@ -165,11 +173,16 @@ export function Guardians({ address, network, onBack }: Props) {
 
       // Lantern pre-sign scan — this is a high-impact account-control change and
       // will surface as high risk with a confirm gate (same as Send).
-      const scanVerdict = scan({
+      const input: WalletScanInput = {
         xdr,
         networkPassphrase: network.passphrase,
+        rpcUrl: network.sorobanRpcUrl,
         context: { network: network.id, fromAddress: address },
-      });
+      };
+      const scanVerdict = await scanTx(input);
+      setScanInput(input);
+      recheck.reset();
+      if (__FEATURE_TELEMETRY__) track.txScanned(scanVerdict);
 
       setReview({
         xdr,
@@ -194,6 +207,17 @@ export function Guardians({ address, network, onBack }: Props) {
     if (!review) return;
     setSubmitting(true);
     setError(null);
+    // Re-check the exact XDR about to be signed (#121). An escalation aborts
+    // and needs a fresh confirm — the typed CONFIRM never survives it.
+    if (verdict && scanInput) {
+      const rc = await recheck.guard(verdict, scanInput);
+      setVerdict(rc.verdict);
+      if (!rc.proceed) {
+        setConfirmText('');
+        setSubmitting(false);
+        return;
+      }
+    }
     const res = await sendMessage({
       type: 'SIGN_AND_SUBMIT',
       xdr: review.xdr,
@@ -202,6 +226,18 @@ export function Guardians({ address, network, onBack }: Props) {
     });
     setSubmitting(false);
     if (res.ok) {
+      // A first-time setup adds every guardian; an edit adds only the diff.
+      if (
+        __FEATURE_TELEMETRY__ &&
+        (!editing ||
+          !current ||
+          guardianDiff(
+            current.guardians.map((g) => g.key),
+            filled,
+          ).added.length > 0)
+      ) {
+        track.guardianAdded();
+      }
       setTxHash(res.data.hash);
       setStep('success');
     } else if (res.code === 'LOCKED') {
@@ -289,6 +325,13 @@ export function Guardians({ address, network, onBack }: Props) {
               />
             ) : null}
           </div>
+
+          {/* One-click report to the registry (#120), one row per screened
+              counterparty. Testnet only — renders nothing on PUBLIC. */}
+          <RecheckNotice state={recheck.state} />
+          {!scanning && verdict && (
+            <ReportCounterparties reporter={address} network={network} subjects={counterpartiesOf(verdict, address)} />
+          )}
 
           {changes && (changes.added.length > 0 || changes.removed.length > 0) && (
             <Card className="space-y-1.5">

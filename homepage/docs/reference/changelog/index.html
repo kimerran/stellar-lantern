@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Full changelog — Lantern — Instawards Phase 1</title>
+    <meta name="description" content="Evidence site for Lantern's Stellar Development Foundation Instawards sprint: weekly reports, deliverable traceability, and an index of every on-chain and off-chain artifact." />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/docs/docs.css" />
+  </head>
+  <body class="docs">
+    <header class="docs-top">
+      <div class="docs-top-inner">
+        <a class="brand" href="/docs/"><img src="/logo.jpg" alt="Lantern logo" /><span>Lantern</span><em>Instawards evidence</em></a>
+        <a class="md-link" href="/docs/reference/changelog.md" title="This page as markdown">view as markdown</a>
+      </div>
+    </header>
+    <div class="docs-layout">
+      <nav class="side" aria-label="Pages"><ul><li><a href="/docs/">Overview</a></li><li><a href="/docs/sow/">Statement of Work</a></li><li class="group"><span>Weekly reports</span><ul><li><a href="/docs/weekly/week-1/">Week 1 — 7–13 Sep</a></li><li><a href="/docs/weekly/week-2/">Week 2 — 14–20 Sep</a></li><li><a href="/docs/weekly/week-3/">Week 3 — 21–27 Sep</a></li><li><a href="/docs/weekly/week-4/">Week 4 — 28 Sep – 4 Oct</a></li></ul></li><li class="group"><span>Deliverables</span><ul><li><a href="/docs/deliverables/d1/">D1 — On-chain blacklist registry</a></li><li><a href="/docs/deliverables/d2/">D2 — Transaction security scanner</a></li><li><a href="/docs/deliverables/d3/">D3 — Scanner in the wallet</a></li><li><a href="/docs/deliverables/d4/">D4 — Public demo</a></li></ul></li><li class="group"><span>Reference</span><ul><li><a href="/docs/reference/scanner/">Scanner package</a></li><li><a href="/docs/reference/registry/">Registry contract</a></li><li><a href="/docs/reference/metrics/">Metrics</a></li><li><a href="/docs/reference/evidence/">Evidence index</a></li><li class="on"><a href="/docs/reference/changelog/">Full changelog</a></li></ul></li></ul></nav>
+      <main class="docs-main">
+        <p class="crumbs"><a href="/docs/">Lantern — Instawards Phase 1</a> <span class="sep">/</span> <span>Reference</span> <span class="sep">/</span> <span>Full changelog</span></p>
+        <article class="prose">
+<h1>Full changelog</h1>
+<p>Every change merged during the sprint, newest first — the union of the weekly changelogs. Commits link to the public repository.</p>
+<div class="table"><table><thead>
+<tr>
+<th>Date</th>
+<th>Change</th>
+<th>Commit</th>
+<th>Week</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-09-17</td>
+<td>Analytics: drop anonymous installs from the admin pages</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/262e08a" target="_blank" rel="noopener"><code>262e08a</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-17</td>
+<td>D2 QA: <code>npm run scan</code> CLI harness + the manual test plan</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/73d5b34" target="_blank" rel="noopener"><code>73d5b34</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-16</td>
+<td>Lantern API: telemetry ingest + raw export on Railway Postgres</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/d6eb8a6" target="_blank" rel="noopener"><code>d6eb8a6</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-16</td>
+<td>Analytics consent UI: Settings → Privacy toggle, delete-my-data, one-time prompt</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/1be589a" target="_blank" rel="noopener"><code>1be589a</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-16</td>
+<td>Telemetry emit points across the wallet</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/8368834" target="_blank" rel="noopener"><code>8368834</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-16</td>
+<td><code>npm run report:activity</code> — the self-contained activity report</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/a42f3a3" target="_blank" rel="noopener"><code>a42f3a3</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-16</td>
+<td>Telemetry on in the release and Android builds; release flag fix</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/d0bbb0e" target="_blank" rel="noopener"><code>d0bbb0e</code></a>, <a href="https://github.com/kimerran/stellar-lantern/commit/56928f2" target="_blank" rel="noopener"><code>56928f2</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-16</td>
+<td>Tester identity: analytics ID under Settings → Privacy; alpha builds attach the wallet address</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/b646af8" target="_blank" rel="noopener"><code>b646af8</code></a>, <a href="https://github.com/kimerran/stellar-lantern/commit/8befa37" target="_blank" rel="noopener"><code>8befa37</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-16</td>
+<td>Analytics page: <code>/admin</code> on the Lantern API; deploy the API from CI</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/3b5f11f" target="_blank" rel="noopener"><code>3b5f11f</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-16</td>
+<td>Analytics UI: dashboard, wallets table with drill-down, raw JSON/CSV downloads</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/e2bbc49" target="_blank" rel="noopener"><code>e2bbc49</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-15</td>
+<td>Scanner stage 5 — Verdict: deterministic risk core</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/faa3829" target="_blank" rel="noopener"><code>faa3829</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-15</td>
+<td>Scanner stage 6 — Explain: AI layer, bounded and verdict-proof</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/e76700d" target="_blank" rel="noopener"><code>e76700d</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-15</td>
+<td>CI: pin Android SDK packages (build and release lanes)</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/5dfd5ac" target="_blank" rel="noopener"><code>5dfd5ac</code></a>, <a href="https://github.com/kimerran/stellar-lantern/commit/7c0d14f" target="_blank" rel="noopener"><code>7c0d14f</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-15</td>
+<td>Release build: scanner AI flag explicitly OFF</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/3addf40" target="_blank" rel="noopener"><code>3addf40</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-15</td>
+<td>Lantern API: design spec + the LLM proxy for the scanner explainer</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/c1aa027" target="_blank" rel="noopener"><code>c1aa027</code></a>, <a href="https://github.com/kimerran/stellar-lantern/commit/418d4c1" target="_blank" rel="noopener"><code>418d4c1</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-15</td>
+<td>Telemetry core: consent-gated, enum-only, anonymous</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/219336f" target="_blank" rel="noopener"><code>219336f</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-14</td>
+<td>Release: on-chain blacklist registry (D1) promoted to <code>main</code></td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/af35851" target="_blank" rel="noopener"><code>af35851</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-14</td>
+<td>Scanner: MIT license + extract the scanner into <code>@lantern/scanner</code></td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/addfea1" target="_blank" rel="noopener"><code>addfea1</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-14</td>
+<td>Scanner: six-stage pipeline skeleton + the verdict-immutability invariant</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/57ff777" target="_blank" rel="noopener"><code>57ff777</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-14</td>
+<td>Scanner stage 1 — Ingest: Soroban RPC simulation, fail-closed</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/d8ffe18" target="_blank" rel="noopener"><code>d8ffe18</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-14</td>
+<td>Scanner stage 2 — Auth: walk the <code>SorobanAuthorizationEntry</code> tree</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/3bd3123" target="_blank" rel="noopener"><code>3bd3123</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-14</td>
+<td>Scanner stage 3a — Effects: classic payment operations</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/f9048d0" target="_blank" rel="noopener"><code>f9048d0</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-14</td>
+<td>Scanner stage 3b — Effects: SEP-41 / SAC token-interface calls</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/3f09105" target="_blank" rel="noopener"><code>3f09105</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-14</td>
+<td>Scanner stage 3c — the unverified-contract fallback</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/57f34cc" target="_blank" rel="noopener"><code>57f34cc</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-14</td>
+<td>Review follow-up: mark merge inflows as total in the aggregate</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/6e0f2c5" target="_blank" rel="noopener"><code>6e0f2c5</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-14</td>
+<td>Scanner stage 4 — Screen counterparties against the D1 registry</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/c30f30a" target="_blank" rel="noopener"><code>c30f30a</code></a></td>
+<td><a href="/docs/weekly/week-2/">Week 2</a></td>
+</tr>
+<tr>
+<td>2026-09-10</td>
+<td>Blacklist registry: ABI, data model, status semantics and event reference</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/7983bd3" target="_blank" rel="noopener"><code>7983bd3</code></a></td>
+<td><a href="/docs/weekly/week-1/">Week 1</a></td>
+</tr>
+<tr>
+<td>2026-09-09</td>
+<td>Blacklist registry: testnet deploy + smoke report (fee-routing evidence)</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/96c4713" target="_blank" rel="noopener"><code>96c4713</code></a></td>
+<td><a href="/docs/weekly/week-1/">Week 1</a></td>
+</tr>
+<tr>
+<td>2026-09-08</td>
+<td>Blacklist registry: admin status transitions (active / disputed / revoked) + config</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/76edfba" target="_blank" rel="noopener"><code>76edfba</code></a></td>
+<td><a href="/docs/weekly/week-1/">Week 1</a></td>
+</tr>
+<tr>
+<td>2026-09-08</td>
+<td>Blacklist registry: public read API (<code>is_flagged</code>, <code>get</code>, <code>count</code>, <code>list</code>)</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/4d7b093" target="_blank" rel="noopener"><code>4d7b093</code></a></td>
+<td><a href="/docs/weekly/week-1/">Week 1</a></td>
+</tr>
+<tr>
+<td>2026-09-08</td>
+<td>Blacklist registry: O(1) hot read — deterministic ledger key + <code>getLedgerEntries</code> recipe</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/3bcfc4e" target="_blank" rel="noopener"><code>3bcfc4e</code></a></td>
+<td><a href="/docs/weekly/week-1/">Week 1</a></td>
+</tr>
+<tr>
+<td>2026-09-07</td>
+<td>Blacklist registry: crate scaffold, data model, storage schema, constructor</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/22de070" target="_blank" rel="noopener"><code>22de070</code></a></td>
+<td><a href="/docs/weekly/week-1/">Week 1</a></td>
+</tr>
+<tr>
+<td>2026-09-07</td>
+<td>Blacklist registry: fee-gated <code>report()</code> write + treasury routing</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/072c336" target="_blank" rel="noopener"><code>072c336</code></a></td>
+<td><a href="/docs/weekly/week-1/">Week 1</a></td>
+</tr>
+<tr>
+<td>2026-09-07</td>
+<td>CI: Soroban contracts lane (fmt, clippy, tests, wasm build)</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/619214a" target="_blank" rel="noopener"><code>619214a</code></a></td>
+<td><a href="/docs/weekly/week-1/">Week 1</a></td>
+</tr>
+</tbody>
+</table></div>
+        </article>
+        <footer class="docs-foot">
+          <p>Unlisted evidence site for the Stellar Development Foundation Instawards programme. Not indexed; no links from the landing page. Machine-readable index: <a href="/docs/llms.txt">llms.txt</a>.</p>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

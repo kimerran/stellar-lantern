@@ -1,7 +1,7 @@
 // On-chain blacklist registry (#31, Deliverable 1): a shared, composable list
 // of addresses reported as malicious, that any Stellar wallet can read.
 // Lantern's scanner screens recipients against a hardcoded demo deny-list
-// (`DEMO_FLAGGED_ADDRESSES` in src/core/scan/engine.ts); this contract is what
+// (`DEMO_FLAGGED_ADDRESSES` in packages/lantern-scanner/src/engine.ts); this contract is what
 // replaces it — report once, protect everyone.
 //
 // Two properties shape the design:

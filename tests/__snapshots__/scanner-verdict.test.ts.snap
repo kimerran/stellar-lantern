@@ -1,0 +1,269 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`verdict: corpus snapshots > archived-state 1`] = `
+{
+  "action": "block_confirm",
+  "reasons": [
+    "high:state_archived",
+  ],
+  "risk": "high",
+  "signals": [
+    "ingest:unknown@simulation",
+    "auth:flat@auth.calls",
+    "effects:coverage_full@effects.coverage",
+    "screen:clean@screen",
+    "effects:observed_balance_changes@observed",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > classic-account-merge 1`] = `
+{
+  "action": "block_confirm",
+  "reasons": [
+    "high:drains_balance",
+    "high:account_merge",
+  ],
+  "risk": "high",
+  "signals": [
+    "ingest:classic@simulation",
+    "auth:flat@auth.calls",
+    "effects:coverage_full@effects.coverage",
+    "screen:clean@screen",
+    "verdict:drains_balance@net[GAMN…SRNK:XLM]",
+    "verdict:account_merge@closes[0]",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > classic-flagged-memo-injection 1`] = `
+{
+  "action": "allow",
+  "reasons": [],
+  "risk": "low",
+  "signals": [
+    "ingest:classic@simulation",
+    "auth:flat@auth.calls",
+    "effects:coverage_full@effects.coverage",
+    "screen:clean@screen",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > classic-multi-op 1`] = `
+{
+  "action": "allow",
+  "reasons": [],
+  "risk": "low",
+  "signals": [
+    "ingest:classic@simulation",
+    "auth:flat@auth.calls",
+    "effects:coverage_full@effects.coverage",
+    "screen:clean@screen",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > classic-path-payment-receive 1`] = `
+{
+  "action": "warn",
+  "reasons": [
+    "medium:swap_to_other",
+  ],
+  "risk": "medium",
+  "signals": [
+    "ingest:classic@simulation",
+    "auth:flat@auth.calls",
+    "effects:coverage_full@effects.coverage",
+    "screen:clean@screen",
+    "verdict:swap_to_other@ops[0]",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > classic-payment 1`] = `
+{
+  "action": "allow",
+  "reasons": [],
+  "risk": "low",
+  "signals": [
+    "ingest:classic@simulation",
+    "auth:flat@auth.calls",
+    "effects:coverage_full@effects.coverage",
+    "screen:clean@screen",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > classic-payment-to-flagged 1`] = `
+{
+  "action": "allow",
+  "reasons": [],
+  "risk": "low",
+  "signals": [
+    "ingest:classic@simulation",
+    "auth:flat@auth.calls",
+    "effects:coverage_full@effects.coverage",
+    "screen:clean@screen",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > classic-two-recipients-flagged 1`] = `
+{
+  "action": "allow",
+  "reasons": [],
+  "risk": "low",
+  "signals": [
+    "ingest:classic@simulation",
+    "auth:flat@auth.calls",
+    "effects:coverage_full@effects.coverage",
+    "screen:clean@screen",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > deep-auth 1`] = `
+{
+  "action": "block_confirm",
+  "reasons": [
+    "high:unlimited_allowance",
+    "medium:unverified_contract",
+  ],
+  "risk": "high",
+  "signals": [
+    "ingest:simulated@simulation",
+    "auth:nested_invocations@auth.calls",
+    "effects:coverage_partial@effects.coverage",
+    "screen:clean@screen",
+    "effects:nested_outflow@deltas[0]",
+    "effects:nested_outflow@deltas[2]",
+    "effects:unlimited_allowance@approvals[0]",
+    "verdict:unlimited_allowance@approvals[0]",
+    "effects:unverified_contract@unverified",
+    "effects:observed_balance_changes@observed",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > malformed-xdr 1`] = `
+{
+  "action": "block_confirm",
+  "reasons": [
+    "high:undecodable",
+  ],
+  "risk": "high",
+  "signals": [
+    "ingest:fail_closed@simulation",
+    "auth:flat@auth.calls",
+    "effects:coverage_none@effects.coverage",
+    "screen:clean@screen",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > nested-subinvocation 1`] = `
+{
+  "action": "warn",
+  "reasons": [
+    "medium:unverified_contract",
+  ],
+  "risk": "medium",
+  "signals": [
+    "ingest:simulated@simulation",
+    "auth:nested_invocations@auth.calls",
+    "effects:coverage_partial@effects.coverage",
+    "screen:clean@screen",
+    "effects:nested_outflow@deltas[0]",
+    "effects:unverified_contract@unverified",
+    "effects:observed_balance_changes@observed",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > path-payment 1`] = `
+{
+  "action": "allow",
+  "reasons": [],
+  "risk": "low",
+  "signals": [
+    "ingest:classic@simulation",
+    "auth:flat@auth.calls",
+    "effects:coverage_full@effects.coverage",
+    "screen:clean@screen",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > sac-transfer 1`] = `
+{
+  "action": "allow",
+  "reasons": [],
+  "risk": "low",
+  "signals": [
+    "ingest:simulated@simulation",
+    "auth:flat@auth.calls",
+    "effects:coverage_full@effects.coverage",
+    "screen:clean@screen",
+    "effects:observed_balance_changes@observed",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > sep41-approve 1`] = `
+{
+  "action": "block_confirm",
+  "reasons": [
+    "high:unlimited_allowance",
+  ],
+  "risk": "high",
+  "signals": [
+    "ingest:simulated@simulation",
+    "auth:flat@auth.calls",
+    "effects:coverage_full@effects.coverage",
+    "screen:clean@screen",
+    "effects:unlimited_allowance@approvals[0]",
+    "verdict:unlimited_allowance@approvals[0]",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > token-admin 1`] = `
+{
+  "action": "block_confirm",
+  "reasons": [
+    "high:unexpected_outflow",
+    "medium:unverified_contract",
+  ],
+  "risk": "high",
+  "signals": [
+    "ingest:simulated@simulation",
+    "auth:nested_invocations@auth.calls",
+    "effects:coverage_partial@effects.coverage",
+    "screen:clean@screen",
+    "effects:unexpected_outflow@observed[0]",
+    "effects:nested_outflow@deltas[1]",
+    "effects:nested_outflow@deltas[2]",
+    "effects:unverified_contract@unverified",
+    "effects:observed_balance_changes@observed",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > unknown-contract 1`] = `
+{
+  "action": "block_confirm",
+  "reasons": [
+    "high:simulation_reverted",
+    "medium:unverified_contract",
+  ],
+  "risk": "high",
+  "signals": [
+    "ingest:fail_closed@simulation",
+    "auth:flat@auth.calls",
+    "effects:coverage_partial@effects.coverage",
+    "screen:clean@screen",
+    "effects:unverified_contract@unverified",
+  ],
+}
+`;

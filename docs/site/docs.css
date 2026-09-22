@@ -1,0 +1,41 @@
+/* Instawards evidence site — a section of the homepage, same tokens (styles.css). */
+body.docs { margin: 0; background: var(--bg); color: var(--on-surface); }
+.docs-top { position: sticky; top: 0; z-index: 5; background: var(--surface-lowest); border-bottom: 1px solid var(--surface-highest); }
+.docs-top-inner { max-width: 1240px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.docs-top .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--on-surface); font-weight: 600; }
+.docs-top .brand img { width: 28px; height: 28px; border-radius: 8px; }
+.docs-top .brand em { font-style: normal; font-weight: 400; color: var(--on-surface-variant); }
+.docs-top .md-link { font-family: 'Roboto Mono', monospace; font-size: 12px; color: var(--amber); text-decoration: none; border: 1px solid var(--outline-variant); border-radius: 8px; padding: 6px 10px; }
+.docs-layout { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: 240px 1fr; gap: 32px; padding: 24px 20px 64px; }
+.side ul { list-style: none; margin: 0; padding: 0; }
+.side > ul > li { margin: 0 0 6px; }
+.side .group > span { display: block; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--outline); margin: 18px 0 6px; }
+.side a { display: block; padding: 6px 10px; border-radius: 8px; color: var(--on-surface-variant); text-decoration: none; font-size: 14px; }
+.side a:hover { background: var(--surface-low); color: var(--on-surface); }
+.side li.on > a { background: var(--surface); color: var(--amber); font-weight: 600; }
+.docs-main { min-width: 0; }
+.crumbs { font-size: 13px; color: var(--outline); margin: 0 0 18px; }
+.crumbs a { color: var(--on-surface-variant); text-decoration: none; }
+.crumbs .sep { margin: 0 6px; }
+.prose { line-height: 1.6; font-size: 15px; }
+.prose h1 { font-size: 30px; line-height: 1.2; margin: 0 0 16px; }
+.prose h2 { font-size: 21px; margin: 36px 0 12px; padding-top: 12px; border-top: 1px solid var(--surface-highest); }
+.prose h3 { font-size: 16px; margin: 24px 0 8px; color: var(--amber-bright); }
+.prose p, .prose ul, .prose ol { margin: 0 0 14px; }
+.prose a { color: var(--amber); }
+.prose code { font-family: 'Roboto Mono', monospace; font-size: 0.9em; background: var(--surface-low); padding: 1px 5px; border-radius: 5px; word-break: break-all; }
+.prose pre { background: var(--surface-lowest); border: 1px solid var(--surface-highest); border-radius: 12px; padding: 14px 16px; overflow-x: auto; }
+.prose pre code { background: none; padding: 0; word-break: normal; }
+.prose blockquote { margin: 0 0 14px; padding: 10px 16px; border-left: 3px solid var(--amber); background: var(--surface-low); border-radius: 0 10px 10px 0; color: var(--on-surface-variant); }
+.prose .table { overflow-x: auto; margin: 0 0 18px; border: 1px solid var(--surface-highest); border-radius: 12px; }
+.prose table { border-collapse: collapse; width: 100%; font-size: 14px; }
+.prose th, .prose td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--surface-highest); }
+.prose th { background: var(--surface-low); color: var(--on-surface-variant); font-weight: 600; white-space: nowrap; }
+.prose tr:last-child td { border-bottom: 0; }
+.prose hr { border: 0; border-top: 1px solid var(--surface-highest); margin: 28px 0; }
+.docs-foot { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--surface-highest); font-size: 13px; color: var(--outline); }
+.docs-foot a { color: var(--on-surface-variant); }
+@media (max-width: 860px) {
+  .docs-layout { grid-template-columns: 1fr; }
+  .side { order: 2; }
+}
