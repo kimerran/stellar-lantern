@@ -5,6 +5,7 @@
 // report (src/core/telemetry/report.ts).
 
 import { esc, CSS, type Row, type UserTrail } from '@lantern/telemetry-report';
+import type { DownloadRow } from '../downloads/store';
 
 // ── Model ────────────────────────────────────────────────────────────────────
 
@@ -205,6 +206,91 @@ export function buildDashboard(allRows: Row[], since: string, until: string): Da
   };
 }
 
+// ── Downloads (#131) ─────────────────────────────────────────────────────────
+//
+// The download log is a server log of CLICKS on /download/<target>, not app
+// telemetry: it has no consent behind it and no identity, so it is never
+// joined to rows — only counted next to them. "Download intents" is the
+// honest label and the only one used here.
+
+export interface Downloads {
+  total: number;
+  byTarget: Record<string, number>;
+  bySrc: Array<{ src: string; count: number }>;
+  byUa: Record<string, number>;
+  daily: Array<{ day: string; android: number; extension: number }>;
+  // The funnel this exists to show: clicks → installs that reported anything
+  // (opt-in) → wallets with a scan. Each step is a different population and
+  // the ratios are indicative, never exact — consent sits between the first
+  // two and cannot be seen.
+  funnel: { intents: number; installs: number; walletsScanned: number };
+}
+
+export function buildDownloads(
+  downloads: DownloadRow[],
+  rows: Row[],
+  since: string,
+  until: string,
+): Downloads {
+  const byTarget: Record<string, number> = {};
+  const byUa: Record<string, number> = {};
+  const src = new Map<string, number>();
+  const days = new Map<string, { android: number; extension: number }>();
+  const start = Date.parse(`${since}T00:00:00Z`);
+  const end = Date.parse(`${until}T00:00:00Z`);
+  for (let t = start; t < end; t += DAY_MS)
+    days.set(new Date(t).toISOString().slice(0, 10), { android: 0, extension: 0 });
+  for (const d of downloads) {
+    byTarget[d.target] = (byTarget[d.target] ?? 0) + 1;
+    byUa[d.uaFamily] = (byUa[d.uaFamily] ?? 0) + 1;
+    const label = d.src || '(none)';
+    src.set(label, (src.get(label) ?? 0) + 1);
+    const day = days.get(d.ts.toISOString().slice(0, 10));
+    if (day) day[d.target] += 1;
+  }
+  const scanned = new Set<string>();
+  for (const r of rows) if (r.event === 'tx_scanned' && r.account) scanned.add(r.account);
+  return {
+    total: downloads.length,
+    byTarget,
+    bySrc: [...src.entries()]
+      .map(([s, count]) => ({ src: s, count }))
+      .sort((a, b) => b.count - a.count || a.src.localeCompare(b.src)),
+    byUa,
+    daily: [...days.entries()].map(([day, v]) => ({ day, ...v })),
+    funnel: {
+      intents: downloads.length,
+      installs: new Set(rows.map((r) => r.installId)).size,
+      walletsScanned: scanned.size,
+    },
+  };
+}
+
+export function renderDownloadsCard(d: Downloads, qs: string): string {
+  const f = d.funnel;
+  const pct = (a: number, b: number) => (b > 0 ? ` (${Math.round((100 * a) / b)}%)` : '');
+  const funnel = `<table><tr><th>step</th><th class="n">count</th></tr>
+<tr><td>download intents (clicks)</td><td class="n">${n(f.intents)}</td></tr>
+<tr><td>installs reporting (opt-in)</td><td class="n">${n(f.installs)}${esc(pct(f.installs, f.intents))}</td></tr>
+<tr><td>wallets that scanned</td><td class="n">${n(f.walletsScanned)}${esc(pct(f.walletsScanned, f.intents))}</td></tr></table>
+<p class="note">A click is an intent, not a completed download; consent sits between the first two steps and cannot be seen. Ratios are indicative.</p>`;
+  const bySrc = d.bySrc.length
+    ? `<table><tr><th>src</th><th class="n">clicks</th></tr>${d.bySrc
+        .map((s) => `<tr><td><code>${esc(s.src)}</code></td><td class="n">${n(s.count)}</td></tr>`)
+        .join('')}</table>`
+    : '<p class="note">no download clicks in this window</p>';
+  const targets = ['android', 'extension']
+    .map((t) => `<span class="pill">${esc(t)}: ${n(d.byTarget[t] ?? 0)}</span>`)
+    .join(' ');
+  const ua = Object.entries(d.byUa)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => `<span class="pill">${esc(k)}: ${n(v)}</span>`)
+    .join(' ');
+  return `<div class="card"><h2>Download intents</h2><p class="note">${targets}${ua ? ' · ' + ua : ''}</p>
+<div class="grid2"><div>${funnel}</div><div>${bySrc}</div></div>
+<div class="actions"><a href="/admin/downloads.csv?${esc(qs)}">Download CSV</a></div></div>`;
+}
+
 // The rows of one identity, as the trail the report already renders.
 export function walletTrail(
   rows: Row[],
@@ -297,7 +383,7 @@ const tiles = (pairs: Array<[string, string | number]>) =>
 
 export function renderDashboard(
   d: Dashboard,
-  opts: { toolbar: string; qs: string; window: string },
+  opts: { toolbar: string; qs: string; window: string; downloads?: string },
 ): string {
   const top = tiles([
     ['wallets', d.wallets],
@@ -331,6 +417,7 @@ ${d.events === 0 ? '<div class="empty">No activity in this window yet.</div>' : 
 ${top}
 <div class="card"><h2>Daily activity</h2>${dailyChart(d.daily)}</div>
 <div class="grid2"><div class="card"><h2>Events</h2>${events}</div><div class="card"><h2>Transaction scans by risk</h2>${verdicts}</div></div>
+${opts.downloads ?? ''}
 <div class="actions"><a class="primary" href="/admin/wallets${opts.qs ? '?' + esc(opts.qs) : ''}">Wallets →</a><a href="/admin/export.csv?${esc(opts.qs)}">Download CSV</a><a href="/admin/export.json?${esc(opts.qs)}">Download JSON</a></div>`;
   return pageShell('Lantern analytics', body);
 }

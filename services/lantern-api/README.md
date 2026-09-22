@@ -22,6 +22,7 @@ service is down the wallet shows its rules-based sentence instead.
 | `POST /v1/telemetry` | body: the wallet's telemetry envelope; one row per event; `204` (#85) |
 | `DELETE /v1/telemetry/install` | body `{ installId }`; that install's rows gone; `204` either way |
 | `GET /v1/telemetry/export` | `Authorization: Bearer $TELEMETRY_ADMIN_TOKEN`; `?since=&until=&after=`; `{ rows, next }`, 1000 rows a page — the report's only input |
+| `GET /download/android` · `GET /download/extension` | `302` to the newest Release asset (#131): `lantern-<version>-testnet.apk` / `lantern-extension-<version>.zip`. `?v=<version>` pins a release, `?src=<slug>` is attribution. Logs one row per click — a server log, not telemetry (below) |
 
 `/v1/explain` runs the scanner package's own code, imported: `buildPrompt`
 (structured facts only — no XDR, no memo, symbol / function-name guards) →
@@ -62,6 +63,36 @@ unaffected. With it, `TELEMETRY_ADMIN_TOKEN` is required (boot fails
 otherwise). Postgres is private-network only on Railway, so the `pgStore`
 integration test (`test/pg-store.test.ts`) runs only when you point
 `DATABASE_URL` at a database of your own; CI uses the in-memory store.
+
+## Download links and the download log (#131)
+
+`/download/<target>` answers a **302 to the current GitHub Release asset**
+(#130) and writes one row: `{ target, version, src, country, uaFamily, ts }`.
+It never streams the bytes — GitHub's CDN serves the file, Railway pays no
+egress, and the asset's own name means the APK lands as an `.apk`. A row is
+therefore a **download intent** (a click), not a completed download; the
+dashboard labels it that way.
+
+The release is resolved by listing `api.github.com/repos/<DOWNLOADS_REPO>/releases`
+(public repo, **no token**) and taking the newest non-draft release carrying
+the asset — `/releases/latest` cannot be used because it hides pre-releases,
+and every alpha build is one. Cached 5 minutes; on any API failure the last
+good answer keeps serving, then `DOWNLOAD_FALLBACK_<TARGET>_URL` if set, then
+the releases page. A broken link during a tester push is expensive; a 500 is
+never the answer.
+
+**This is a server log with a different privacy basis from the in-app
+events**, and the code keeps them apart: its own table (`downloads`), its own
+store interface, its own CSV. In-app events rest on explicit opt-in consent; a
+download click cannot, because there is no app yet to consent in. What the row
+holds is the whole list above — **no raw IP** (the request's address is never
+read by the files that write rows; the coarse country comes from the edge's
+header when one exists), **no user-agent string** (a three-bucket family:
+`android` / `chrome-desktop` / `other`). Same retention window and sweep as
+telemetry. A `HEAD` is answered but not counted. Own rate limiter and daily cap.
+
+`/admin` shows the funnel — download intents → installs reporting (opt-in) →
+wallets that scanned — by `src`, and `/admin/downloads.csv` exports the log.
 
 ## The analytics page: `/admin` (#104)
 
@@ -135,6 +166,9 @@ The upgrade path once there are real users is per-install client identity
 | `TELEMETRY_ADMIN_TOKEN` | with `DATABASE_URL` | — ; bearer for `/v1/telemetry/export` |
 | `TELEMETRY_DAILY_CAP` | no | `50000` |
 | `TELEMETRY_RETENTION_DAYS` | no | `90` |
+| `DOWNLOADS_REPO` | no | `kimerran/stellar-lantern` — the public repo whose Releases carry the builds (#131) |
+| `DOWNLOADS_DAILY_CAP` | no | `5000` |
+| `DOWNLOAD_FALLBACK_ANDROID_URL` · `DOWNLOAD_FALLBACK_EXTENSION_URL` | no | — ; pinned known-good asset URLs served when the Releases API is unreachable and nothing is cached |
 
 The extension's origin is `chrome-extension://<extension id>`; add the demo
 site's origin alongside it.
@@ -205,9 +239,13 @@ src/upstream/anthropic.ts the one outbound call (injectable fetch)
 src/routes/telemetry.ts   POST /v1/telemetry, DELETE …/install, GET …/export (#85)
 src/telemetry/store.ts    TelemetryStore interface + in-memory implementation
 src/telemetry/pg-store.ts Postgres implementation + the migration
-src/telemetry/retention.ts the 90-day purge
+src/telemetry/retention.ts the 90-day purge (telemetry + the download log)
+src/routes/download.ts    GET /download/<target> — 302 + one row (#131)
+src/downloads/store.ts    DownloadStore interface, in-memory implementation, the row helpers
+src/downloads/releases.ts the GitHub Releases resolver (cache, stale, fallback)
 test/app.test.ts          offline suite (explainer)
 test/telemetry.test.ts    offline suite (ingest, export, delete, retention)
+test/download.test.ts     offline suite (redirect, row shape, fallback, limiter, /admin funnel)
 test/pg-store.test.ts     Postgres integration, DATABASE_URL-gated
 Dockerfile, railway.toml  deploy
 ```

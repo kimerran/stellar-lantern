@@ -3,6 +3,7 @@
 
 import pg from 'pg';
 import type { ExportQuery, NewRow, TelemetryRow, TelemetryStore } from './store';
+import type { DownloadRow, DownloadStore, DownloadTarget, UaFamily } from '../downloads/store';
 
 export const MIGRATION = `
 CREATE TABLE IF NOT EXISTS telemetry_events (
@@ -20,6 +21,40 @@ ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS account TEXT NULL;
 CREATE INDEX IF NOT EXISTS telemetry_events_install_ts ON telemetry_events (install_id, ts);
 CREATE INDEX IF NOT EXISTS telemetry_events_received   ON telemetry_events (received_at);
 `;
+
+// The download log (#131) is its own table, never joined to the consented
+// telemetry rows: the two have different privacy bases (downloads/store.ts).
+export const DOWNLOADS_MIGRATION = `
+CREATE TABLE IF NOT EXISTS downloads (
+  id         BIGSERIAL PRIMARY KEY,
+  target     TEXT        NOT NULL,
+  version    TEXT        NOT NULL,
+  src        TEXT        NOT NULL DEFAULT '',
+  country    TEXT        NOT NULL DEFAULT 'unknown',
+  ua_family  TEXT        NOT NULL,
+  ts         TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS downloads_ts ON downloads (ts);
+`;
+
+interface DownloadDbRow {
+  id: string;
+  target: string;
+  version: string;
+  src: string;
+  country: string;
+  ua_family: string;
+  ts: Date;
+}
+const toDownload = (r: DownloadDbRow): DownloadRow => ({
+  id: Number(r.id),
+  target: r.target as DownloadTarget,
+  version: r.version,
+  src: r.src,
+  country: r.country,
+  uaFamily: r.ua_family as UaFamily,
+  ts: r.ts,
+});
 
 interface DbRow {
   id: string;
@@ -49,10 +84,42 @@ const toRow = (r: DbRow): TelemetryRow => ({
 
 export async function pgStore(
   databaseUrl: string,
-): Promise<TelemetryStore & { close(): Promise<void> }> {
+): Promise<TelemetryStore & { downloads: DownloadStore; close(): Promise<void> }> {
   const pool = new pg.Pool({ connectionString: databaseUrl, max: 5 });
   await pool.query(MIGRATION);
+  await pool.query(DOWNLOADS_MIGRATION);
+  const downloads: DownloadStore = {
+    async insertDownload(r) {
+      await pool.query(
+        'INSERT INTO downloads (target, version, src, country, ua_family, ts) VALUES ($1, $2, $3, $4, $5, $6)',
+        [r.target, r.version, r.src, r.country, r.uaFamily, r.ts],
+      );
+    },
+    async listDownloads(q) {
+      const where: string[] = [];
+      const values: unknown[] = [];
+      if (q.since) {
+        values.push(q.since);
+        where.push(`ts >= $${values.length}`);
+      }
+      if (q.until) {
+        values.push(q.until);
+        where.push(`ts < $${values.length}`);
+      }
+      values.push(q.limit);
+      const res = await pool.query<DownloadDbRow>(
+        `SELECT id, target, version, src, country, ua_family, ts FROM downloads${where.length ? ' WHERE ' + where.join(' AND ') : ''} ORDER BY id ASC LIMIT $${values.length}`,
+        values,
+      );
+      return res.rows.map(toDownload);
+    },
+    async purgeDownloadsBefore(cutoff) {
+      const res = await pool.query('DELETE FROM downloads WHERE ts < $1', [cutoff]);
+      return res.rowCount ?? 0;
+    },
+  };
   return {
+    downloads,
     async insert(rows: NewRow[], receivedAt: Date) {
       if (rows.length === 0) return 0;
       // One multi-row INSERT per envelope.

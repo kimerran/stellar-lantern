@@ -10,6 +10,7 @@
 //   POST /admin/logout         clears the cookie → 303 /admin
 //   GET  /admin/export.csv     the raw rows for the same filters, `account` included
 //   GET  /admin/export.json    same rows as { rows: [...] }; add &wallet=<key> for one identity
+//   GET  /admin/downloads.csv  the download log (#131) for the window — a separate table, separate file
 //
 // The cookie never carries the token: its value is an HMAC of the token under
 // a nonce minted at boot, so a restart invalidates every session and a leaked
@@ -23,6 +24,8 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { buildReport, renderHtml, esc, CSS, type Row } from '@lantern/telemetry-report';
 import {
   buildDashboard,
+  buildDownloads,
+  renderDownloadsCard,
   dailySeries,
   renderDashboard,
   renderNotFound,
@@ -36,10 +39,13 @@ import {
   identityKey,
 } from './admin-views';
 import type { TelemetryRow, TelemetryStore } from '../telemetry/store';
+import type { DownloadRow, DownloadStore } from '../downloads/store';
 import { EXPORT_PAGE } from './telemetry';
 
 export interface AdminDeps {
   store: TelemetryStore | null;
+  // The download log (#131); null when there is no database.
+  downloads?: DownloadStore | null;
   adminToken?: string;
   registryId: string;
   now?: () => Date;
@@ -152,6 +158,20 @@ async function loadRows(store: TelemetryStore, f: Filters): Promise<Row[]> {
     if (page.length < EXPORT_PAGE || out.length >= MAX_ROWS) return out;
     afterId = page[page.length - 1]!.id;
   }
+}
+
+export function downloadsCsv(rows: DownloadRow[]): string {
+  const cell = (v: unknown) => {
+    const s = v === null || v === undefined ? '' : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const head = ['id', 'target', 'version', 'src', 'country', 'uaFamily', 'ts'];
+  const lines = rows.map((r) =>
+    [r.id, r.target, r.version, r.src, r.country, r.uaFamily, r.ts.toISOString()]
+      .map(cell)
+      .join(','),
+  );
+  return [head.join(','), ...lines].join('\n') + '\n';
 }
 
 export function toCsv(rows: Row[]): string {
@@ -281,19 +301,43 @@ export function adminRoutes(deps: AdminDeps): Hono {
     return { rows: await loadRows(deps.store, f), f };
   };
 
+  const loadDownloads = async (f: Filters): Promise<DownloadRow[]> =>
+    deps.downloads
+      ? deps.downloads.listDownloads({
+          since: new Date(`${f.since}T00:00:00Z`),
+          until: new Date(`${f.until}T00:00:00Z`),
+          limit: MAX_ROWS,
+        })
+      : [];
+
   app.get('/admin', async (c) => {
     const g = await gate(c, true);
     if ('deny' in g) return g.deny;
     const { rows, f } = g;
     const d = buildDashboard(rows, f.since, f.until);
-    log({ route: 'admin_dashboard', status: 200, rows: rows.length });
+    const dl = await loadDownloads(f);
+    log({ route: 'admin_dashboard', status: 200, rows: rows.length, downloads: dl.length });
     return c.html(
       renderDashboard(d, {
         toolbar: toolbar(f, '/admin'),
         qs: queryString(f),
         window: windowText(f),
+        downloads: renderDownloadsCard(buildDownloads(dl, rows, f.since, f.until), queryString(f)),
       }),
     );
+  });
+
+  app.get('/admin/downloads.csv', async (c) => {
+    const g = await gate(c, false);
+    if ('deny' in g) return g.deny;
+    const dl = await loadDownloads(g.f);
+    log({ route: 'admin_downloads_csv', status: 200, rows: dl.length });
+    c.header('Content-Type', 'text/csv; charset=utf-8');
+    c.header(
+      'Content-Disposition',
+      `attachment; filename="lantern-downloads-${g.f.since}_${g.f.until}.csv"`,
+    );
+    return c.body(downloadsCsv(dl));
   });
 
   app.get('/admin/wallets', async (c) => {

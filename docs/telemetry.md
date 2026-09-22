@@ -137,6 +137,22 @@ Each flush sends one envelope:
   a failed batch is dropped, not retried (a retry queue is a privacy
   liability). The buffer is capped at 200 events.
 
+## Not telemetry: the download log (#131)
+
+`https://lantern-api-production-3fad.up.railway.app/download/android` and
+`…/download/extension` redirect to the current build and count the click. That
+log is **a server log, not part of the opt-in analytics above**, and it is
+kept apart on purpose: in-app events rest on the consent switch; a download
+click cannot, because there is no app yet to consent in. So it lives in its
+own table, is never joined to events, and is exported separately.
+
+What a row holds — and all it holds: which build (`android` / `extension`),
+the version it was sent to, the `?src=` campaign slug, a coarse country from
+the CDN's header when there is one, and a three-bucket browser family. **No IP
+address** (the code that writes the row never reads it) and **no user-agent
+string**. A row is a download *intent* — a click — not a completed download,
+and the dashboard says so. Same 90-day retention as everything else.
+
 ## Retention
 
 Raw per-install events for **90 days**, then deleted — enforced by the Lantern

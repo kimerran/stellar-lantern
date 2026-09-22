@@ -10,12 +10,13 @@ const log = (line: Record<string, string | number>) => console.log(JSON.stringif
 // Telemetry storage is optional: without DATABASE_URL the telemetry routes
 // answer 503 and the explainer runs as before.
 const store = env.databaseUrl ? await pgStore(env.databaseUrl) : null;
-if (store) startRetention({ store, retentionDays: env.retentionDays, log });
+if (store)
+  startRetention({ store, downloads: store.downloads, retentionDays: env.retentionDays, log });
 if (env.databaseUrl && !env.telemetryAdminToken) {
   throw new Error('TELEMETRY_ADMIN_TOKEN is required when DATABASE_URL is set');
 }
 
-const app = createApp({ env, store, log });
+const app = createApp({ env, store, downloads: store?.downloads ?? null, log });
 serve({ fetch: app.fetch, port: env.port }, (info) => {
   log({ event: 'listening', port: info.port, model: env.model, telemetry: store ? 'on' : 'off' });
 });
