@@ -92,6 +92,11 @@ export interface ScanVerdict {
   // Stage 4's per-counterparty registry answers, when the pipeline ran (#120):
   // what the one-click report hangs off. Absent from the legacy scan().
   screening?: Array<{ address: string; answer: ScreenAnswer }>;
+  // Stage 3's decision-bearing effects, when the pipeline ran (#121): the
+  // per-address net balance movements and the token approvals. The re-check
+  // before submit diffs these — not the prose, not the fee, not the sequence.
+  net?: ReadonlyArray<NetDelta>;
+  approvals?: ReadonlyArray<Approval>;
 }
 
 // ── Paste-to-check (spec §4.5) ───────────────────────────────────────────────

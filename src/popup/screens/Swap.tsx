@@ -9,8 +9,10 @@ import { buildPathPaymentStrictSendXdr, destMinFromQuote } from '@core/stellar/s
 import { fetchStrictSendPaths } from '@core/stellar/paths';
 import { fetchSoroswapQuote, buildSoroswapSwapXdr, pickBestEngine, type SoroswapConfig } from '@core/stellar/soroswap';
 import { computeMaxXlm, type AssetRef } from '@core/stellar/tx';
-import { scanTx } from '@core/scan/wallet';
+import { scanTx, type WalletScanInput } from '@core/scan/wallet';
 import type { ScanVerdict } from '@core/scan';
+import { useRecheck } from '../hooks/useRecheck';
+import { RecheckNotice } from '../components/RecheckNotice';
 import { FLAGS } from '@shared/flags';
 import { isNativePlatform } from '@shared/kv';
 import { formatAmount } from '@shared/format';
@@ -87,6 +89,9 @@ export function Swap({ address, network, onBack }: Props) {
   const [review, setReview] = useState<ReviewData | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [confirmText, setConfirmText] = useState('');
+  const [scanInput, setScanInput] = useState<WalletScanInput | null>(null);
+  // Re-simulate immediately before submit (#121, SOW §3.9).
+  const recheck = useRecheck();
 
   useEffect(() => {
     void loadAccountState(network, address).then((s) => {
@@ -119,6 +124,7 @@ export function Swap({ address, network, onBack }: Props) {
     setReview(null);
     setConfirmText('');
     setError(null);
+    recheck.reset();
   }
 
   // Quote the swap on Horizon, apply the slippage floor, build + scan the tx.
@@ -211,7 +217,7 @@ export function Swap({ address, network, onBack }: Props) {
         });
       }
 
-      const verdict = await scanTx({
+      const input: WalletScanInput = {
         xdr,
         networkPassphrase: network.passphrase,
         rpcUrl: network.sorobanRpcUrl,
@@ -220,7 +226,10 @@ export function Swap({ address, network, onBack }: Props) {
           fromAddress: address,
           spendableXlm: sendBal.isNative ? spendable : undefined,
         },
-      });
+      };
+      const verdict = await scanTx(input);
+      setScanInput(input);
+      recheck.reset();
       if (__FEATURE_TELEMETRY__) track.txScanned(verdict);
 
       setReview({
@@ -247,6 +256,17 @@ export function Swap({ address, network, onBack }: Props) {
     if (!review) return;
     setSubmitting(true);
     setError(null);
+    // Re-check the exact XDR about to be signed (#121). An escalation aborts
+    // and needs a fresh confirm — the typed CONFIRM never survives it.
+    if (scanInput) {
+      const rc = await recheck.guard(review.verdict, scanInput);
+      setReview({ ...review, verdict: rc.verdict });
+      if (!rc.proceed) {
+        setConfirmText('');
+        setSubmitting(false);
+        return;
+      }
+    }
     const res = await sendMessage({
       type: 'SIGN_AND_SUBMIT',
       xdr: review.xdr,
@@ -339,6 +359,7 @@ export function Swap({ address, network, onBack }: Props) {
 
           {/* One-click report to the registry (#120), one row per screened
               counterparty. Testnet only — renders nothing on PUBLIC. */}
+          <RecheckNotice state={recheck.state} />
           <ReportCounterparties reporter={address} network={network} subjects={counterpartiesOf(verdict, address)} />
 
           <Card className="space-y-3">

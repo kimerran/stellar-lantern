@@ -27,7 +27,9 @@ import {
   intentAssetCode,
   type PaymentIntent,
 } from '@core/miniapps/bridge';
-import { scanTx } from '@core/scan/wallet';
+import { scanTx, type WalletScanInput } from '@core/scan/wallet';
+import { useRecheck } from '../hooks/useRecheck';
+import { RecheckNotice } from '../components/RecheckNotice';
 import type { ScanVerdict } from '@core/scan';
 import { Icon } from '../components/Icon';
 import { Card } from '../components/Card';
@@ -300,7 +302,16 @@ function Browser({
   // user's review. The dApp sends an *intent* (destination/amount/memo) — Lantern
   // builds, scans, signs and submits, so the secret never leaves and every send
   // goes through the same security review as the wallet's own Send flow.
-  const [signReq, setSignReq] = useState<{ intent: PaymentIntent; xdr: string; verdict: ScanVerdict; fee: string } | null>(null);
+  const [signReq, setSignReq] = useState<{
+    intent: PaymentIntent;
+    xdr: string;
+    verdict: ScanVerdict;
+    fee: string;
+    scanInput: WalletScanInput;
+  } | null>(null);
+  // Re-simulate immediately before submit (#121, SOW §3.9). A dApp-initiated
+  // payment is the case where the wait between review and confirm is longest.
+  const recheck = useRecheck();
   const [submitting, setSubmitting] = useState(false);
   const [signErr, setSignErr] = useState<string | null>(null);
   const [confirmText, setConfirmText] = useState('');
@@ -358,16 +369,18 @@ function Browser({
         amount: intent.amount,
         memo: intent.memo,
       });
-      const verdict = await scanTx({
+      const scanInput: WalletScanInput = {
         xdr,
         networkPassphrase: cfg.passphrase,
         rpcUrl: cfg.sorobanRpcUrl,
         context: { network, fromAddress: address, destinationFunded: destFunded, origin: open.title },
-      });
+      };
+      const verdict = await scanTx(scanInput);
       setConfirmText('');
       setSignErr(null);
+      recheck.reset();
       if (__FEATURE_TELEMETRY__) track.txScanned(verdict);
-      setSignReq({ intent, xdr, verdict, fee: formatAmount(String(Number(baseFee) / 1e7)) });
+      setSignReq({ intent, xdr, verdict, fee: formatAmount(String(Number(baseFee) / 1e7)), scanInput });
     } catch {
       postToApp({ type: 'lantern:txError', error: 'Could not prepare the transaction.' });
     }
@@ -431,6 +444,20 @@ function Browser({
     submittingRef.current = true;
     setSubmitting(true);
     setSignErr(null);
+    // Re-check the exact XDR about to be signed (#121). An escalation aborts
+    // and needs a fresh confirm — the typed CONFIRM never survives it.
+    const rc = await recheck.guard(signReq.verdict, signReq.scanInput);
+    // Functional update, keyed to the xdr: a second intent posted during the
+    // re-check must not be overwritten by the old request with a fresh verdict.
+    setSignReq((cur) =>
+      cur && cur.xdr === signReq.xdr ? { ...cur, verdict: rc.verdict } : cur,
+    );
+    if (!rc.proceed) {
+      setConfirmText('');
+      submittingRef.current = false;
+      setSubmitting(false);
+      return;
+    }
     const cfg = config;
     const res = await sendMessage({
       type: 'SIGN_AND_SUBMIT',
@@ -451,6 +478,7 @@ function Browser({
     postToApp({ type: 'lantern:txRejected' });
     setSignReq(null);
     setSignErr(null);
+    recheck.reset();
   }
 
   // Make the sign & submit sheet a real modal dialog (#127): trap Tab focus,
@@ -740,6 +768,8 @@ function Browser({
                 whatToDo={isHigh ? 'A dApp requested this. If you didn’t expect it, reject — signing can’t be undone.' : undefined}
               />
             )}
+
+            <RecheckNotice state={recheck.state} />
 
             {/* One-click report to the registry (#120): the dApp's destination
                 and any other screened counterparty. Testnet only. */}

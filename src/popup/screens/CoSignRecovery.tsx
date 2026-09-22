@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { track } from '@core/telemetry';
 import type { NetworkConfig } from '@shared/constants';
 import { sendMessage } from '@shared/messages';
-import { scanTx } from '@core/scan/wallet';
+import { scanTx, type WalletScanInput } from '@core/scan/wallet';
 import type { ScanVerdict } from '@core/scan';
+import { useRecheck } from '../hooks/useRecheck';
+import { RecheckNotice } from '../components/RecheckNotice';
 import { recoveryCoSignError } from '@core/recovery/guardians';
 import { isNativePlatform } from '@shared/kv';
 import { Button } from '../components/Button';
@@ -36,6 +38,10 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
   // and double-counting tx_scanned, and the button shows the wait.
   const [reviewing, setReviewing] = useState(false);
   const [confirmText, setConfirmText] = useState('');
+  const [scanInput, setScanInput] = useState<WalletScanInput | null>(null);
+  // Re-simulate immediately before signing (#121, SOW §3.9) — a co-signature
+  // is still a signature over a transaction that can have drifted.
+  const recheck = useRecheck();
   const [signedXdr, setSignedXdr] = useState('');
   const [signing, setSigning] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -60,12 +66,15 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
     setError(null);
     setReviewing(true);
     try {
-      const v = await scanTx({
+      const input: WalletScanInput = {
         xdr: xdr.trim(),
         networkPassphrase: network.passphrase,
         rpcUrl: network.sorobanRpcUrl,
         context: { network: network.id, fromAddress: address },
-      });
+      };
+      const v = await scanTx(input);
+      setScanInput(input);
+      recheck.reset();
       if (__FEATURE_TELEMETRY__) track.txScanned(v);
       setVerdict(v);
       setConfirmText('');
@@ -78,6 +87,17 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
   async function coSign() {
     setSigning(true);
     setError(null);
+    // Re-check the exact XDR about to be signed (#121). An escalation aborts
+    // and needs a fresh confirm — the typed CONFIRM never survives it.
+    if (verdict && scanInput) {
+      const rc = await recheck.guard(verdict, scanInput);
+      setVerdict(rc.verdict);
+      if (!rc.proceed) {
+        setConfirmText('');
+        setSigning(false);
+        return;
+      }
+    }
     const res = await sendMessage({ type: 'SIGN_ONLY', xdr: xdr.trim(), networkPassphrase: network.passphrase });
     setSigning(false);
     if (res.ok) {
@@ -138,7 +158,7 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
     const acknowledged = !isHigh || native || confirmText.trim().toUpperCase() === 'CONFIRM';
     return (
       <div className="flex h-full flex-col bg-background">
-        <Header title="Review Request" onBack={() => { setStep('paste'); setVerdict(null); setError(null); }} />
+        <Header title="Review Request" onBack={() => { setStep('paste'); setVerdict(null); setError(null); recheck.reset(); }} />
         <div className="no-scrollbar flex-1 space-y-4 overflow-y-auto px-4 pb-4">
           <p className="text-label-md text-on-surface-variant">
             You’re co-signing someone’s account recovery. Only continue if you personally trust them and expected this.
@@ -161,6 +181,7 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
 
           {/* One-click report to the registry (#120), one row per screened
               counterparty. Testnet only — renders nothing on PUBLIC. */}
+          <RecheckNotice state={recheck.state} />
           {!scanning && verdict && (
             <ReportCounterparties reporter={address} network={network} subjects={counterpartiesOf(verdict, address)} />
           )}

@@ -10,6 +10,7 @@ export type RiskLevel = 'low' | 'medium' | 'high';
 export type ScanAction = 'allow' | 'warn' | 'block_confirm';
 // Mirrors the registry contract's `Reason` enum (src/core/registry/report.ts).
 export type RegistryReason = 'Scam' | 'Phishing' | 'Drainer' | 'Poisoning' | 'Mixer' | 'Other';
+export type RecheckDirection = 'none' | 'escalated' | 'de_escalated' | 'lateral' | 'failed';
 
 // Bundled mini-app ids only (src/core/miniapps/directory.ts) — never a URL.
 // Anything not in this list is reported as 'other'.
@@ -41,6 +42,10 @@ export type TelemetryEvent =
   // targets. The reason is the contract's closed enum; no address, no fee
   // amount, no note has a slot here.
   | { name: 'registry_report_submitted'; props: { reason: RegistryReason; ok: boolean } }
+  // The re-check before submit (#121). `failed` = could not re-check (RPC
+  // down / timeout); `none` = re-checked, nothing changed. Drift frequency is
+  // the number that says whether the guard earns its latency.
+  | { name: 'tx_rechecked'; props: { drifted: boolean; direction: RecheckDirection } }
   // Consent lifecycle
   | { name: 'consent_granted'; props: Record<string, never> }
   | { name: 'consent_revoked'; props: Record<string, never> };
@@ -65,6 +70,10 @@ export const EVENT_SCHEMA: Record<EventName, Record<string, readonly string[] | 
   registry_report_submitted: {
     reason: ['Scam', 'Phishing', 'Drainer', 'Poisoning', 'Mixer', 'Other'],
     ok: 'boolean',
+  },
+  tx_rechecked: {
+    drifted: 'boolean',
+    direction: ['none', 'escalated', 'de_escalated', 'lateral', 'failed'],
   },
   consent_granted: {},
   consent_revoked: {},
