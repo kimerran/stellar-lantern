@@ -24,8 +24,10 @@ Lantern is a **non-custodial Stellar wallet** built around one idea: you should 
 ### What you'll need
 
 - Your **tester number** — it's in the message that sent you this guide. You'll need it in Part 3.
-- An Android phone (Android 8 or newer) and the **`app-debug.apk`** file we sent you.
-- Desktop Chrome, Edge, Brave or another Chromium browser, and the **`lantern-stellar-wallet-0.1.0.zip`** we sent you (the version number may be higher — the message names the exact file).
+- An Android phone (Android 8 or newer) and the **`lantern-0.1.0-testnet.apk`** file from the release link we sent you.
+- Desktop Chrome, Edge, Brave or another Chromium browser, and the **`lantern-extension-0.1.0.zip`** from the same release link (the version number may be higher — the message names the exact release).
+
+Both files sit on one GitHub **Release** page together with a `SHA256SUMS.txt` and the hashes printed in the release notes. If you know how to check a file's SHA-256, do — you're about to sideload an app and load an unpacked extension, and a matching hash is how you know you got what we published. If you don't, skip it; nothing else depends on it.
 - Somewhere to save screenshots.
 
 **We'd like you to test both platforms.** Pick one as your *main* platform and do everything on it (Parts 0–5). Then, in Part 7, install the other, import the same wallet, and repeat two short steps — about 10 extra minutes. The same wallet on two screens is exactly the comparison we can't make ourselves. If you truly can't do both, one is still valuable — tell us which.
@@ -76,7 +78,7 @@ You'll install **both** eventually. Install your **main** platform now (either o
 
 ### Android APK
 
-1. Copy `app-debug.apk` onto your phone (email it to yourself, or use the link we sent).
+1. On the phone, open the release link and tap `lantern-0.1.0-testnet.apk`. It downloads as an `.apk` — no unzipping.
 2. Open your **Files** app and tap the APK.
 3. Android will warn you the app is from an unknown source. That's expected — this is a test build not yet on the Play Store. Tap **Settings** → enable **Allow from this source** → go back and tap **Install**.
 4. You may also see "Play Protect doesn't recognize this developer". Tap **Install anyway**. (Expected for a pre-release build — but don't do this for apps from people you don't know.)
@@ -86,7 +88,7 @@ You'll install **both** eventually. Install your **main** platform now (either o
 
 ### Chrome extension
 
-1. Unzip `lantern-stellar-wallet-0.1.0.zip` somewhere you'll leave it — your Documents folder, not Downloads. **Chrome loads the extension from this folder every time, so don't delete or move it after installing.**
+1. Download `lantern-extension-0.1.0.zip` from the release link and unzip it somewhere you'll leave it — your Documents folder, not Downloads. **Chrome loads the extension from this folder every time, so don't delete or move it after installing.**
 2. Go to `chrome://extensions`.
 3. Turn on **Developer mode** (toggle, top right).
 4. Click **Load unpacked**.
