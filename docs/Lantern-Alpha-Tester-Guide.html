@@ -28,8 +28,8 @@ hr { border: 0; border-top: 1px solid #d8dde8; margin: 22px 0; }
 a { color: #1a1a1a; }
 em { color: #444; }
 </style></head><body>
-<div class="hero"><span class="tag">ALPHA · CONFIDENTIAL</span><h1>Lantern<br>Alpha Tester Guide</h1><p class="sub">A security-first Stellar wallet. You're one of a small group looking at this before anyone else.</p><div class="meta"><p><strong>Time needed:</strong> about 60 minutes · <strong>Platforms:</strong> Android APK <strong>and</strong> Chrome extension — please test both · <strong>Network:</strong> Stellar Testnet only<br><strong>What we need back:</strong> one ZIP file — 10 screenshots from your main platform, 2 from the second, and honest answers to 5 questions.</p></div></div>
-<p>Lantern is a <strong>non-custodial Stellar wallet</strong> built around one idea: you should never sign something you don't understand. Every time you are about to sign, Lantern shows a <strong>review screen</strong> that says in plain words what the transaction does, checks who it pays against an on-chain scam registry, and gives it a risk level. That review screen is what this round of testing is about: <strong>we need you to make it run, six times, in six different places in the app</strong>, and tell us where it helped, confused, or got it wrong.</p>
+<div class="hero"><span class="tag">ALPHA · CONFIDENTIAL</span><h1>Lantern<br>Alpha Tester Guide</h1><p class="sub">A security-first Stellar wallet. You're one of a small group looking at this before anyone else.</p><div class="meta"><p><strong>Time needed:</strong> about 70 minutes · <strong>Platforms:</strong> Android APK <strong>and</strong> Chrome extension — please test both · <strong>Network:</strong> Stellar Testnet only<br><strong>What we need back:</strong> one ZIP file — 12 screenshots from your main platform, 2 from the second, three stellar.expert links, and honest answers to 5 questions.</p></div></div>
+<p>Lantern is a <strong>non-custodial Stellar wallet</strong> built around one idea: you should never sign something you don't understand. Every time you are about to sign, Lantern shows a <strong>review screen</strong> that says in plain words what the transaction does, checks who it pays against an on-chain scam registry, and gives it a risk level. That review screen is what this round of testing is about: <strong>we need you to make it run, six times, in six different places in the app</strong>, then <strong>report two addresses to that registry yourself</strong> (Part 8), and tell us where it helped, confused, or got it wrong.</p>
 <blockquote class="warn">
 <p>⚠️ <strong>Read this first — Testnet only</strong></p>
 <p>This build runs on <strong>Stellar Testnet</strong>. The XLM in it is <strong>play money with no value</strong>, handed out for free by a faucet.</p>
@@ -53,6 +53,7 @@ em { color: #444; }
 <ul>
 <li><strong>Settings → Privacy</strong>: the switch is titled <strong>Share usage data (alpha)</strong>, and the &quot;we collect&quot; list includes <em>your public wallet address (alpha builds only)</em>. If the switch's title says &quot;Share <strong>anonymous</strong> usage data&quot; instead, you have the wrong build — stop and tell us.</li>
 <li><strong>Settings</strong>, bottom of the page: the version number. Put it in your answers file.</li>
+<li><strong>A review screen</strong> (exercise 1) shows a <strong>Report this address</strong> row under Lantern's check. If it doesn't, the build is older than this guide — stop and tell us.</li>
 </ul>
 <hr>
 <h2>Part 0 — Turn usage sharing on (the first thing you do)</h2>
@@ -154,7 +155,7 @@ em { color: #444; }
 <h2>Part 3 — Six transactions through the security check ⭐</h2>
 <p><strong>This is the heart of the test.</strong> Each exercise below makes Lantern's review screen run in a different part of the app. Do all six, in order. Some you will sign; two you will <strong>cancel</strong> at the review screen — cancelling still counts, because the check ran.</p>
 <p>At every review screen, before you do anything else, read it and ask: <em>does it say, in one plain sentence, what is about to happen? Would I have understood it if I weren't a crypto person?</em> Then look for the <strong>badge</strong>: <strong>Checked by Lantern</strong> (low risk), <strong>Caution — review below</strong> (medium) or <strong>High risk — action needed</strong> (high).</p>
-<p>You'll need your <strong>tester number</strong> and the <a href="https://github.com/kimerran/stellar-lantern/blob/develop/docs/alpha-tester-assignments.md">assignment table</a> for exercise 3.</p>
+<p>You'll need your <strong>tester number</strong> and the <a href="https://github.com/kimerran/stellar-lantern/blob/develop/docs/alpha-tester-assignments.md">assignment table</a> for exercise 3 and for Part 8.</p>
 <h3>Exercise 1 — An ordinary payment (baseline)</h3>
 <ol>
 <li>On <strong>Home</strong>, tap <strong>Send</strong>.</li>
@@ -306,8 +307,56 @@ I owe you tonight once I'm home.
 </blockquote>
 <p>Then tell us: did anything look, read or behave <strong>differently</strong> between the phone and the browser? Same wallet, two screens — differences are findings.</p>
 <hr>
-<h2>Coming next: reporting an address to the registry</h2>
-<p>The registry that flagged exercise 2's address is public and on-chain, and the next build adds a <strong>one-click report</strong> so you can add an address to it yourself. Your row in the <a href="https://github.com/kimerran/stellar-lantern/blob/develop/docs/alpha-tester-assignments.md">assignment table</a> already holds two addresses (<strong>R1</strong>, <strong>R2</strong>) for that exercise. <strong>Do nothing with them yet</strong> — the button isn't in this build. When it ships we'll send a one-page addendum; you'll report each of your two addresses once, then one of them a second time, and screenshot the transaction on stellar.expert. Reporting costs a small testnet fee (Friendbot covers it), you can't report your own address, and a second report of the same address is an extra transaction but not an extra registry entry — the addendum explains why that matters.</p>
+<h2>Part 8 — Report two addresses to the registry (about 10 minutes)</h2>
+<p>The registry that flagged exercise 2's address is public and on-chain, and this build lets you <strong>add an address to it yourself</strong> with a one-click report. Your row in the <a href="https://github.com/kimerran/stellar-lantern/blob/develop/docs/alpha-tester-assignments.md">assignment table</a> holds two addresses for this, <strong>R1</strong> and <strong>R2</strong>. They were generated for the exercise and belong to nobody — you are seeding test entries on a test network, not accusing anyone.</p>
+<p>Four things to know before you start:</p>
+<ul>
+<li><strong>Reporting costs 1 XLM</strong> (Testnet money — Friendbot covered it). The fee is shown on the sheet before you sign; if it ever says <em>Unknown</em>, stop and tell us.</li>
+<li><strong>Your address is recorded on-chain as the reporter.</strong> The sheet says so. That's the point of the registry — reports are attributable — and it's why we ask you to report only your two assigned rows.</li>
+<li><strong>You can't report your own address</strong>, and you don't need to send any money to report: you'll do it from the review screen, then cancel the payment.</li>
+<li><strong>Report exactly what this part asks for: R1, then R2, then R1 again.</strong> The order matters for what we're measuring (see 8.4).</li>
+</ul>
+<h3>8.1 — Report R1</h3>
+<ol>
+<li>On <strong>Home</strong>, tap <strong>Send</strong>. Paste your <strong>R1</strong> address, enter <strong>2 XLM</strong>, and continue to the review step. (Nobody has funded R1, so it reads as a brand-new account, like exercise 3. You're not going to send this.)</li>
+<li>Under Lantern's check, find the row <strong>Report this address</strong> and tap it.</li>
+<li>A sheet opens. Check it against this list — every item should be there:
+<ul>
+<li>the <strong>full address</strong>, not shortened (compare it to your row — every character);</li>
+<li>a <strong>Reason</strong> picker — choose <strong>Scam</strong>;</li>
+<li>an optional <strong>Note</strong> box — type a few words if you like. Only a fingerprint (hash) of the note goes on-chain; the note itself never leaves your device and isn't saved anywhere;</li>
+<li><strong>Report fee: 1 XLM</strong>;</li>
+<li>the sentence <em>&quot;This is public, permanent, and recorded on-chain against your address.&quot;</em></li>
+</ul>
+</li>
+<li>Tap <strong>Sign &amp; report</strong>. Within a few seconds the row turns into <strong>Reported to the registry — This address now has 1 report.</strong></li>
+<li>Tap <strong>View report on stellar.expert</strong>. The page that opens is the transaction you just made.</li>
+</ol>
+<blockquote class="shot">
+<p>📸 <strong>SCREENSHOT 13</strong> — The stellar.expert page for the report transaction. <strong>Copy its URL into your answers file too.</strong></p>
+</blockquote>
+<h3>8.2 — Watch Lantern catch it</h3>
+<p>Stay on the same review screen — the one you opened before reporting. It still shows the check from <em>before</em> your report.</p>
+<ol>
+<li>Tap <strong>Confirm &amp; Send</strong> as if you'd changed your mind and wanted to pay R1 after all.</li>
+<li>Lantern re-checks the payment right before signing. Expect a red box — <strong>Something changed while you were reviewing</strong> — saying R1 <em>was reported as scam while you were reviewing</em>, and the badge switching to <strong>High risk — action needed</strong> with the extra step from exercise 2 (press-and-hold, or type CONFIRM).</li>
+<li><strong>Nothing was signed. Cancel.</strong></li>
+</ol>
+<p>That is the whole loop in one screen: an address gets reported, and the next person about to pay it is warned — even if their review was already open.</p>
+<blockquote class="shot">
+<p>📸 <strong>SCREENSHOT 14</strong> — The <em>Something changed</em> box with the high-risk badge.</p>
+</blockquote>
+<h3>8.3 — Report R2</h3>
+<p>Same as 8.1 with your <strong>R2</strong> address: <strong>Send</strong> → paste R2 → 2 XLM → review → <strong>Report this address</strong> → reason <strong>Phishing</strong> this time → <strong>Sign &amp; report</strong> → <em>now has 1 report</em> → then <strong>cancel</strong> the payment. No screenshot needed, but note the stellar.expert URL.</p>
+<h3>8.4 — Report R1 a second time</h3>
+<ol>
+<li><strong>Send</strong> → paste <strong>R1</strong> again → 2 XLM → review. This time the review should <strong>already</strong> warn you: R1 is a reported address now, exactly like exercise 2. (Lantern remembers a registry check for about a minute — if it still says clean, go back, wait a minute, and open the review again.)</li>
+<li>The report row now reads <strong>Report it too · 1 report on chain</strong>. Tap it.</li>
+<li>The sheet adds a warning: <em>This address is already on the registry. Reporting again adds to its count and charges the fee again; the first reporter and date stay as they are.</em> Read it, then <strong>Sign &amp; report</strong>.</li>
+<li>Expect <strong>This address now has 2 reports.</strong> Then <strong>cancel</strong> the payment.</li>
+</ol>
+<p><strong>Why we ask for this.</strong> A second report of an address is a real transaction (the network fee and the 1 XLM fee are both charged again) and it raises that address's count — but it does <strong>not</strong> create a second registry entry, and it doesn't change who reported it first. The sprint is measured on both numbers: <em>how many distinct addresses are on the registry</em> (your R1 and R2 each add one) and <em>how many report transactions were made</em> (your three reports add three). Thirty testers reporting the same address would score thirty transactions and one entry — which is why every tester has their own two rows.</p>
+<p>Tell us afterwards: did the sheet make it clear that this would cost you money and be recorded against your address? Would you have reported a real scammer with this, and what would have stopped you?</p>
 <hr>
 <h2>Sending it back</h2>
 <p>Put everything in <strong>one ZIP file</strong> named</p>
@@ -315,10 +364,11 @@ I owe you tonight once I'm home.
 </code></pre>
 <p>containing:</p>
 <ul>
-<li><strong>Your screenshots</strong> — 1 through 12, named by number (<code>01-privacy.png</code>, <code>03-exercise-1.png</code>, …).</li>
+<li><strong>Your screenshots</strong> — 1 through 14, named by number (<code>01-privacy.png</code>, <code>03-exercise-1.png</code>, …).</li>
 <li><strong>Your answers</strong> to the five questions and the Part 7 differences, as a text or document file (<code>answers.txt</code> / <code>answers.docx</code>).</li>
 <li><strong>At the top of the answers file:</strong> your tester number, which platform was your main one, your phone model and browser version, the <strong>app version</strong> from Settings, and your <strong>Analytics ID</strong> from Part 0.</li>
 <li><strong>Your wallet address</strong> (the <code>G…</code> address from <strong>Receive</strong>) — paste it under your platform details. This is how we match your answers to your usage.</li>
+<li><strong>The stellar.expert URLs</strong> of your three report transactions from Part 8.</li>
 </ul>
 <p>If you hit a crash or something clearly broken, tell us <strong>what you did immediately before it happened</strong>. That one sentence saves us hours.</p>
 <p><strong>Email the ZIP to:</strong> lantern@artisam.xyz</p>
