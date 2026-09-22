@@ -306,7 +306,10 @@ describe('decideRecheck — what the confirm handler does next', () => {
 
   it('the hook only remembers an acknowledgement for the same xdr, and never for high', () => {
     expect(hookSrc).toMatch(/acknowledgedXdr\.current === input\.xdr/);
-    expect(hookSrc).toMatch(/acknowledged && reviewed\.action !== 'block_confirm'/);
+    // The retry re-runs the re-check and hands the acknowledgement to the
+    // pure decision — it never short-circuits recheckTx().
+    expect(hookSrc).toMatch(/decideRecheck\(reviewed, result, acknowledged\)/);
+    expect(hookSrc).not.toMatch(/return \{ proceed: true, verdict: reviewed/);
     expect(hookSrc).toMatch(/decision\.state\.kind === 'failed' && !decision\.state\.refused \? input\.xdr : null/);
   });
 });

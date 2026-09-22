@@ -19,10 +19,12 @@ import {
 //   …sign…
 //
 // The "couldn't re-check" branch needs an explicit second confirm: the first
-// call returns `proceed: false` with `state.kind === 'failed'`; the next call
-// on the SAME xdr proceeds without re-running (unless the reviewed verdict
-// was already high, which refuses every time). Any other xdr resets that
-// acknowledgement — it never carries across transactions.
+// call returns `proceed: false` with `state.kind === 'failed'`. The next call
+// on the SAME xdr re-runs the re-check regardless — the RPC may well be back,
+// and a fresh result is decided as normal (an escalation still aborts). Only
+// if it fails AGAIN does the acknowledgement let it proceed, and never when
+// the reviewed verdict was already high, which refuses every time. Any other
+// xdr resets that acknowledgement — it never carries across transactions.
 export function useRecheck() {
   const [state, setState] = useState<RecheckState>({ kind: 'idle' });
   const acknowledgedXdr = useRef<string | null>(null);
@@ -30,16 +32,10 @@ export function useRecheck() {
   const guard = useCallback(
     async (reviewed: ScanVerdict, input: WalletScanInput): Promise<RecheckDecision> => {
       const acknowledged = acknowledgedXdr.current === input.xdr;
-      if (acknowledged && reviewed.action !== 'block_confirm') {
-        // The user saw "couldn't re-check" and confirmed anyway.
-        const state: RecheckState = { kind: 'failed', failure: 'rpc', refused: false };
-        setState(state);
-        return { proceed: true, verdict: reviewed, state };
-      }
       setState({ kind: 'checking' });
       const result = await recheckTx(reviewed, input);
       if (__FEATURE_TELEMETRY__) track.txRechecked(recheckTelemetry(result));
-      const decision = decideRecheck(reviewed, result, false);
+      const decision = decideRecheck(reviewed, result, acknowledged);
       acknowledgedXdr.current =
         decision.state.kind === 'failed' && !decision.state.refused ? input.xdr : null;
       setState(decision.state);

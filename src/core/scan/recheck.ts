@@ -106,6 +106,9 @@ const approvalKey = (a: Approval) =>
  */
 export function diffVerdicts(reviewed: ScanVerdict, fresh: ScanVerdict): VerdictDrift {
   const changes: DriftChange[] = [];
+  // Tracked structurally, not by matching the copy: set only in the two
+  // branches that are relief (risk fell; an address stopped being flagged).
+  let relief = false;
 
   // Risk / action.
   if (
@@ -118,6 +121,7 @@ export function diffVerdicts(reviewed: ScanVerdict, fresh: ScanVerdict): Verdict
       escalation: true,
     });
   } else if (RANK[fresh.risk] < RANK[reviewed.risk]) {
+    relief = true;
     changes.push({
       kind: 'risk',
       detail: `The risk went from ${reviewed.risk} to ${fresh.risk} since you opened this review.`,
@@ -140,6 +144,7 @@ export function diffVerdicts(reviewed: ScanVerdict, fresh: ScanVerdict): Verdict
         escalation: true,
       });
     } else if (b === 'flagged') {
+      relief = true;
       changes.push({
         kind: 'screening',
         address,
@@ -263,11 +268,6 @@ export function diffVerdicts(reviewed: ScanVerdict, fresh: ScanVerdict): Verdict
 
   if (changes.length === 0) return { drifted: false };
   if (changes.some((c) => c.escalation)) return { drifted: true, changes, direction: 'escalated' };
-  const relief = changes.some(
-    (c) =>
-      (c.kind === 'risk' && !c.escalation) ||
-      (c.kind === 'screening' && c.detail.includes('no longer flagged')),
-  );
   return { drifted: true, changes, direction: relief ? 'de-escalated' : 'lateral' };
 }
 

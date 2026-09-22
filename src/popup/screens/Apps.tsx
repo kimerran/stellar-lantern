@@ -447,7 +447,11 @@ function Browser({
     // Re-check the exact XDR about to be signed (#121). An escalation aborts
     // and needs a fresh confirm — the typed CONFIRM never survives it.
     const rc = await recheck.guard(signReq.verdict, signReq.scanInput);
-    setSignReq({ ...signReq, verdict: rc.verdict });
+    // Functional update, keyed to the xdr: a second intent posted during the
+    // re-check must not be overwritten by the old request with a fresh verdict.
+    setSignReq((cur) =>
+      cur && cur.xdr === signReq.xdr ? { ...cur, verdict: rc.verdict } : cur,
+    );
     if (!rc.proceed) {
       setConfirmText('');
       submittingRef.current = false;
