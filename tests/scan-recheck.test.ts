@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Account, Asset, BASE_FEE, Networks, Operation, TransactionBuilder } from '@stellar/stellar-sdk';
+import {
+  Account,
+  Asset,
+  BASE_FEE,
+  Networks,
+  Operation,
+  TransactionBuilder,
+} from '@stellar/stellar-sdk';
 import {
   entryLedgerKey,
   runPipeline,
@@ -77,7 +84,10 @@ const ENTRY = {
   evidence: '00'.repeat(32),
   index: 0,
 };
-const notFlagged = async (_a: string): Promise<ScreenAnswer> => ({ outcome: 'not_flagged', source: 'stub' });
+const notFlagged = async (_a: string): Promise<ScreenAnswer> => ({
+  outcome: 'not_flagged',
+  source: 'stub',
+});
 const flagged = async (address: string): Promise<ScreenAnswer> =>
   address === FLAGGED
     ? { outcome: 'flagged', source: 'registry', entry: ENTRY }
@@ -93,7 +103,12 @@ function input(f: Fixture, extra: Record<string, unknown> = {}): WalletScanInput
     xdr: f.xdr,
     networkPassphrase: f.networkPassphrase,
     rpcUrl: 'https://rpc.invalid',
-    context: { network: 'TESTNET' as const, fromAddress: f.source, destinationFunded: true, ...extra },
+    context: {
+      network: 'TESTNET' as const,
+      fromAddress: f.source,
+      destinationFunded: true,
+      ...extra,
+    },
   };
 }
 
@@ -149,7 +164,15 @@ describe('an address reported between review and confirm', () => {
     expect(decideRecheck(reviewed, result, true).proceed).toBe(false);
     // And every confirm handler wipes the typed CONFIRM when it aborts, so
     // the fresh verdict's gate starts empty.
-    for (const [name, src] of Object.entries({ sendSrc, appsSrc, swapSrc, earnSrc, guardiansSrc, smartSrc, coSignSrc })) {
+    for (const [name, src] of Object.entries({
+      sendSrc,
+      appsSrc,
+      swapSrc,
+      earnSrc,
+      guardiansSrc,
+      smartSrc,
+      coSignSrc,
+    })) {
       expect(src, name).toMatch(/if \(!rc\.proceed\) \{\s*setConfirmText\(''\);/);
     }
   });
@@ -173,21 +196,39 @@ describe('what the diff ignores', () => {
     const source = 'GDRXE2BQUC3AZNPVFSCEZ76NJ3WWL25FYFK6RGZGIEKWE4SOOHSUJUJ6';
     const build = (seq: string, fee: string, timeout: number) =>
       new TransactionBuilder(new Account(source, seq), { fee, networkPassphrase: Networks.TESTNET })
-        .addOperation(Operation.payment({ destination: FLAGGED, asset: Asset.native(), amount: '25' }))
+        .addOperation(
+          Operation.payment({ destination: FLAGGED, asset: Asset.native(), amount: '25' }),
+        )
         .setTimeout(timeout)
         .build()
         .toXDR();
     const ctx = { network: 'TESTNET' as const, fromAddress: source, destinationFunded: true };
-    const a = await scanTx({ xdr: build('1', BASE_FEE, 180), networkPassphrase: Networks.TESTNET, context: ctx }, { screen: notFlagged });
-    const b = await scanTx({ xdr: build('999', '5000', 30), networkPassphrase: Networks.TESTNET, context: ctx }, { screen: notFlagged });
+    const a = await scanTx(
+      { xdr: build('1', BASE_FEE, 180), networkPassphrase: Networks.TESTNET, context: ctx },
+      { screen: notFlagged },
+    );
+    const b = await scanTx(
+      { xdr: build('999', '5000', 30), networkPassphrase: Networks.TESTNET, context: ctx },
+      { screen: notFlagged },
+    );
     expect(a.net).toHaveLength(2);
     expect(diffVerdicts(a, b)).toEqual({ drifted: false });
   });
 
   it('never reads the sentence, the sequence, the fee or the time bounds', () => {
     // Property reads of the ignored fields — mentions in comments don't count.
-    for (const field of ['.explanation', '.sequence', '.timeBounds', '.fee', '.latencyMs', '.reasons', '.tier']) {
-      const uses = recheckSrc.split('\n').filter((l) => !l.trim().startsWith('//') && l.includes(field));
+    for (const field of [
+      '.explanation',
+      '.sequence',
+      '.timeBounds',
+      '.fee',
+      '.latencyMs',
+      '.reasons',
+      '.tier',
+    ]) {
+      const uses = recheckSrc
+        .split('\n')
+        .filter((l) => !l.trim().startsWith('//') && l.includes(field));
       expect(uses, field).toEqual([]);
     }
   });
@@ -211,18 +252,29 @@ describe('net movements and approvals', () => {
 
   it('more leaving, or less arriving, escalates; less leaving is lateral', () => {
     const reviewed = { ...base, net: [net(me, '25', '0'), net(FLAGGED, '0', '25')] };
-    expect(diffVerdicts(reviewed, { ...base, net: [net(me, '26', '0'), net(FLAGGED, '0', '25')] })).toMatchObject({
+    expect(
+      diffVerdicts(reviewed, { ...base, net: [net(me, '26', '0'), net(FLAGGED, '0', '25')] }),
+    ).toMatchObject({
       direction: 'escalated',
       changes: [{ kind: 'delta', address: me, escalation: true }],
     });
-    expect(diffVerdicts(reviewed, { ...base, net: [net(me, '25', '0'), net(FLAGGED, '0', '24')] })).toMatchObject({
+    expect(
+      diffVerdicts(reviewed, { ...base, net: [net(me, '25', '0'), net(FLAGGED, '0', '24')] }),
+    ).toMatchObject({
       direction: 'escalated',
     });
-    expect(diffVerdicts(reviewed, { ...base, net: [net(me, '20', '0'), net(FLAGGED, '0', '25')] })).toMatchObject({
+    expect(
+      diffVerdicts(reviewed, { ...base, net: [net(me, '20', '0'), net(FLAGGED, '0', '25')] }),
+    ).toMatchObject({
       direction: 'lateral',
     });
     // A new outflow the review never showed.
-    expect(diffVerdicts(reviewed, { ...base, net: [...reviewed.net, { ...net(me, '5', '0'), asset: { code: 'USDC', decimals: 7 } }] })).toMatchObject({
+    expect(
+      diffVerdicts(reviewed, {
+        ...base,
+        net: [...reviewed.net, { ...net(me, '5', '0'), asset: { code: 'USDC', decimals: 7 } }],
+      }),
+    ).toMatchObject({
       direction: 'escalated',
     });
   });
@@ -239,19 +291,35 @@ describe('net movements and approvals', () => {
       opIndex: 0,
       depth: 0,
     };
-    expect(diffVerdicts(base, { ...base, approvals: [approval] })).toMatchObject({ direction: 'escalated' });
+    expect(diffVerdicts(base, { ...base, approvals: [approval] })).toMatchObject({
+      direction: 'escalated',
+    });
     const reviewed = { ...base, approvals: [approval] };
-    expect(diffVerdicts(reviewed, { ...base, approvals: [{ ...approval, unlimited: true }] })).toMatchObject({
+    expect(
+      diffVerdicts(reviewed, { ...base, approvals: [{ ...approval, unlimited: true }] }),
+    ).toMatchObject({
       direction: 'escalated',
       changes: [{ kind: 'approval', detail: expect.stringMatching(/became unlimited/) }],
     });
-    expect(diffVerdicts(reviewed, { ...base, approvals: [{ ...approval, amount: '2000000000', amountScaled: '200' }] })).toMatchObject({
+    expect(
+      diffVerdicts(reviewed, {
+        ...base,
+        approvals: [{ ...approval, amount: '2000000000', amountScaled: '200' }],
+      }),
+    ).toMatchObject({
       direction: 'escalated',
     });
-    expect(diffVerdicts(reviewed, { ...base, approvals: [{ ...approval, amount: '1', amountScaled: '0.0000001' }] })).toMatchObject({
+    expect(
+      diffVerdicts(reviewed, {
+        ...base,
+        approvals: [{ ...approval, amount: '1', amountScaled: '0.0000001' }],
+      }),
+    ).toMatchObject({
       direction: 'lateral',
     });
-    expect(diffVerdicts(reviewed, { ...base, approvals: [] })).toMatchObject({ direction: 'lateral' });
+    expect(diffVerdicts(reviewed, { ...base, approvals: [] })).toMatchObject({
+      direction: 'lateral',
+    });
   });
 
   it('a flag that lifted, or a risk that fell, is de-escalated', () => {
@@ -259,7 +327,9 @@ describe('net movements and approvals', () => {
       ...base,
       risk: 'high',
       action: 'block_confirm',
-      screening: [{ address: FLAGGED, answer: { outcome: 'flagged', source: 'registry', entry: ENTRY } }],
+      screening: [
+        { address: FLAGGED, answer: { outcome: 'flagged', source: 'registry', entry: ENTRY } },
+      ],
     };
     expect(diffVerdicts(reviewedHigh, base)).toMatchObject({ direction: 'de-escalated' });
   });
@@ -268,7 +338,9 @@ describe('net movements and approvals', () => {
     expect(cmpDecimal('25', '25.0')).toBe(0);
     expect(cmpDecimal('25.0000001', '25')).toBe(1);
     expect(cmpDecimal('-1', '0')).toBe(-1);
-    expect(cmpDecimal('123456789012345678901234567890.5', '123456789012345678901234567890.4')).toBe(1);
+    expect(cmpDecimal('123456789012345678901234567890.5', '123456789012345678901234567890.4')).toBe(
+      1,
+    );
   });
 });
 
@@ -286,8 +358,14 @@ describe('decideRecheck — what the confirm handler does next', () => {
 
   it('re-scan failure on a previously-high transaction refuses, acknowledged or not', () => {
     const high: ScanVerdict = { ...base, risk: 'high', action: 'block_confirm' };
-    expect(decideRecheck(high, failed, false)).toMatchObject({ proceed: false, state: { refused: true } });
-    expect(decideRecheck(high, failed, true)).toMatchObject({ proceed: false, state: { refused: true } });
+    expect(decideRecheck(high, failed, false)).toMatchObject({
+      proceed: false,
+      state: { refused: true },
+    });
+    expect(decideRecheck(high, failed, true)).toMatchObject({
+      proceed: false,
+      state: { refused: true },
+    });
   });
 
   it('no drift, lateral and de-escalated all proceed with the fresh verdict rendered', () => {
@@ -310,7 +388,9 @@ describe('decideRecheck — what the confirm handler does next', () => {
     // pure decision — it never short-circuits recheckTx().
     expect(hookSrc).toMatch(/decideRecheck\(reviewed, result, acknowledged\)/);
     expect(hookSrc).not.toMatch(/return \{ proceed: true, verdict: reviewed/);
-    expect(hookSrc).toMatch(/decision\.state\.kind === 'failed' && !decision\.state\.refused \? input\.xdr : null/);
+    expect(hookSrc).toMatch(
+      /decision\.state\.kind === 'failed' && !decision\.state\.refused \? input\.xdr : null/,
+    );
   });
 });
 
@@ -324,7 +404,7 @@ describe('a re-check that could not look is a failure, not an escalation', () =>
     expect(result).toMatchObject({ ok: false, failure: 'rpc' });
   });
 
-  it('RPC down for a Soroban transaction → failed, not the pipeline\'s fail-closed high', async () => {
+  it("RPC down for a Soroban transaction → failed, not the pipeline's fail-closed high", async () => {
     const f = fixture('sac-transfer');
     const reviewed = await scanTx(input(f), { simulate: recorded(f), screen: notFlagged });
     const result = await recheckTx(reviewed, input(f), {
@@ -341,16 +421,50 @@ describe('a re-check that could not look is a failure, not an escalation', () =>
   });
 
   it('recheckFailureOf reads the simulation failure and the screen reasons', () => {
-    const fresh = (over: Partial<ScanResult['simulation']>, answers: ScanResult['screen']['answers'] = []) =>
-      ({ simulation: { failure: undefined, ...over }, screen: { answers } }) as unknown as ScanResult;
+    const fresh = (
+      over: Partial<ScanResult['simulation']>,
+      answers: ScanResult['screen']['answers'] = [],
+    ) =>
+      ({
+        simulation: { failure: undefined, ...over },
+        screen: { answers },
+      }) as unknown as ScanResult;
     expect(recheckFailureOf(base, fresh({ failure: 'rpc_timeout' }))).toBe('timeout');
     expect(recheckFailureOf(base, fresh({ failure: 'rpc_transport' }))).toBe('rpc');
     // The contract would now revert: that is a real change, not a failure.
     expect(recheckFailureOf(base, fresh({ failure: 'simulation_reverted' }))).toBeNull();
-    expect(recheckFailureOf(base, fresh({}, [{ address: FLAGGED, answer: { outcome: 'unknown', reason: 'timeout', source: 'registry' } }]))).toBe('timeout');
+    expect(
+      recheckFailureOf(
+        base,
+        fresh({}, [
+          {
+            address: FLAGGED,
+            answer: { outcome: 'unknown', reason: 'timeout', source: 'registry' },
+          },
+        ]),
+      ),
+    ).toBe('timeout');
     // An address that was already unknown at review is not a new failure.
-    const unknownBefore = { ...base, screening: [{ address: FLAGGED, answer: { outcome: 'unknown' as const, reason: 'archived', source: 'registry' } }] };
-    expect(recheckFailureOf(unknownBefore, fresh({}, [{ address: FLAGGED, answer: { outcome: 'unknown', reason: 'rpc_error', source: 'registry' } }]))).toBeNull();
+    const unknownBefore = {
+      ...base,
+      screening: [
+        {
+          address: FLAGGED,
+          answer: { outcome: 'unknown' as const, reason: 'archived', source: 'registry' },
+        },
+      ],
+    };
+    expect(
+      recheckFailureOf(
+        unknownBefore,
+        fresh({}, [
+          {
+            address: FLAGGED,
+            answer: { outcome: 'unknown', reason: 'rpc_error', source: 'registry' },
+          },
+        ]),
+      ),
+    ).toBeNull();
   });
 
   it('a hung screener hits the hard timeout', async () => {
@@ -359,17 +473,31 @@ describe('a re-check that could not look is a failure, not an escalation', () =>
     const reviewed = await scanTx(input(f), { screen: notFlagged });
     const hang = () => new Promise<ScreenAnswer>(() => {});
     const started = Date.now();
-    const result = await recheckTx(reviewed, input(f), { depsOverride: { screen: hang }, timeoutMs: 40 });
+    const result = await recheckTx(reviewed, input(f), {
+      depsOverride: { screen: hang },
+      timeoutMs: 40,
+    });
     expect(Date.now() - started).toBeLessThan(1_000);
     expect(result).toMatchObject({ ok: false, failure: 'timeout' });
   });
 
   it('tx_rechecked carries drifted + direction only, and validates', () => {
     const cases: Array<[RecheckResult, ReturnType<typeof recheckTelemetry>]> = [
-      [{ ok: false, failure: 'timeout', latencyMs: 1 }, { drifted: false, direction: 'failed' }],
-      [{ ok: true, verdict: base, drift: { drifted: false }, latencyMs: 1 }, { drifted: false, direction: 'none' }],
       [
-        { ok: true, verdict: base, drift: { drifted: true, direction: 'de-escalated', changes: [] }, latencyMs: 1 },
+        { ok: false, failure: 'timeout', latencyMs: 1 },
+        { drifted: false, direction: 'failed' },
+      ],
+      [
+        { ok: true, verdict: base, drift: { drifted: false }, latencyMs: 1 },
+        { drifted: false, direction: 'none' },
+      ],
+      [
+        {
+          ok: true,
+          verdict: base,
+          drift: { drifted: true, direction: 'de-escalated', changes: [] },
+          latencyMs: 1,
+        },
         { drifted: true, direction: 'de_escalated' },
       ],
     ];
@@ -378,7 +506,13 @@ describe('a re-check that could not look is a failure, not an escalation', () =>
       expect(t).toEqual(expected);
       expect(validateEvent({ ...txRecheckedEvent(t), ts: 1 })).toBe(true);
     }
-    expect(validateEvent({ name: 'tx_rechecked', props: { drifted: true, direction: 'escalated', address: FLAGGED }, ts: 1 })).toBe(false);
+    expect(
+      validateEvent({
+        name: 'tx_rechecked',
+        props: { drifted: true, direction: 'escalated', address: FLAGGED },
+        ts: 1,
+      }),
+    ).toBe(false);
   });
 
   it('PUBLIC (legacy engine) re-checks synchronously and never drifts', async () => {
@@ -402,9 +536,16 @@ describe('the re-check bypasses the screener TTL cache for this transaction', ()
     const rpcUrl = 'https://rpc.stub.invalid';
     // A fake Soroban RPC whose registry answer for FLAGGED flips mid-test:
     // the recorded hot-read body (a live Active entry) once `reported`.
-    const hot = ON_DISK[Object.keys(ON_DISK).find((p) => p.endsWith('/registry-hot-read.json'))!] as unknown as {
+    const hot = ON_DISK[
+      Object.keys(ON_DISK).find((p) => p.endsWith('/registry-hot-read.json'))!
+    ] as unknown as {
       keys: { flagged: string };
-      response: { result: { latestLedger: number; entries: Array<{ key: string; xdr: string; liveUntilLedgerSeq?: number }> } };
+      response: {
+        result: {
+          latestLedger: number;
+          entries: Array<{ key: string; xdr: string; liveUntilLedgerSeq?: number }>;
+        };
+      };
     };
     const live = hot.response.result.entries.find((e) => e.key === hot.keys.flagged)!;
     expect(live.key).toBe(entryLedgerKey(TESTNET_REGISTRY_ID, FLAGGED));
@@ -418,28 +559,40 @@ describe('the re-check bypasses the screener TTL cache for this transaction', ()
       return {
         ok: true,
         status: 200,
-        json: async () => ({ jsonrpc: '2.0', id: 1, result: { latestLedger: hot.response.result.latestLedger, entries } }),
+        json: async () => ({
+          jsonrpc: '2.0',
+          id: 1,
+          result: { latestLedger: hot.response.result.latestLedger, entries },
+        }),
       };
     });
     vi.stubGlobal('fetch', fetchStub);
 
     const inp = { ...input(f), rpcUrl };
     const reviewed = await scanTx(inp);
-    expect(reviewed.screening?.find((s) => s.address === FLAGGED)?.answer.outcome).toBe('not_flagged');
+    expect(reviewed.screening?.find((s) => s.address === FLAGGED)?.answer.outcome).toBe(
+      'not_flagged',
+    );
     const reads = seen.length;
 
     reported = true;
-    // The shared screener still answers from its cache — no new read.
+    // The shared screener answers from its cache: the report that just landed
+    // is invisible to it. Asserted on the ANSWER, not on a call count — the
+    // cache is keyed per address with a wall-clock TTL, so counting reads made
+    // this test depend on how many counterparties the fixture screens and on
+    // how long the run took (it failed as `expected 3 to be 2` on a loaded
+    // runner, blocking a release build).
     const stale = await scanTx(inp);
     expect(stale.screening?.find((s) => s.address === FLAGGED)?.answer.outcome).toBe('not_flagged');
-    expect(seen.length).toBe(reads);
 
     // The re-check's screener has no TTL: it reads again and sees the report.
     const fresh = await recheckTx(reviewed, inp);
     expect(seen.length).toBeGreaterThan(reads);
     expect(fresh.ok).toBe(true);
     if (!fresh.ok) return;
-    expect(fresh.verdict.screening?.find((s) => s.address === FLAGGED)?.answer.outcome).toBe('flagged');
+    expect(fresh.verdict.screening?.find((s) => s.address === FLAGGED)?.answer.outcome).toBe(
+      'flagged',
+    );
     expect(fresh.drift).toMatchObject({ direction: 'escalated' });
     // …and it did not write into the shared cache either: the shared screener
     // still returns its cached answer.
@@ -454,12 +607,22 @@ describe('the re-check bypasses the screener TTL cache for this transaction', ()
 
 describe('every confirm handler re-checks the exact XDR it signs', () => {
   it('seven screens call recheck.guard before signing and render the notice', () => {
-    for (const [name, src] of Object.entries({ sendSrc, appsSrc, swapSrc, earnSrc, guardiansSrc, smartSrc, coSignSrc })) {
+    for (const [name, src] of Object.entries({
+      sendSrc,
+      appsSrc,
+      swapSrc,
+      earnSrc,
+      guardiansSrc,
+      smartSrc,
+      coSignSrc,
+    })) {
       expect(src, name).toMatch(/await recheck\.guard\(/);
       expect(src, name).toMatch(/<RecheckNotice state=\{recheck\.state\} \/>/);
       // The guard runs BEFORE the sign message, in source order.
       const guardAt = src.indexOf('await recheck.guard(');
-      const signAt = src.search(/type: 'SIGN_AND_SUBMIT'|type: 'SIGN_ONLY'|finalizePasskeyTransfer\(\{/);
+      const signAt = src.search(
+        /type: 'SIGN_AND_SUBMIT'|type: 'SIGN_ONLY'|finalizePasskeyTransfer\(\{/,
+      );
       expect(guardAt, name).toBeGreaterThan(0);
       expect(signAt, name).toBeGreaterThan(guardAt);
     }
@@ -476,7 +639,11 @@ describe('every confirm handler re-checks the exact XDR it signs', () => {
   it('toScanVerdict carries net + approvals for the diff', async () => {
     const f = fixture('sep41-approve');
     const result = await runPipeline(
-      { xdr: f.xdr, networkPassphrase: f.networkPassphrase, context: { network: 'TESTNET', fromAddress: f.source } },
+      {
+        xdr: f.xdr,
+        networkPassphrase: f.networkPassphrase,
+        context: { network: 'TESTNET', fromAddress: f.source },
+      },
       { simulate: recorded(f), screen: notFlagged },
     );
     const v = toScanVerdict(result, 1);
