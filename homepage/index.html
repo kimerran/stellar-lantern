@@ -37,7 +37,7 @@
           <a href="Lantern_Pitch_Deck.pdf" target="_blank" rel="noopener">Pitch Deck</a>
           <a href="#contact">Contact</a>
         </nav>
-        <a class="btn btn-primary" href="https://drive.google.com/drive/folders/1xNiN2ws0Uqfysv_fii0ZSfBd1116Woa4?usp=sharing" target="_blank" rel="noopener">
+        <a class="btn btn-primary" href="#install">
           <span class="material-symbols-outlined">download</span> Download
         </a>
         <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu">
@@ -59,8 +59,13 @@
               screens every transaction before you sign. So scams never make it past the glow.
             </p>
             <div class="hero-cta reveal-load d4">
-              <a class="btn btn-primary" href="https://drive.google.com/drive/folders/1xNiN2ws0Uqfysv_fii0ZSfBd1116Woa4?usp=sharing" target="_blank" rel="noopener">
-                <span class="material-symbols-outlined">download</span> Download
+              <!-- /download on the Lantern API (#131): a 302 to the newest Release
+                   asset, logged as a download intent. ?src=homepage attributes it. -->
+              <a class="btn btn-primary" href="https://lantern-api-production-3fad.up.railway.app/download/android?src=homepage">
+                <span class="material-symbols-outlined">android</span> Android APK
+              </a>
+              <a class="btn btn-primary" href="https://lantern-api-production-3fad.up.railway.app/download/extension?src=homepage">
+                <span class="material-symbols-outlined">extension</span> Chrome extension
               </a>
               <a class="btn btn-ghost" href="#install">
                 <span class="material-symbols-outlined">menu_book</span> How to install
@@ -204,7 +209,7 @@
           <div class="section-head reveal">
             <span class="beta-tag"><span class="material-symbols-outlined" style="font-size:14px">science</span> Beta install</span>
             <h2 style="margin-top:16px">Install the Beta</h2>
-            <p>Lantern isn't in the app stores yet. On Android, it's a one-tap APK. On Chrome or Edge, load the extension in Developer Mode — about a minute either way. Both live in the same download folder.</p>
+            <p>Lantern isn't in the app stores yet. On Android, it's a one-tap APK. On Chrome or Edge, load the extension in Developer Mode — about a minute either way. Both are published on every release, with SHA-256 checksums next to them.</p>
           </div>
 
           <div class="steps">
@@ -212,14 +217,14 @@
               <div class="num"><span class="material-symbols-outlined" style="font-size:18px">android</span></div>
               <div>
                 <h4>On Android? Just the APK</h4>
-                <p>Download <strong>lantern.apk</strong> from the folder, open it, and allow installs from unknown sources. That's it — the steps below are only for the desktop extension.</p>
+                <p>Download <a class="inline" href="https://lantern-api-production-3fad.up.railway.app/download/android?src=homepage"><strong>lantern-&lt;version&gt;-testnet.apk</strong></a> on the phone, open it, and allow installs from this source if asked. That's it — the steps below are only for the desktop extension.</p>
               </div>
             </div>
             <div class="step reveal">
               <div class="num">1</div>
               <div>
                 <h4>Download &amp; unzip</h4>
-                <p>Grab the extension package from our Drive and unzip it to a folder you'll remember.</p>
+                <p>Download <a class="inline" href="https://lantern-api-production-3fad.up.railway.app/download/extension?src=homepage"><strong>lantern-extension-&lt;version&gt;.zip</strong></a> and unzip it to a folder you'll keep — Chrome loads it from there every time.</p>
               </div>
             </div>
             <div class="step reveal">
@@ -240,7 +245,7 @@
               <div class="num">4</div>
               <div>
                 <h4>Load unpacked</h4>
-                <p>Click <strong>Load unpacked</strong> and select the unzipped <code>dist</code> folder.</p>
+                <p>Click <strong>Load unpacked</strong> and select the folder you unzipped — the one with <code>manifest.json</code> directly inside it.</p>
               </div>
             </div>
             <div class="step reveal">
@@ -260,10 +265,13 @@
           </div>
 
           <div class="install-cta reveal">
-            <a class="btn btn-primary" href="https://drive.google.com/drive/folders/1xNiN2ws0Uqfysv_fii0ZSfBd1116Woa4?usp=sharing" target="_blank" rel="noopener">
-              <span class="material-symbols-outlined">download</span> Download
+            <a class="btn btn-primary" href="https://lantern-api-production-3fad.up.railway.app/download/android?src=homepage">
+              <span class="material-symbols-outlined">android</span> Android APK
             </a>
-            <span class="muted" style="font-size:0.9rem">Android APK + extension for Chrome &amp; Edge (Chromium).</span>
+            <a class="btn btn-primary" href="https://lantern-api-production-3fad.up.railway.app/download/extension?src=homepage">
+              <span class="material-symbols-outlined">extension</span> Chrome extension
+            </a>
+            <span class="muted" style="font-size:0.9rem">Always the newest testnet build. Chrome, Edge, Brave and other Chromium browsers.</span>
           </div>
         </div>
       </section>
@@ -293,8 +301,11 @@
           </div>
           <div class="footer-col">
             <h5>Product</h5>
-            <a href="https://drive.google.com/drive/folders/1xNiN2ws0Uqfysv_fii0ZSfBd1116Woa4?usp=sharing" target="_blank" rel="noopener">
-              <span class="material-symbols-outlined">download</span> Download
+            <a href="https://lantern-api-production-3fad.up.railway.app/download/android?src=homepage">
+              <span class="material-symbols-outlined">android</span> Android APK
+            </a>
+            <a href="https://lantern-api-production-3fad.up.railway.app/download/extension?src=homepage">
+              <span class="material-symbols-outlined">extension</span> Chrome extension
             </a>
             <a href="#features"><span class="material-symbols-outlined">bolt</span> Features</a>
             <a href="#screens"><span class="material-symbols-outlined">photo_library</span> Screens</a>
