@@ -6,7 +6,7 @@
     <title>Lantern — Securely light your path to the decentralized web</title>
     <meta
       name="description"
-      content="Lantern is a non-custodial Stellar wallet — Chrome extension and Android app — with an AI security layer that screens every transaction before you sign. Send, swap, earn, cash out, and recover with guardians. Beta."
+      content="Lantern is a non-custodial Stellar wallet — Chrome extension and Android app — that screens every transaction before you sign (on testnet, against an on-chain scam registry too), and has an AI explain it in plain language. Send, swap, earn, cash out, and recover with guardians. Testnet beta."
     />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -55,8 +55,9 @@
               Securely light your path to the <span class="amber-text">decentralized web</span>.
             </h1>
             <p class="lede reveal-load d3">
-              Lantern is a Stellar wallet — on Chrome and Android — with an AI security layer that
-              screens every transaction before you sign. So scams never make it past the glow.
+              Lantern is a Stellar wallet — on Chrome and Android — that screens every transaction
+              before you sign (on testnet, against an on-chain scam registry too), and has an AI
+              tell you in plain language what it does. So scams never make it past the glow.
             </p>
             <div class="hero-cta reveal-load d4">
               <!-- /download on the Lantern API (#131): a 302 to the newest Release
@@ -90,7 +91,10 @@
           <div class="section-head reveal">
             <span class="eyebrow">Why Lantern</span>
             <h2>Your keys. Your coins. <span class="amber-text">An AI watching your back.</span></h2>
-            <p>Everything a Stellar wallet should do — send, swap, earn, and cash out — plus a safety net between you and every signature.</p>
+            <!-- The AI is the explainer (VITE_FEATURE_SCANNER_AI, on in release.yml): it writes
+                 the plain-language sentence. The verdict itself is deterministic rules plus the
+                 registry, so it stands without the AI. Keep this copy true of the release build. -->
+            <p>Everything a Stellar wallet should do — send, swap, earn, and cash out — plus a safety net between you and every signature. The risk verdict is rules and a public registry you can check; the AI explains it in words.</p>
           </div>
 
           <div class="features">
@@ -103,6 +107,23 @@
               <div class="chip"><span class="material-symbols-outlined">security</span></div>
               <h3>Scan every signature</h3>
               <p>Payments, trustlines, contract calls — each one is decoded, explained in plain language, and gated when it's high-risk.</p>
+            </article>
+            <article class="feature reveal">
+              <div class="chip"><span class="material-symbols-outlined">campaign</span></div>
+              <h3>Report once, protect everyone</h3>
+              <p>On testnet, every review checks the counterparty against Lantern's on-chain blacklist registry, and one tap reports a scammer to it — so the next wallet is warned too. It's a live Soroban contract anyone can inspect:
+                <a class="inline" href="https://stellar.expert/explorer/testnet/contract/CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F" target="_blank" rel="noopener"><code>CBJWD6SA…G623F</code></a>
+                on testnet, WASM hash <code>40fd3771…5be23783</code>.</p>
+            </article>
+            <article class="feature reveal">
+              <div class="chip"><span class="material-symbols-outlined">code</span></div>
+              <h3>Open-source scanner</h3>
+              <p>The engine behind every review is <a class="inline" href="https://github.com/kimerran/stellar-lantern/tree/main/packages/lantern-scanner" target="_blank" rel="noopener"><code>@lantern/scanner</code></a> — MIT-licensed and standalone, so any Stellar wallet, dApp or CLI can decode, explain and screen a transaction before it's signed.</p>
+            </article>
+            <article class="feature reveal">
+              <div class="chip"><span class="material-symbols-outlined">published_with_changes</span></div>
+              <h3>Checked again at send</h3>
+              <p>Right before a transaction is submitted, Lantern simulates and screens it once more — so a counterparty reported while you were reviewing still stops you.</p>
             </article>
             <article class="feature reveal">
               <div class="chip"><span class="material-symbols-outlined">shield_person</span></div>
@@ -152,7 +173,8 @@
               See the risk <span class="amber-text">before</span> you sign.
             </h2>
             <ul>
-              <li><span class="material-symbols-outlined">verified_user</span> Reported-address &amp; drainer detection</li>
+              <li><span class="material-symbols-outlined">verified_user</span> Reported-address &amp; drainer detection, checked against the on-chain registry on testnet</li>
+              <li><span class="material-symbols-outlined">campaign</span> One-tap report of a scammer to the registry</li>
               <li><span class="material-symbols-outlined">warning</span> Plain-language warnings, not raw hex</li>
               <li><span class="material-symbols-outlined">block</span> High-risk transactions gated behind a confirm step</li>
               <li><span class="material-symbols-outlined">lock</span> Advisory only — Lantern never signs or sends for you</li>
@@ -297,7 +319,7 @@
         <div class="footer-grid">
           <div class="footer-brand">
             <a class="brand" href="#top"><img src="logo.jpg" alt="Lantern logo" /> Lantern</a>
-            <p>A non-custodial Stellar wallet with an AI security layer — on Chrome and Android. Built by Artisam Labs.</p>
+            <p>A non-custodial Stellar wallet that screens every transaction before you sign — on Chrome and Android. Built by Artisam Labs.</p>
           </div>
           <div class="footer-col">
             <h5>Product</h5>
