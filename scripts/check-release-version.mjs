@@ -11,14 +11,15 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkReleaseVersion } from './release-assets.mjs';
+import { checkReleaseVersion, releaseTagsExcept } from './release-assets.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const { version } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-const tags = execFileSync('git', ['ls-remote', '--tags', '--refs', 'origin'], { cwd: root, encoding: 'utf8' })
-  .split('\n')
-  .filter(Boolean)
-  .map((line) => line.split('refs/tags/')[1] ?? '');
+const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+const tags = releaseTagsExcept(
+  execFileSync('git', ['ls-remote', '--tags', '--refs', 'origin'], { cwd: root, encoding: 'utf8' }),
+  head,
+);
 
 const result = checkReleaseVersion(version, tags);
 if (!result.ok) {

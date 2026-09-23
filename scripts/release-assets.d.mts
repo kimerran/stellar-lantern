@@ -14,6 +14,7 @@ export function versionCode(version: string): number;
 export function nextVersion(version: string, part?: 'major' | 'minor' | 'patch'): string;
 export function compareVersions(a: string, b: string): -1 | 0 | 1;
 export function latestReleasedVersion(tags: string[]): string | null;
+export function releaseTagsExcept(lsRemote: string, head: string): string[];
 export function checkReleaseVersion(
   version: string,
   tags: string[],

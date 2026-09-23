@@ -84,6 +84,18 @@ export function latestReleasedVersion(tags) {
   return best;
 }
 
+// Tag names from `git ls-remote --tags --refs` output, minus the tags that
+// point at `head`. Release tags are lightweight, so each line's sha is the
+// tagged commit. A re-run of this commit's own release finds the tag that run
+// created, which is not a reused version.
+export function releaseTagsExcept(lsRemote, head) {
+  return lsRemote
+    .split('\n')
+    .filter(Boolean)
+    .filter((line) => !line.startsWith(`${head}\t`))
+    .map((line) => line.split('refs/tags/')[1] ?? '');
+}
+
 // The release gate's verdict: a release must carry a version newer than
 // every Release already published from this repo.
 export function checkReleaseVersion(version, tags) {

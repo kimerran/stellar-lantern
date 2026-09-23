@@ -8,6 +8,7 @@ import {
   compareVersions,
   latestReleasedVersion,
   nextVersion,
+  releaseTagsExcept,
   versionCode,
 } from '../scripts/release-assets.mjs';
 import buildGradle from '../android/app/build.gradle?raw';
@@ -99,6 +100,17 @@ describe('the minor bump per release', () => {
     expect(!r.ok && r.message).toContain('0.2.0');
     expect(checkReleaseVersion('0.2.0', tags)).toEqual({ ok: true, latest: '0.1.0' });
     expect(checkReleaseVersion('0.1.0', [])).toEqual({ ok: true, latest: null });
+  });
+
+  it('ignores a release tag at HEAD (a re-run of its own release), not one at another commit', () => {
+    const head = 'a'.repeat(40);
+    const other = 'b'.repeat(40);
+    const lsRemote = `${other}\trefs/tags/v0.1.0-testnet.12\n${head}\trefs/tags/v0.2.0-testnet.13\n`;
+    const tags = releaseTagsExcept(lsRemote, head);
+    expect(tags).toEqual(['v0.1.0-testnet.12']);
+    expect(checkReleaseVersion('0.2.0', tags).ok).toBe(true);
+    const elsewhere = releaseTagsExcept(lsRemote, 'c'.repeat(40));
+    expect(checkReleaseVersion('0.2.0', elsewhere).ok).toBe(false);
   });
 
   it('the package version is newer than the last release (the tags that existed at #141)', () => {
