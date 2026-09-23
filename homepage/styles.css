@@ -377,7 +377,7 @@ footer { border-top: 1px solid rgba(79, 70, 50, 0.5); padding: 56px 0 40px; back
 .legal p, .legal li { color: var(--on-surface-variant); margin-bottom: 12px; }
 .legal ul { padding-left: 22px; }
 .legal li { margin-bottom: 8px; }
-.legal a.inline { color: var(--amber-bright); text-decoration: underline; }
+.legal a.inline, .step a.inline { color: var(--amber-bright); text-decoration: underline; }
 
 /* ───────── Responsive ───────── */
 @media (max-width: 900px) {
