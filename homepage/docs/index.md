@@ -1,4 +1,4 @@
-> Markdown twin of https://lantern.artisam.xyz/docs/ — index of every page: https://lantern.artisam.xyz/docs/llms.txt
+> Markdown twin of https://golantern.xyz/docs/ — index of every page: https://golantern.xyz/docs/llms.txt
 
 # Lantern — Instawards Phase 1
 
@@ -7,7 +7,7 @@
 | | |
 |---|---|
 | Builder | Team Lantern |
-| Live site | [lantern.artisam.xyz](https://lantern.artisam.xyz) |
+| Live site | [golantern.xyz](https://golantern.xyz) |
 | Source (MIT) | [github.com/kimerran/stellar-lantern](https://github.com/kimerran/stellar-lantern) |
 | Network | Stellar Testnet (`Test SDF Network ; September 2015`) |
 | Sprint | 7 September – 4 October 2026, four weeks, Monday–Sunday |

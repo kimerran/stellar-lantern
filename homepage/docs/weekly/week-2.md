@@ -1,4 +1,4 @@
-> Markdown twin of https://lantern.artisam.xyz/docs/weekly/week-2/ — index of every page: https://lantern.artisam.xyz/docs/llms.txt
+> Markdown twin of https://golantern.xyz/docs/weekly/week-2/ — index of every page: https://golantern.xyz/docs/llms.txt
 
 # Week 2 — 14–20 September 2026 · D2, transaction security scanner
 

@@ -1,4 +1,4 @@
-> Markdown twin of https://lantern.artisam.xyz/docs/weekly/week-1/ — index of every page: https://lantern.artisam.xyz/docs/llms.txt
+> Markdown twin of https://golantern.xyz/docs/weekly/week-1/ — index of every page: https://golantern.xyz/docs/llms.txt
 
 # Week 1 — 7–13 September 2026 · D1, on-chain blacklist registry
 

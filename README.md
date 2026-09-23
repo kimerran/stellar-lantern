@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>🌐 <a href="https://lantern.artisam.xyz/">lantern.artisam.xyz</a></strong>
+  <strong>🌐 <a href="https://golantern.xyz/">golantern.xyz</a></strong>
 </p>
 
 Lantern is a **non-custodial wallet for [Stellar](https://stellar.org)** that ships as a Chrome/MV3 **browser extension** and an **Android app** (Capacitor), from one TypeScript/React codebase. Beyond the basics — create or import an account (SEP-0005 HD keys), hold and send XLM/assets, and review history — Lantern does three things ordinary wallets don't: it **reads every transaction back to you in plain English and gates the dangerous ones before you sign**; it **removes the "lose your 12 words, lose everything" failure mode** with *guardian social recovery* built on Stellar's native weighted multisig; and it **turns cash into crypto in-app** through regulated *anchors* (SEP-1/10/24). Stellar dApps and DeFi (e.g. Blend) run inside a sandboxed **mini-app browser**, and — crucially — **every signature, from a payment to a recovery to a contract call, is routed through the same `scan → explain → confirm → sign` pipeline**. Keys never leave the device and are encrypted at rest.
