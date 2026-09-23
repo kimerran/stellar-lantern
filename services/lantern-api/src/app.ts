@@ -113,6 +113,7 @@ export function createApp(opts: AppOptions): Hono {
         opts.releaseResolver ??
         createReleaseResolver({
           repo: env.downloadsRepo,
+          ...(env.downloadsGithubToken ? { token: env.downloadsGithubToken } : {}),
           ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}),
           ...(opts.now ? { now: opts.now } : {}),
           fallback: {

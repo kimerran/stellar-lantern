@@ -22,7 +22,8 @@ service is down the wallet shows its rules-based sentence instead.
 | `POST /v1/telemetry` | body: the wallet's telemetry envelope; one row per event; `204` (#85) |
 | `DELETE /v1/telemetry/install` | body `{ installId }`; that install's rows gone; `204` either way |
 | `GET /v1/telemetry/export` | `Authorization: Bearer $TELEMETRY_ADMIN_TOKEN`; `?since=&until=&after=`; `{ rows, next }`, 1000 rows a page — the report's only input |
-| `GET /download/android` · `GET /download/extension` | `302` to the newest Release asset (#131): `lantern-<version>-testnet.apk` / `lantern-extension-<version>.zip`. `?v=<version>` pins a release, `?src=<slug>` is attribution. Logs one row per click — a server log, not telemetry (below) |
+| `GET /download/android` · `GET /download/extension` | `302` to the newest Release asset (#131): `lantern-<version>-testnet.apk` / `lantern-extension-<version>.zip`. `?v=<version>` pins a release, `?src=<slug>` is attribution. Logs one row per click — a server log, not telemetry (below). From a private repo: a `302` to a signed, short-lived storage URL, or a `503` try-again page (#153) |
+| `GET /download/checksums` | The same release's `SHA256SUMS.txt` as `text/plain` (`X-Lantern-Release: <tag>`); `?v=` pins a release; `503` when unavailable. Not logged as a click (#153) |
 
 `/v1/explain` runs the scanner package's own code, imported: `buildPrompt`
 (structured facts only — no XDR, no memo, symbol / function-name guards) →
@@ -74,12 +75,44 @@ therefore a **download intent** (a click), not a completed download; the
 dashboard labels it that way.
 
 The release is resolved by listing `api.github.com/repos/<DOWNLOADS_REPO>/releases`
-(public repo, **no token**) and taking the newest non-draft release carrying
-the asset — `/releases/latest` cannot be used because it hides pre-releases,
-and every alpha build is one. Cached 5 minutes; on any API failure the last
-good answer keeps serving, then `DOWNLOAD_FALLBACK_<TARGET>_URL` if set, then
-the releases page. A broken link during a tester push is expensive; a 500 is
-never the answer.
+and taking the newest non-draft release carrying the asset — `/releases/latest`
+cannot be used because it hides pre-releases, and every alpha build is one.
+Cached 5 minutes; on any API failure the last good answer keeps serving, then
+`DOWNLOAD_FALLBACK_<TARGET>_URL` if set, then the releases page (public repo)
+or a `503` try-again page (private repo). A broken link during a tester push is
+expensive; a 500 is never the answer.
+
+### Serving from the private repo (#153)
+
+The builds are made in **internal-lantern** (private), where `release.yml`
+already publishes a Release on every merge to `main`. To serve those:
+
+```
+DOWNLOADS_REPO=kimerran/internal-lantern
+DOWNLOADS_GITHUB_TOKEN=<fine-grained PAT: internal-lantern only, Contents: read-only, with an expiry>
+```
+
+With a token, the release list is read with it, and for **each click** the
+asset API (`Accept: application/octet-stream`, `redirect: manual`) returns a
+`302` to a signed storage URL that works signed out and expires within
+minutes. That URL is forwarded to the browser — still a redirect, never a
+proxy — and never cached (the release list is). The file downloads under its
+own name (`Content-Disposition: attachment; filename=lantern-…apk`).
+
+- **The token is the whole private source.** Read access to internal-lantern's
+  contents is read access to its code, not just its Releases. It is sent only to
+  `api.github.com` (and only to this repo's asset URLs), and never appears in a
+  response, a log line or `/admin`. Rotate it before it expires; an expired
+  token turns every download into the `503` page.
+- **Fallbacks:** a private releases page is a 404 to visitors, so it is never
+  the fallback. `DOWNLOAD_FALLBACK_<TARGET>_URL` must be publicly reachable to
+  help; otherwise the answer is a static `503` page with `Retry-After: 60`.
+- **Verification:** the public Release page with `SHA256SUMS.txt` is not
+  visible to testers any more, so `/download/checksums` serves it (fetched once
+  per tag, validated as `<sha256>  <name>` lines).
+- `DOWNLOADS_REPO` pointing at a private repo **without** a token resolves
+  nothing and falls to the releases page, which visitors cannot open — set both
+  together.
 
 **This is a server log with a different privacy basis from the in-app
 events**, and the code keeps them apart: its own table (`downloads`), its own
@@ -166,7 +199,8 @@ The upgrade path once there are real users is per-install client identity
 | `TELEMETRY_ADMIN_TOKEN` | with `DATABASE_URL` | — ; bearer for `/v1/telemetry/export` |
 | `TELEMETRY_DAILY_CAP` | no | `50000` |
 | `TELEMETRY_RETENTION_DAYS` | no | `90` |
-| `DOWNLOADS_REPO` | no | `kimerran/stellar-lantern` — the public repo whose Releases carry the builds (#131) |
+| `DOWNLOADS_REPO` | no | `kimerran/stellar-lantern` — the repo whose Releases carry the builds (#131); `kimerran/internal-lantern` with a token (#153) |
+| `DOWNLOADS_GITHUB_TOKEN` | with a private `DOWNLOADS_REPO` | — ; fine-grained PAT, that repo only, Contents read-only. **Secret** (#153) |
 | `DOWNLOADS_DAILY_CAP` | no | `5000` |
 | `DOWNLOAD_FALLBACK_ANDROID_URL` · `DOWNLOAD_FALLBACK_EXTENSION_URL` | no | — ; pinned known-good asset URLs served when the Releases API is unreachable and nothing is cached |
 
@@ -242,7 +276,7 @@ src/telemetry/pg-store.ts Postgres implementation + the migration
 src/telemetry/retention.ts the 90-day purge (telemetry + the download log)
 src/routes/download.ts    GET /download/<target> — 302 + one row (#131)
 src/downloads/store.ts    DownloadStore interface, in-memory implementation, the row helpers
-src/downloads/releases.ts the GitHub Releases resolver (cache, stale, fallback)
+src/downloads/releases.ts the GitHub Releases resolver (cache, stale, fallback; private-repo signed URLs, checksums)
 test/app.test.ts          offline suite (explainer)
 test/telemetry.test.ts    offline suite (ingest, export, delete, retention)
 test/download.test.ts     offline suite (redirect, row shape, fallback, limiter, /admin funnel)
