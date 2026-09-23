@@ -36,6 +36,19 @@ export function assetNames(version) {
   };
 }
 
+// Android's versionCode for a semver string (#141): major*10000 + minor*100 +
+// patch, so it strictly increases across bumps and needs nothing but the
+// version to reproduce. android/app/build.gradle computes the same formula in
+// Groovy; tests/version.test.ts keeps the two in step. Minor and patch must
+// stay under 100 for the ordering to hold.
+export function versionCode(version) {
+  const m = /^(\d+)\.(\d+)\.(\d+)(?:-.*)?$/.exec(version);
+  if (!m) throw new Error(`not a semver version: ${version}`);
+  const [major, minor, patch] = m.slice(1).map(Number);
+  if (minor > 99 || patch > 99) throw new Error(`versionCode needs minor and patch < 100: ${version}`);
+  return major * 10000 + minor * 100 + patch;
+}
+
 // `v0.1.0-testnet.42`: the package version plus the workflow run number, so
 // repeated merges of the same version never collide on a tag.
 export function releaseTag(version, runNumber) {
