@@ -6,7 +6,7 @@
     <title>Lantern — Securely light your path to the decentralized web</title>
     <meta
       name="description"
-      content="Lantern is a non-custodial Stellar wallet — Chrome extension and Android app — that screens every transaction against an on-chain scam registry before you sign, and has an AI explain it in plain language. Send, swap, earn, cash out, and recover with guardians. Testnet beta."
+      content="Lantern is a non-custodial Stellar wallet — Chrome extension and Android app — that screens every transaction before you sign (on testnet, against an on-chain scam registry too), and has an AI explain it in plain language. Send, swap, earn, cash out, and recover with guardians. Testnet beta."
     />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -56,8 +56,8 @@
             </h1>
             <p class="lede reveal-load d3">
               Lantern is a Stellar wallet — on Chrome and Android — that screens every transaction
-              against an on-chain scam registry before you sign, and has an AI tell you in plain
-              language what it does. So scams never make it past the glow.
+              before you sign (on testnet, against an on-chain scam registry too), and has an AI
+              tell you in plain language what it does. So scams never make it past the glow.
             </p>
             <div class="hero-cta reveal-load d4">
               <!-- /download on the Lantern API (#131): a 302 to the newest Release
@@ -111,7 +111,7 @@
             <article class="feature reveal">
               <div class="chip"><span class="material-symbols-outlined">campaign</span></div>
               <h3>Report once, protect everyone</h3>
-              <p>Every review checks the counterparty against Lantern's on-chain blacklist registry, and one tap reports a scammer to it — so the next wallet is warned too. It's a live Soroban contract anyone can inspect:
+              <p>On testnet, every review checks the counterparty against Lantern's on-chain blacklist registry, and one tap reports a scammer to it — so the next wallet is warned too. It's a live Soroban contract anyone can inspect:
                 <a class="inline" href="https://stellar.expert/explorer/testnet/contract/CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F" target="_blank" rel="noopener"><code>CBJWD6SA…G623F</code></a>
                 on testnet, WASM hash <code>40fd3771…5be23783</code>.</p>
             </article>
@@ -173,7 +173,7 @@
               See the risk <span class="amber-text">before</span> you sign.
             </h2>
             <ul>
-              <li><span class="material-symbols-outlined">verified_user</span> Reported-address &amp; drainer detection, checked against the on-chain registry</li>
+              <li><span class="material-symbols-outlined">verified_user</span> Reported-address &amp; drainer detection, checked against the on-chain registry on testnet</li>
               <li><span class="material-symbols-outlined">campaign</span> One-tap report of a scammer to the registry</li>
               <li><span class="material-symbols-outlined">warning</span> Plain-language warnings, not raw hex</li>
               <li><span class="material-symbols-outlined">block</span> High-risk transactions gated behind a confirm step</li>
