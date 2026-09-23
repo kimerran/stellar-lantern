@@ -49,6 +49,55 @@ export function versionCode(version) {
   return major * 10000 + minor * 100 + patch;
 }
 
+function parseVersion(version) {
+  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
+  if (!m) throw new Error(`not a semver version: ${version}`);
+  return m.slice(1).map(Number);
+}
+
+// The version a release PR bumps to (#141). Minor by default: Lantern is
+// pre-1.0 and every release to main is a feature release, so minor-per-release
+// is the rule; patch stays available for a hotfix release, major for 1.0.
+export function nextVersion(version, part = 'minor') {
+  const [major, minor, patch] = parseVersion(version);
+  if (part === 'major') return `${major + 1}.0.0`;
+  if (part === 'minor') return `${major}.${minor + 1}.0`;
+  if (part === 'patch') return `${major}.${minor}.${patch + 1}`;
+  throw new Error(`unknown version part: ${part} (major | minor | patch)`);
+}
+
+// -1 / 0 / 1, numerically by major, minor, patch.
+export function compareVersions(a, b) {
+  const [x, y] = [parseVersion(a), parseVersion(b)];
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1;
+  return 0;
+}
+
+// The highest version among release tags (`v0.1.0-testnet.12`), or null when
+// the repo has none yet. Other tags are ignored.
+export function latestReleasedVersion(tags) {
+  let best = null;
+  for (const tag of tags) {
+    const m = /^v(\d+\.\d+\.\d+)-testnet\.\d+$/.exec(tag.trim());
+    if (m && (best === null || compareVersions(m[1], best) > 0)) best = m[1];
+  }
+  return best;
+}
+
+// The release gate's verdict: a release must carry a version newer than
+// every Release already published from this repo.
+export function checkReleaseVersion(version, tags) {
+  const latest = latestReleasedVersion(tags);
+  if (latest === null || compareVersions(version, latest) > 0) return { ok: true, latest };
+  return {
+    ok: false,
+    latest,
+    message:
+      `package.json is ${version}, but ${latest} is already released from this repo. ` +
+      `Run \`npm run version:bump\` on develop (→ ${nextVersion(latest)}) and merge it before releasing.`,
+  };
+}
+
 // `v0.1.0-testnet.42`: the package version plus the workflow run number, so
 // repeated merges of the same version never collide on a tag.
 export function releaseTag(version, runNumber) {

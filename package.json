@@ -22,7 +22,9 @@
     "scan": "esbuild scripts/scan.ts --bundle --platform=node --format=esm --target=node22 --packages=external --alias:@lantern/scanner=./packages/lantern-scanner/src/index.ts --outfile=dist-report/.build/scan.mjs --log-level=warning && node dist-report/.build/scan.mjs",
     "docs:build": "node scripts/build-docs-site.mjs",
     "guide:build": "node scripts/build-alpha-guide.mjs",
-    "report:activity": "esbuild scripts/report-activity.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist-report/.build/report.mjs --log-level=warning && node dist-report/.build/report.mjs"
+    "report:activity": "esbuild scripts/report-activity.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist-report/.build/report.mjs --log-level=warning && node dist-report/.build/report.mjs",
+    "version:bump": "node scripts/bump-version.mjs",
+    "version:check": "node scripts/check-release-version.mjs"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.0",

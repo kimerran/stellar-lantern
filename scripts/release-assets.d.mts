@@ -11,6 +11,13 @@ export interface AssetNames {
 export function assetNames(version: string): AssetNames;
 
 export function versionCode(version: string): number;
+export function nextVersion(version: string, part?: 'major' | 'minor' | 'patch'): string;
+export function compareVersions(a: string, b: string): -1 | 0 | 1;
+export function latestReleasedVersion(tags: string[]): string | null;
+export function checkReleaseVersion(
+  version: string,
+  tags: string[],
+): { ok: true; latest: string | null } | { ok: false; latest: string; message: string };
 export function releaseTag(version: string, runNumber: string | number): string;
 export function releaseName(version: string, runNumber: string | number): string;
 

@@ -65,6 +65,15 @@ jobs:
         run: npm ci
 
       # Release gates — verify before building the shipped artifacts.
+      # The version must be newer than every Release from this repo (#141), so
+      # two releases never share asset names. The bump is `npm run
+      # version:bump`, committed on develop and carried here by the release
+      # PR (release-gate.yml says why CI does not bump). Push only: a
+      # workflow_dispatch rebuild of a released version stays allowed.
+      - name: Release version is new
+        if: github.event_name == 'push'
+        run: npm run version:check
+
       - name: Test
         run: npm test
 
