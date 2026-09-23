@@ -758,7 +758,7 @@ function Browser({
             {signReq.verdict.action === 'allow' ? (
               <div className="flex items-center justify-between rounded-xl border border-tertiary-container/20 bg-surface-container-high p-3">
                 <p className="pr-2 text-label-md text-on-surface">{signReq.verdict.explanation}</p>
-                <ScanBadge risk="low" latencyMs={signReq.verdict.latencyMs} />
+                <ScanBadge risk="low" latencyMs={signReq.verdict.latencyMs} registry={signReq.verdict.registry} />
               </div>
             ) : (
               <RiskCallout

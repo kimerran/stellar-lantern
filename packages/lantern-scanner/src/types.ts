@@ -97,6 +97,12 @@ export interface ScanVerdict {
   // before submit diffs these — not the prose, not the fee, not the sequence.
   net?: ReadonlyArray<NetDelta>;
   approvals?: ReadonlyArray<Approval>;
+  // Whether the registry was consulted for this verdict. `unavailable` on a
+  // network with no registry (Mainnet today): the review must then not
+  // claim a check it did not make — no "Checked by Lantern", no clean
+  // screening line (D3 QA plan §10.1). Absent from the legacy scan() itself;
+  // the wallet adapter sets it.
+  registry?: 'checked' | 'unavailable';
 }
 
 // ── Paste-to-check (spec §4.5) ───────────────────────────────────────────────
