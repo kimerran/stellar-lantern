@@ -10,6 +10,7 @@ export interface AssetNames {
 }
 export function assetNames(version: string): AssetNames;
 
+export function versionCode(version: string): number;
 export function releaseTag(version: string, runNumber: string | number): string;
 export function releaseName(version: string, runNumber: string | number): string;
 

@@ -1,4 +1,5 @@
 import { defineManifest } from '@crxjs/vite-plugin';
+import { version } from './package.json';
 
 // MV3 manifest. Minimal permissions per SPEC §8 / AGENT §5: only `storage`,
 // and host access limited to the Stellar endpoints (Horizon, friendbot and the
@@ -10,7 +11,8 @@ export default defineManifest({
   manifest_version: 3,
   name: 'Lantern — Stellar Wallet',
   description: 'Securely light your path to the decentralized web. A non-custodial Stellar wallet.',
-  version: '0.1.0',
+  // From package.json, the single version source (#141) — never hardcode it.
+  version,
   action: {
     default_popup: 'index.html',
     default_title: 'Lantern',
