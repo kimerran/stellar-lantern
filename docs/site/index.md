@@ -9,7 +9,7 @@ description: Evidence site for Lantern's Stellar Development Foundation Instawar
 | | |
 |---|---|
 | Builder | Team Lantern |
-| Live site | [lantern.artisam.xyz](https://lantern.artisam.xyz) |
+| Live site | [golantern.xyz](https://golantern.xyz) |
 | Source (MIT) | [github.com/kimerran/stellar-lantern](https://github.com/kimerran/stellar-lantern) |
 | Network | Stellar Testnet (`Test SDF Network ; September 2015`) |
 | Sprint | 7 September – 4 October 2026, four weeks, Monday–Sunday |

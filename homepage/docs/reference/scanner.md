@@ -1,4 +1,4 @@
-> Markdown twin of https://lantern.artisam.xyz/docs/reference/scanner/ — index of every page: https://lantern.artisam.xyz/docs/llms.txt
+> Markdown twin of https://golantern.xyz/docs/reference/scanner/ — index of every page: https://golantern.xyz/docs/llms.txt
 
 # Scanner package — `@lantern/scanner`
 

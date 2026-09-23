@@ -31,7 +31,11 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(ROOT, 'docs', 'site');
 const OUT_REAL = join(ROOT, 'homepage', 'docs');
 const BASE = '/docs';
-const SITE_URL = 'https://lantern.artisam.xyz';
+// The product domain (#133). The old lantern.artisam.xyz stays attached on
+// Railway and 301s here, path preserved, because it is already in submitted
+// evidence. Artisam's own links (artisam.xyz, hello@artisam.xyz) are the
+// company's identity, not the product's, and do not move.
+const SITE_URL = 'https://golantern.xyz';
 
 const check = process.argv.includes('--check');
 const OUT = check ? join(ROOT, 'dist-report', '.docs-check') : OUT_REAL;
