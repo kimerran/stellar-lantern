@@ -153,6 +153,12 @@ address** (the code that writes the row never reads it) and **no user-agent
 string**. A row is a download *intent* — a click — not a completed download,
 and the dashboard says so. Same 90-day retention as everything else.
 
+`…/join?src=<slug>` (#162), the homepage's *Join the alpha* button, redirects
+to the alpha testers' WhatsApp group and writes the same kind of row to the
+same log, with `alpha` as the target and no version. It is counted on its own
+in `/admin` (*Alpha group joins*, by `src`), never as a download intent, and a
+click is not a confirmed membership.
+
 ## Retention
 
 Raw per-install events for **90 days**, then deleted — enforced by the Lantern
