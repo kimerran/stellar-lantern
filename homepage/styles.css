@@ -295,6 +295,7 @@ section { padding: 76px 0; }
 .step h4 { font-size: 1rem; margin-bottom: 4px; }
 .step p { color: var(--on-surface-variant); font-size: 0.92rem; }
 .step code { font-family: 'Roboto Mono', monospace; color: var(--amber-bright); background: rgba(255,193,7,0.08); padding: 1px 6px; border-radius: 5px; font-size: 0.86em; }
+.feature code { font-family: 'Roboto Mono', monospace; color: var(--amber-bright); background: rgba(255,193,7,0.08); padding: 1px 6px; border-radius: 5px; font-size: 0.86em; overflow-wrap: anywhere; }
 .install-cta { margin-top: 30px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
 
 /* ───────── Showcase ───────── */
@@ -377,7 +378,7 @@ footer { border-top: 1px solid rgba(79, 70, 50, 0.5); padding: 56px 0 40px; back
 .legal p, .legal li { color: var(--on-surface-variant); margin-bottom: 12px; }
 .legal ul { padding-left: 22px; }
 .legal li { margin-bottom: 8px; }
-.legal a.inline { color: var(--amber-bright); text-decoration: underline; }
+.legal a.inline, .step a.inline, .feature a.inline, .hero-note a.inline { color: var(--amber-bright); text-decoration: underline; }
 
 /* ───────── Responsive ───────── */
 @media (max-width: 900px) {

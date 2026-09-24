@@ -1,0 +1,39 @@
+name: Release version gate
+
+# A release PR into main must carry a version newer than every Release this
+# repo has published (#141). release.yml runs the same check before it builds;
+# this runs it on the PR so the missing bump shows up before the merge, not as a
+# failed release after it.
+#
+# Why the bump is a commit on develop (`npm run version:bump`) and not something
+# CI writes after a release: two repos release from the same develop. Each
+# repo's release.yml pushes nothing back, so there is no release loop, and a
+# release commits nothing to main, so develop and main never diverge on
+# package.json. A bot commit on one repo's develop would fork it from the
+# other's, and the next mirror push would be rejected as non-fast-forward.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      # Default checkout keeps the token, which `git ls-remote --tags origin`
+      # needs on the private repo.
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Release version is new
+        run: npm run version:check

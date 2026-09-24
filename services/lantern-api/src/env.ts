@@ -20,6 +20,8 @@ export interface Env {
   // /download (#131): the public repo whose Releases carry the builds, a
   // daily cap for the redirect, and optional pinned fallback asset URLs.
   downloadsRepo: string;
+  // Set → DOWNLOADS_REPO is private and read with this token (#153).
+  downloadsGithubToken?: string;
   downloadsDailyCap: number;
   downloadFallbackAndroidUrl?: string;
   downloadFallbackExtensionUrl?: string;
@@ -59,6 +61,7 @@ export function readEnv(source: Record<string, string | undefined> = process.env
     retentionDays: int('TELEMETRY_RETENTION_DAYS', source.TELEMETRY_RETENTION_DAYS, 90),
     registryId: source.BLACKLIST_REGISTRY_ID || DEFAULT_REGISTRY,
     downloadsRepo: source.DOWNLOADS_REPO || DEFAULT_DOWNLOADS_REPO,
+    ...(source.DOWNLOADS_GITHUB_TOKEN ? { downloadsGithubToken: source.DOWNLOADS_GITHUB_TOKEN } : {}),
     downloadsDailyCap: int('DOWNLOADS_DAILY_CAP', source.DOWNLOADS_DAILY_CAP, 5_000),
     ...(source.DOWNLOAD_FALLBACK_ANDROID_URL
       ? { downloadFallbackAndroidUrl: source.DOWNLOAD_FALLBACK_ANDROID_URL }

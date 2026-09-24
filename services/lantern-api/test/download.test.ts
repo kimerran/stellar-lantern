@@ -464,3 +464,259 @@ describe('/admin shows the funnel and exports the log', () => {
     expect(downloadsCsv([])).toBe('id,target,version,src,country,uaFamily,ts\n');
   });
 });
+
+// ── Private repo (#153): internal-lantern's Releases, read with a token ──────
+
+const PRIV = 'kimerran/internal-lantern';
+const GH_TOKEN = 'github_pat_TEST_do_not_leak_1234567890';
+const assetApi = (id: number) => `https://api.github.com/repos/${PRIV}/releases/assets/${id}`;
+const signed = (name: string) =>
+  `https://release-assets.githubusercontent.com/github-production-release-asset/1/${name}?sp=r&sig=abc&se=2026-09-24T00%3A05%3A00Z`;
+const SUMS = [
+  `${'a'.repeat(64)}  lantern-0.2.0-testnet.apk`,
+  `${'b'.repeat(64)}  lantern-extension-0.2.0.zip`,
+].join('\n');
+const PRIV_RELEASES = [
+  {
+    tag_name: 'v0.2.0-testnet.9',
+    prerelease: true,
+    draft: false,
+    assets: [
+      {
+        name: 'lantern-0.2.0-testnet.apk',
+        url: assetApi(11),
+        browser_download_url: `https://github.com/${PRIV}/releases/download/v0.2.0-testnet.9/lantern-0.2.0-testnet.apk`,
+      },
+      {
+        name: 'lantern-extension-0.2.0.zip',
+        url: assetApi(12),
+        browser_download_url: `https://github.com/${PRIV}/releases/download/v0.2.0-testnet.9/lantern-extension-0.2.0.zip`,
+      },
+      {
+        name: 'SHA256SUMS.txt',
+        url: assetApi(13),
+        browser_download_url: `https://github.com/${PRIV}/releases/download/v0.2.0-testnet.9/SHA256SUMS.txt`,
+      },
+    ],
+  },
+];
+
+interface Seen {
+  url: string;
+  headers: Record<string, string>;
+  redirect?: string;
+}
+
+// A GitHub that serves private assets: the list and the asset API need the
+// token; the asset API answers a 302 to a signed URL that needs nothing.
+function privateGithub(
+  opts: { seen?: Seen[]; listDown?: boolean; assetDown?: boolean; assetStatus?: number } = {},
+): typeof fetch {
+  let n = 0;
+  return (async (url: string, init?: { headers?: Record<string, string>; redirect?: string }) => {
+    const headers = init?.headers ?? {};
+    opts.seen?.push({ url, headers, ...(init?.redirect ? { redirect: init.redirect } : {}) });
+    const authed = headers.Authorization === `Bearer ${GH_TOKEN}`;
+    if (url.startsWith(`https://api.github.com/repos/${PRIV}/releases?`)) {
+      if (opts.listDown) throw new Error('api down');
+      if (!authed) return { ok: false, status: 404, json: async () => ({}) };
+      return { ok: true, status: 200, json: async () => PRIV_RELEASES };
+    }
+    if (url.startsWith(assetApi(0).slice(0, -1))) {
+      if (opts.assetDown) throw new Error('asset api down');
+      if (!authed || headers.Accept !== 'application/octet-stream')
+        return { ok: false, status: 404, headers: new Headers() };
+      const status = opts.assetStatus ?? 302;
+      const name = PRIV_RELEASES[0]!.assets.find((a) => a.url === url)!.name;
+      n += 1;
+      return {
+        ok: status < 300,
+        status,
+        headers: new Headers(status === 302 ? { location: `${signed(name)}&n=${n}` } : {}),
+      };
+    }
+    if (url.startsWith('https://release-assets.githubusercontent.com/')) {
+      return { ok: true, status: 200, text: async () => `${SUMS}\n` };
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  }) as unknown as typeof fetch;
+}
+
+function privateHarness(
+  over: Record<string, string> = {},
+  fetchOpts: Parameters<typeof privateGithub>[0] = {},
+) {
+  const downloads = memoryDownloads();
+  const lines: Array<Record<string, string | number>> = [];
+  const app = createApp({
+    env: env({ DOWNLOADS_REPO: PRIV, DOWNLOADS_GITHUB_TOKEN: GH_TOKEN, ...over }),
+    store: memoryStore(),
+    downloads,
+    log: (l) => lines.push(l),
+    nowDate: NOW,
+    now: () => NOW().getTime(),
+    fetchImpl: privateGithub(fetchOpts),
+  });
+  const get = (path: string) => app.request(path, { redirect: 'manual' });
+  return { app, downloads, lines, get };
+}
+
+describe('private repo downloads (#153)', () => {
+  it('302s a signed-out browser to a fresh signed storage URL for each click', async () => {
+    const seen: Seen[] = [];
+    const h = privateHarness({}, { seen });
+    const a = await h.get('/download/android?src=homepage');
+    expect(a.status).toBe(302);
+    expect(a.headers.get('location')).toMatch(
+      /^https:\/\/release-assets\.githubusercontent\.com\/.*lantern-0\.2\.0-testnet\.apk\?.*sig=/,
+    );
+    const e = await h.get('/download/extension');
+    expect(e.headers.get('location')).toContain('lantern-extension-0.2.0.zip');
+    // A second click resolves a NEW signed URL (they expire) but reuses the list.
+    const a2 = await h.get('/download/android');
+    expect(a2.headers.get('location')).not.toBe(a.headers.get('location'));
+    expect(seen.filter((s) => s.url.includes('/releases?'))).toHaveLength(1);
+    const assetCalls = seen.filter((s) => s.url.includes('/releases/assets/'));
+    expect(assetCalls).toHaveLength(3);
+    for (const c of assetCalls) {
+      expect(c.redirect).toBe('manual');
+      expect(c.headers.Accept).toBe('application/octet-stream');
+    }
+    // Attribution and the download log are unchanged.
+    expect(h.downloads.rows).toHaveLength(3);
+    expect(h.downloads.rows[0]).toMatchObject({ target: 'android', version: '0.2.0', src: 'homepage' });
+  });
+
+  it('the token goes only to api.github.com, and never into a response or a log line', async () => {
+    const seen: Seen[] = [];
+    const h = privateHarness({}, { seen });
+    const responses = [
+      await h.get('/download/android'),
+      await h.get('/download/extension'),
+      await h.get('/download/checksums'),
+    ];
+    for (const s of seen) {
+      if (s.headers.Authorization) expect(s.url.startsWith('https://api.github.com/')).toBe(true);
+    }
+    expect(seen.some((s) => s.url.startsWith('https://release-assets.') && s.headers.Authorization)).toBe(
+      false,
+    );
+    for (const r of responses) {
+      const all = [...r.headers.entries()].map(([k, v]) => `${k}:${v}`).join('\n') + (await r.text());
+      expect(all).not.toContain(GH_TOKEN);
+    }
+    expect(JSON.stringify(h.lines)).not.toContain(GH_TOKEN);
+  });
+
+  it('never sends the token to an asset URL outside this repo', async () => {
+    const seen: Seen[] = [];
+    const foreign = [
+      {
+        ...PRIV_RELEASES[0],
+        assets: [
+          {
+            name: 'lantern-0.2.0-testnet.apk',
+            url: 'https://api.github.com/repos/someone-else/repo/releases/assets/1',
+            browser_download_url: 'https://github.com/x/y.apk',
+          },
+        ],
+      },
+    ];
+    const impl = (async (url: string, init?: { headers?: Record<string, string> }) => {
+      seen.push({ url, headers: init?.headers ?? {} });
+      return { ok: true, status: 200, json: async () => foreign };
+    }) as unknown as typeof fetch;
+    const r = await createReleaseResolver({ repo: PRIV, token: GH_TOKEN, fetchImpl: impl }).resolve(
+      'android',
+    );
+    expect(r.source).toBe('unavailable');
+    expect(seen.map((s) => s.url)).toEqual([
+      `https://api.github.com/repos/${PRIV}/releases?per_page=30`,
+    ]);
+  });
+
+  it('GitHub down, the token rejected, or a 200 instead of a redirect → a 503 try-again page, never the private releases page', async () => {
+    for (const fetchOpts of [
+      { listDown: true },
+      { assetDown: true },
+      { assetStatus: 200 },
+      { assetStatus: 401 },
+    ]) {
+      const h = privateHarness({}, fetchOpts);
+      const r = await h.get('/download/android');
+      expect(r.status, JSON.stringify(fetchOpts)).toBe(503);
+      expect(r.headers.get('location')).toBeNull();
+      expect(r.headers.get('retry-after')).toBe('60');
+      expect(r.headers.get('cache-control')).toBe('no-store');
+      const body = await r.text();
+      expect(body).toContain('Downloads are temporarily unavailable');
+      expect(body).not.toContain('github.com');
+    }
+    // A wrong token: the list 404s → same page.
+    const wrong = privateHarness({ DOWNLOADS_GITHUB_TOKEN: 'github_pat_wrong' });
+    expect((await wrong.get('/download/extension')).status).toBe(503);
+  });
+
+  it('a pinned public fallback still wins over the try-again page', async () => {
+    const h = privateHarness(
+      { DOWNLOAD_FALLBACK_ANDROID_URL: 'https://example.com/pinned.apk' },
+      { assetDown: true },
+    );
+    const r = await h.get('/download/android');
+    expect(r.status).toBe(302);
+    expect(r.headers.get('location')).toBe('https://example.com/pinned.apk');
+  });
+
+  it('/download/checksums serves the release SHA256SUMS.txt via the signed URL, cached per tag', async () => {
+    const seen: Seen[] = [];
+    const h = privateHarness({}, { seen });
+    const r = await h.get('/download/checksums');
+    expect(r.status).toBe(200);
+    expect(r.headers.get('content-type')).toMatch(/^text\/plain/);
+    expect(r.headers.get('x-lantern-release')).toBe('v0.2.0-testnet.9');
+    expect(await r.text()).toBe(`${SUMS}\n`);
+    await h.get('/download/checksums');
+    expect(seen.filter((s) => s.url.startsWith('https://release-assets.'))).toHaveLength(1);
+    // Not a download click: no row.
+    expect(h.downloads.rows).toHaveLength(0);
+  });
+
+  it('checksums unavailable → 503 text, not a 404 from /download/:target', async () => {
+    const h = privateHarness({}, { listDown: true });
+    const r = await h.get('/download/checksums');
+    expect(r.status).toBe(503);
+    expect(await r.text()).toMatch(/temporarily unavailable/);
+  });
+});
+
+describe('public repo checksums and token-less behaviour (#153)', () => {
+  it('/download/checksums works signed out against the public mirror too', async () => {
+    const sums = `${'c'.repeat(64)}  lantern-0.1.0-testnet.apk\n`;
+    const seen: Seen[] = [];
+    const impl = (async (url: string, init?: { headers?: Record<string, string> }) => {
+      seen.push({ url, headers: init?.headers ?? {} });
+      if (url.includes('/SHA256SUMS.txt')) return { ok: true, status: 200, text: async () => sums };
+      return { ok: true, status: 200, json: async () => RELEASES };
+    }) as unknown as typeof fetch;
+    const app = createApp({ env: env(), store: null, downloads: null, log: () => {}, fetchImpl: impl });
+    const r = await app.request('/download/checksums');
+    expect(r.status).toBe(200);
+    expect(await r.text()).toBe(sums);
+    expect(seen.every((s) => !s.headers.Authorization)).toBe(true);
+  });
+
+  it('rejects a checksums file that is not one', async () => {
+    const impl = (async (url: string) => {
+      if (url.includes('/SHA256SUMS.txt'))
+        return { ok: true, status: 200, text: async () => '<html>not found</html>' };
+      return { ok: true, status: 200, json: async () => RELEASES };
+    }) as unknown as typeof fetch;
+    const r = await createReleaseResolver({ repo: 'kimerran/stellar-lantern', fetchImpl: impl }).checksums();
+    expect(r).toBeNull();
+  });
+
+  it('DOWNLOADS_GITHUB_TOKEN is optional and unset by default', () => {
+    expect(env().downloadsGithubToken).toBeUndefined();
+    expect(env({ DOWNLOADS_GITHUB_TOKEN: GH_TOKEN }).downloadsGithubToken).toBe(GH_TOKEN);
+  });
+});

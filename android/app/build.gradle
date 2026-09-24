@@ -1,5 +1,17 @@
 apply plugin: 'com.android.application'
 
+// The version comes from package.json — the one place it is written (#141) —
+// so the APK reports the same version as the extension manifest and the
+// telemetry appVersion. versionCode must strictly increase for Android to
+// treat a build as an upgrade: major*10000 + minor*100 + patch is monotonic
+// across bumps and reproducible from the source tree (github.run_number is
+// neither). Same formula as versionCode() in scripts/release-assets.mjs.
+def lanternVersion = new groovy.json.JsonSlurper().parse(file('../../package.json')).version
+def lanternVersionCode = { String v ->
+    def (major, minor, patch) = v.tokenize('-')[0].tokenize('.').collect { it as int }
+    major * 10000 + minor * 100 + patch
+}
+
 android {
     namespace = "com.lantern.wallet"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +19,8 @@ android {
         applicationId "com.lantern.wallet"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode lanternVersionCode(lanternVersion)
+        versionName lanternVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
