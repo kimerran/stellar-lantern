@@ -283,7 +283,11 @@ export function diffVerdicts(reviewed: ScanVerdict, fresh: ScanVerdict): Verdict
 // the re-check is treated as failed — never as a silent pass.
 export const RECHECK_TIMEOUT_MS = 2_500;
 
-export type RecheckFailure = 'timeout' | 'rpc' | 'error';
+// `unverified`: the fresh screening still could not read a counterparty
+// (registry unreachable, entry archived, no registry) — the transaction would
+// be signed against an unscreened recipient, so it takes the same explicit
+// second confirm as a re-check that could not look at all (#148).
+export type RecheckFailure = 'timeout' | 'rpc' | 'error' | 'unverified';
 
 export type RecheckResult =
   | { ok: true; verdict: ScanVerdict; drift: VerdictDrift; latencyMs: number }
@@ -293,19 +297,31 @@ export type RecheckResult =
 // pipeline fails closed to `high` when the RPC is down, and the registry
 // answers `unknown` on a transport error, and either would otherwise read as
 // an "escalation" and block a legitimate transaction with a misleading reason.
+//
+// A counterparty whose fresh screening is `unknown` is always a failure, even
+// when it was already unknown at review (#148): `screen_unknown` is only a
+// medium/warn verdict, so the review offers a plain one-tap Confirm & Send,
+// and skipping it here let an unverified recipient sign on the first tap.
+// Transport reasons on an address that WAS known keep their precise failure
+// (`timeout` / `rpc`); anything else is `unverified`. unknown → flagged never
+// reaches this branch (the fresh answer is `flagged`, so the diff escalates),
+// and unknown → clean has no unknown answer, so it passes on the first tap.
 export function recheckFailureOf(reviewed: ScanVerdict, fresh: ScanResult): RecheckFailure | null {
   const f = fresh.simulation.failure;
   if (f === 'rpc_timeout') return 'timeout';
   if (f === 'rpc_transport' || f === 'simulation_malformed') return 'rpc';
   const before = new Map((reviewed.screening ?? []).map((s) => [s.address, s.answer]));
+  let unverified = false;
   for (const { address, answer } of fresh.screen.answers) {
     if (answer.outcome !== 'unknown') continue;
     const was = before.get(address)?.outcome;
-    if (was === undefined || was === 'unknown') continue;
-    if (answer.reason === 'timeout') return 'timeout';
-    if (answer.reason === 'rpc_error' || answer.reason === 'malformed') return 'rpc';
+    if (was !== undefined && was !== 'unknown') {
+      if (answer.reason === 'timeout') return 'timeout';
+      if (answer.reason === 'rpc_error' || answer.reason === 'malformed') return 'rpc';
+    }
+    unverified = true;
   }
-  return null;
+  return unverified ? 'unverified' : null;
 }
 
 /**
