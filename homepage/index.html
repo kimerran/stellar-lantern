@@ -21,6 +21,10 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css" />
+    <!-- Marks the page as scripted before first paint, so the scroll-reveal
+         hide (.js .reveal) and other enhancements apply only when app.js runs.
+         Without JS, every section renders visible. -->
+    <script>document.documentElement.classList.add('js');</script>
   </head>
   <body>
     <!-- ───────── Navbar ───────── -->
@@ -191,6 +195,32 @@
           <!-- Showcase visual — the lantern lighting the Stellar network -->
           <div class="showcase-visual reveal">
             <img src="lantern.jpg" alt="The Lantern lighting up a network of Stellar nodes" />
+          </div>
+        </div>
+      </section>
+
+      <!-- ───────── Walkthrough video ───────── -->
+      <!-- Click-to-play facade (#162 item 5). Nothing loads from YouTube until the
+           visitor presses play: the poster is a local file (video-poster.jpg), and
+           app.js swaps the link below for a <button> that injects the
+           youtube-nocookie.com iframe on click. Without JS it stays a plain link to
+           the video on YouTube. -->
+      <section id="video" class="video-section">
+        <div class="wrap">
+          <div class="section-head reveal">
+            <span class="eyebrow">Walkthrough</span>
+            <h2>See it <span class="amber-text">in action.</span></h2>
+            <p>A short tour of the wallet: the home screen, a transaction screened before you sign, swaps, yield and cash out.</p>
+          </div>
+
+          <div class="video reveal" data-video-id="E6E-frLj0WE" data-video-title="Lantern wallet walkthrough">
+            <a class="video-facade" href="https://www.youtube.com/watch?v=E6E-frLj0WE" target="_blank" rel="noopener">
+              <img class="video-poster" src="video-poster.jpg" alt="" width="1280" height="720" loading="lazy" decoding="async" />
+              <span class="video-play-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="30" height="30" focusable="false"><path fill="currentColor" d="M8 5.5v13l11-6.5z"/></svg>
+              </span>
+              <span class="video-cta">Watch the walkthrough on YouTube</span>
+            </a>
           </div>
         </div>
       </section>
