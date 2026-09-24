@@ -186,14 +186,14 @@
       var owner = slides.filter(function (s) { return s !== e.target && s.contains(e.target); })[0];
       if (owner && owner.hasAttribute('data-offscreen')) goToIndex(slides.indexOf(owner));
     });
-    var t;
+    var scrollTimer, resizeTimer;
     track.addEventListener('scroll', function () {
-      clearTimeout(t);
-      t = setTimeout(sync, 80);
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(sync, 80);
     }, { passive: true });
     window.addEventListener('resize', function () {
-      clearTimeout(t);
-      t = setTimeout(measure, 120);
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(measure, 120);
     });
     measure();
   }
