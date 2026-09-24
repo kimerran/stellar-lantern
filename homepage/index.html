@@ -343,20 +343,25 @@
       </section>
 
       <!-- ───────── Join the alpha ───────── -->
-      <!-- Sign-up by email, not a link to the tester guide: the guide is marked
-           ALPHA · CONFIDENTIAL and assumes a tester number from the invite (#125),
-           so it goes out with the invite. The subject carries src=homepage so a
-           reply is attributable; the download buttons above carry ?src=homepage
-           for /admin (#131). -->
+      <!-- Entry point is the WhatsApp group "Lantern Alpha Testing — group chat"
+           (#162 item 6), not a link to the tester guide: the guide is marked
+           ALPHA · CONFIDENTIAL and assumes a tester number (#125), so both are
+           handed out in the group. The button goes through /join on the Lantern
+           API, which records src=homepage and redirects to the invite; a WhatsApp
+           invite link can't carry the attribution itself (#131). -->
       <section id="alpha" class="contact">
         <div class="wrap">
           <div class="contact-card reveal">
             <span class="material-symbols-outlined big">science</span>
             <h2>Join the alpha</h2>
-            <p>Help us test Lantern on testnet: install the build, run six real-looking transactions through the review screen, and report a scammer to the registry. About 70 minutes, no real funds. Email us and we'll send you a tester number and the guide.</p>
-            <a class="btn btn-primary" href="mailto:lantern@artisam.xyz?subject=Join%20the%20Lantern%20alpha%20%28src%3Dhomepage%29&amp;body=Hi%20%E2%80%94%20I%27d%20like%20to%20test%20Lantern.%20I%20have%3A%20%5BAndroid%20phone%20%2F%20Chrome%20%2F%20both%5D">
-              <span class="material-symbols-outlined">science</span> Join the alpha
+            <p>Help us test Lantern on testnet: install the build, run six real-looking transactions through the review screen, and report a scammer to the registry. About 70 minutes, no real funds. It starts in our WhatsApp tester group: join it, and you'll get your tester number and the guide there.</p>
+            <a class="btn btn-primary" href="https://lantern-api-production-3fad.up.railway.app/join?src=homepage" target="_blank" rel="noopener">
+              <span class="material-symbols-outlined" aria-hidden="true">forum</span> Join on WhatsApp
             </a>
+            <p class="alpha-note">
+              <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+              <span>In a WhatsApp group, other members can see your phone number.</span>
+            </p>
           </div>
         </div>
       </section>
@@ -395,7 +400,7 @@
             <a href="#features"><span class="material-symbols-outlined">bolt</span> Features</a>
             <a href="#screens"><span class="material-symbols-outlined">photo_library</span> Screens</a>
             <a href="#install"><span class="material-symbols-outlined">menu_book</span> Install guide</a>
-            <a href="#alpha"><span class="material-symbols-outlined">science</span> Join the alpha</a>
+            <a href="https://lantern-api-production-3fad.up.railway.app/join?src=homepage" target="_blank" rel="noopener"><span class="material-symbols-outlined">science</span> Join the alpha (WhatsApp)</a>
             <a href="docs/"><span class="material-symbols-outlined">description</span> Docs &amp; evidence</a>
           </div>
           <div class="footer-col">

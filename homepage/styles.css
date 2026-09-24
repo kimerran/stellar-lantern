@@ -446,6 +446,8 @@ section { padding: 76px 0; }
 .contact-card .material-symbols-outlined.big { font-size: 44px; color: var(--amber); filter: drop-shadow(0 0 16px rgba(255,193,7,0.4)); }
 .contact-card h2 { font-size: 2rem; margin: 16px 0 10px; }
 .contact-card p { color: var(--on-surface-variant); margin-bottom: 26px; }
+.contact-card .alpha-note { margin: 16px auto 0; max-width: 42ch; font-size: 0.86rem; color: var(--outline); }
+.contact-card .alpha-note .material-symbols-outlined { font-size: 16px; color: var(--amber-dim); vertical-align: -3px; margin-right: 4px; }
 .email-link {
   display: inline-flex; align-items: center; gap: 10px;
   font-family: 'Roboto Mono', monospace; font-size: 1.1rem; font-weight: 500;
