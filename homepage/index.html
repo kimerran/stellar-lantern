@@ -109,69 +109,72 @@
             <p>Everything a Stellar wallet should do — send, swap, earn, and cash out — plus a safety net between you and every signature. The risk verdict is rules and a public registry you can check; the AI explains it in words.</p>
           </div>
 
-          <div class="features">
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">key</span></div>
-              <h3>Non-custodial</h3>
-              <p>Your private keys are encrypted on-device and never leave it. No accounts, no custodians — just you.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">security</span></div>
-              <h3>Scan every signature</h3>
-              <p>Payments, trustlines, contract calls — each one is decoded, explained in plain language, and gated when it's high-risk.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">campaign</span></div>
-              <h3>Report once, protect everyone</h3>
-              <p>On testnet, every review checks the counterparty against Lantern's on-chain blacklist registry, and one tap reports a scammer to it — so the next wallet is warned too. It's a live Soroban contract anyone can inspect:
-                <a class="inline" href="https://stellar.expert/explorer/testnet/contract/CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F" target="_blank" rel="noopener"><code>CBJWD6SA…G623F</code></a>
-                on testnet, WASM hash <code>40fd3771…5be23783</code>.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">code</span></div>
-              <h3>Open-source scanner</h3>
-              <p>The engine behind every review is <a class="inline" href="https://github.com/kimerran/stellar-lantern/tree/main/packages/lantern-scanner" target="_blank" rel="noopener"><code>@lantern/scanner</code></a> — MIT-licensed and standalone, so any Stellar wallet, dApp or CLI can decode, explain and screen a transaction before it's signed.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">published_with_changes</span></div>
-              <h3>Checked again at send</h3>
-              <p>Right before a transaction is submitted, Lantern simulates and screens it once more — so a counterparty reported while you were reviewing still stops you.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">shield_person</span></div>
-              <h3>Guardian recovery</h3>
-              <p>Lose your seed, keep your funds. Appoint guardians and recover onto a new device with Stellar-native multisig — no 12 words to lose.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">savings</span></div>
-              <h3>Earn yield</h3>
-              <p>Supply assets to Blend lending pools — including our own Lantern Earn pool — and earn yield. Withdraw anytime.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">account_balance</span></div>
-              <h3>Cash in &amp; out</h3>
-              <p>Move between crypto and your bank or card through regulated SEP-24 anchors, right inside the wallet.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">swap_horiz</span></div>
-              <h3>In-wallet swaps</h3>
-              <p>Swap XLM and assets at the best price across Stellar's decentralized exchange — without leaving Lantern.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">grid_view</span></div>
-              <h3>Mini-app browser</h3>
-              <p>Explore Stellar dApps in a sandboxed frame. Connecting shares only your public key — signing always needs a separate prompt.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">content_paste_search</span></div>
-              <h3>Paste-to-check</h3>
-              <p>Drop in a suspicious address or message and Lantern flags scam patterns instantly, on-device.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">devices</span></div>
-              <h3>Android &amp; Chrome</h3>
-              <p>One wallet, two homes: a Chrome/Edge extension and an Android app, built from a single codebase.</p>
-            </article>
+          <!-- Slideshow (#162): a plain grid without JS; app.js adds .is-slideshow. -->
+          <div class="slideshow" data-slideshow="Features">
+            <div class="features slides">
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">key</span></div>
+                <h3>Non-custodial</h3>
+                <p>Your private keys are encrypted on-device and never leave it. No accounts, no custodians — just you.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">security</span></div>
+                <h3>Scan every signature</h3>
+                <p>Payments, trustlines, contract calls — each one is decoded, explained in plain language, and gated when it's high-risk.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">campaign</span></div>
+                <h3>Report once, protect everyone</h3>
+                <p>On testnet, every review checks the counterparty against Lantern's on-chain blacklist registry, and one tap reports a scammer to it — so the next wallet is warned too. It's a live Soroban contract anyone can inspect:
+                  <a class="inline" href="https://stellar.expert/explorer/testnet/contract/CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F" target="_blank" rel="noopener"><code>CBJWD6SA…G623F</code></a>
+                  on testnet, WASM hash <code>40fd3771…5be23783</code>.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">code</span></div>
+                <h3>Open-source scanner</h3>
+                <p>The engine behind every review is <a class="inline" href="https://github.com/kimerran/stellar-lantern/tree/main/packages/lantern-scanner" target="_blank" rel="noopener"><code>@lantern/scanner</code></a> — MIT-licensed and standalone, so any Stellar wallet, dApp or CLI can decode, explain and screen a transaction before it's signed.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">published_with_changes</span></div>
+                <h3>Checked again at send</h3>
+                <p>Right before a transaction is submitted, Lantern simulates and screens it once more — so a counterparty reported while you were reviewing still stops you.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">shield_person</span></div>
+                <h3>Guardian recovery</h3>
+                <p>Lose your seed, keep your funds. Appoint guardians and recover onto a new device with Stellar-native multisig — no 12 words to lose.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">savings</span></div>
+                <h3>Earn yield</h3>
+                <p>Supply assets to Blend lending pools — including our own Lantern Earn pool — and earn yield. Withdraw anytime.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">account_balance</span></div>
+                <h3>Cash in &amp; out</h3>
+                <p>Move between crypto and your bank or card through regulated SEP-24 anchors, right inside the wallet.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">swap_horiz</span></div>
+                <h3>In-wallet swaps</h3>
+                <p>Swap XLM and assets at the best price across Stellar's decentralized exchange — without leaving Lantern.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">grid_view</span></div>
+                <h3>Mini-app browser</h3>
+                <p>Explore Stellar dApps in a sandboxed frame. Connecting shares only your public key — signing always needs a separate prompt.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">content_paste_search</span></div>
+                <h3>Paste-to-check</h3>
+                <p>Drop in a suspicious address or message and Lantern flags scam patterns instantly, on-device.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">devices</span></div>
+                <h3>Android &amp; Chrome</h3>
+                <p>One wallet, two homes: a Chrome/Edge extension and an Android app, built from a single codebase.</p>
+              </article>
+            </div>
           </div>
         </div>
       </section>
@@ -234,31 +237,34 @@
             <p>Real screens from the Lantern Android app — balances, sandboxed dApps, live yield, and guardian-grade settings.</p>
           </div>
 
-          <div class="gallery">
-            <figure class="shot reveal">
-              <img src="screenshots/1185.png" alt="Lantern home screen showing an XLM balance with Send, Receive, Swap and Earn actions" loading="lazy" />
-              <figcaption class="cap"><b>Home</b><span>Balance, send, receive, swap and earn — one clean home.</span></figcaption>
-            </figure>
-            <figure class="shot reveal">
-              <img src="screenshots/1186.png" alt="Lantern mini-app browser listing curated Stellar dApps" loading="lazy" />
-              <figcaption class="cap"><b>Discover apps</b><span>A sandboxed mini-app browser for Stellar dApps.</span></figcaption>
-            </figure>
-            <figure class="shot reveal">
-              <img src="screenshots/1187.png" alt="A dApp connection prompt showing that only the public key is shared" loading="lazy" />
-              <figcaption class="cap"><b>Connect, safely</b><span>dApps get only your public key — signing always needs a separate prompt.</span></figcaption>
-            </figure>
-            <figure class="shot reveal">
-              <img src="screenshots/1189.png" alt="Earn screen showing Blend lending pool positions and APYs" loading="lazy" />
-              <figcaption class="cap"><b>Earn yield</b><span>Supply to Blend pools and track every position.</span></figcaption>
-            </figure>
-            <figure class="shot reveal">
-              <img src="screenshots/1190.png" alt="A supply confirmation reading back the smart-contract call in plain language" loading="lazy" />
-              <figcaption class="cap"><b>Read before you sign</b><span>Even a smart-contract call is explained before you confirm.</span></figcaption>
-            </figure>
-            <figure class="shot reveal">
-              <img src="screenshots/1188.png" alt="Settings screen with guardians, scam checks, cash in/out and network toggle" loading="lazy" />
-              <figcaption class="cap"><b>Settings</b><span>Guardians, scam checks, anchors and network — all in one place.</span></figcaption>
-            </figure>
+          <!-- Slideshow (#162): a plain grid without JS; app.js adds .is-slideshow. -->
+          <div class="slideshow" data-slideshow="Screens">
+            <div class="gallery slides">
+              <figure class="shot reveal">
+                <img src="screenshots/1185.png" alt="Lantern home screen showing an XLM balance with Send, Receive, Swap and Earn actions" loading="lazy" />
+                <figcaption class="cap"><b>Home</b><span>Balance, send, receive, swap and earn — one clean home.</span></figcaption>
+              </figure>
+              <figure class="shot reveal">
+                <img src="screenshots/1186.png" alt="Lantern mini-app browser listing curated Stellar dApps" loading="lazy" />
+                <figcaption class="cap"><b>Discover apps</b><span>A sandboxed mini-app browser for Stellar dApps.</span></figcaption>
+              </figure>
+              <figure class="shot reveal">
+                <img src="screenshots/1187.png" alt="A dApp connection prompt showing that only the public key is shared" loading="lazy" />
+                <figcaption class="cap"><b>Connect, safely</b><span>dApps get only your public key — signing always needs a separate prompt.</span></figcaption>
+              </figure>
+              <figure class="shot reveal">
+                <img src="screenshots/1189.png" alt="Earn screen showing Blend lending pool positions and APYs" loading="lazy" />
+                <figcaption class="cap"><b>Earn yield</b><span>Supply to Blend pools and track every position.</span></figcaption>
+              </figure>
+              <figure class="shot reveal">
+                <img src="screenshots/1190.png" alt="A supply confirmation reading back the smart-contract call in plain language" loading="lazy" />
+                <figcaption class="cap"><b>Read before you sign</b><span>Even a smart-contract call is explained before you confirm.</span></figcaption>
+              </figure>
+              <figure class="shot reveal">
+                <img src="screenshots/1188.png" alt="Settings screen with guardians, scam checks, cash in/out and network toggle" loading="lazy" />
+                <figcaption class="cap"><b>Settings</b><span>Guardians, scam checks, anchors and network — all in one place.</span></figcaption>
+              </figure>
+            </div>
           </div>
         </div>
       </section>
