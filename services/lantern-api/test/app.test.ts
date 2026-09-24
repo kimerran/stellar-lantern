@@ -134,8 +134,9 @@ describe('POST /v1/explain', () => {
     expect(sent?.body.model).toBe(DEFAULT_MODEL);
     expect(sent?.body.max_tokens).toBe(200);
     expect(sent?.body.messages[0]?.content).toMatch(
-      /^Risk verdict \(final\): high — action: block_confirm\./,
+      /^Risk verdict \(final\): high — the user can still sign, after an explicit confirmation\./,
     );
+    expect(sent?.body.messages[0]?.content).not.toMatch(/block_confirm/);
     expect(sent?.body.messages[0]?.content).toMatch(/25\.0000000 XLM leaves GAMN…SRNK/);
     expect(JSON.stringify(sent?.body)).not.toMatch(/[A-Za-z0-9+/]{80,}={0,2}/);
   });
