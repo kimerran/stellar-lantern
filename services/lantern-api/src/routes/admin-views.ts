@@ -5,7 +5,7 @@
 // report (src/core/telemetry/report.ts).
 
 import { esc, CSS, type Row, type UserTrail } from '@lantern/telemetry-report';
-import type { DownloadRow } from '../downloads/store';
+import { isJoin, type DownloadRow, type DownloadTarget } from '../downloads/store';
 
 // ── Model ────────────────────────────────────────────────────────────────────
 
@@ -227,11 +227,13 @@ export interface Downloads {
 }
 
 export function buildDownloads(
-  downloads: DownloadRow[],
+  log: DownloadRow[],
   rows: Row[],
   since: string,
   until: string,
 ): Downloads {
+  // /join clicks (#162) share the log but are not download intents.
+  const downloads = log.filter((d) => !isJoin(d));
   const byTarget: Record<string, number> = {};
   const byUa: Record<string, number> = {};
   const src = new Map<string, number>();
@@ -246,7 +248,7 @@ export function buildDownloads(
     const label = d.src || '(none)';
     src.set(label, (src.get(label) ?? 0) + 1);
     const day = days.get(d.ts.toISOString().slice(0, 10));
-    if (day) day[d.target] += 1;
+    if (day) day[d.target as DownloadTarget] += 1;
   }
   const scanned = new Set<string>();
   for (const r of rows) if (r.event === 'tx_scanned' && r.account) scanned.add(r.account);
@@ -289,6 +291,47 @@ export function renderDownloadsCard(d: Downloads, qs: string): string {
   return `<div class="card"><h2>Download intents</h2><p class="note">${targets}${ua ? ' · ' + ua : ''}</p>
 <div class="grid2"><div>${funnel}</div><div>${bySrc}</div></div>
 <div class="actions"><a href="/admin/downloads.csv?${esc(qs)}">Download CSV</a></div></div>`;
+}
+
+// ── Alpha group joins (#162) ─────────────────────────────────────────────────
+//
+// Clicks on /join, the redirect to the testers' WhatsApp group. Same log,
+// same privacy basis as the download clicks, but a different step: a join is
+// never counted as a download intent, so it gets its own card and its own
+// src breakdown. A click is not a confirmed membership — WhatsApp cannot tell
+// us that.
+
+export interface Joins {
+  total: number;
+  bySrc: Array<{ src: string; count: number }>;
+}
+
+export function buildJoins(log: DownloadRow[]): Joins {
+  const src = new Map<string, number>();
+  let total = 0;
+  for (const d of log) {
+    if (!isJoin(d)) continue;
+    total += 1;
+    const label = d.src || '(none)';
+    src.set(label, (src.get(label) ?? 0) + 1);
+  }
+  return {
+    total,
+    bySrc: [...src.entries()]
+      .map(([s, count]) => ({ src: s, count }))
+      .sort((a, b) => b.count - a.count || a.src.localeCompare(b.src)),
+  };
+}
+
+export function renderJoinsCard(j: Joins): string {
+  const bySrc = j.bySrc.length
+    ? `<table><tr><th>src</th><th class="n">joins</th></tr>${j.bySrc
+        .map((s) => `<tr><td><code>${esc(s.src)}</code></td><td class="n">${n(s.count)}</td></tr>`)
+        .join('')}</table>`
+    : '<p class="note">no alpha group clicks in this window</p>';
+  return `<div class="card"><h2>Alpha group joins</h2><p class="note"><span class="pill">group clicks: ${n(j.total)}</span></p>
+${bySrc}
+<p class="note">Clicks on /join, the redirect to the testers' WhatsApp group. A click is not a confirmed membership, and it is not counted as a download intent. Rows are in the downloads CSV with target <code>alpha</code>.</p></div>`;
 }
 
 // The rows of one identity, as the trail the report already renders.
