@@ -135,12 +135,20 @@ jobs:
 
       # ── Publish: a GitHub Release with directly downloadable assets ──
       # GitHub serves each asset under its own name with no re-zipping, so the
-      # APK downloads as an .apk and installs on tap, needs no login on the
-      # public mirror, and never expires. Tagged v<version>-testnet.<run> so
-      # repeated merges of one version don't collide. Pre-release: it is the
-      # alpha (debug-signed APK, telemetry identity on).
+      # APK downloads as an .apk and installs on tap. Tagged
+      # v<version>-testnet.<run> so repeated merges of one version don't
+      # collide. Pre-release: it is the alpha (debug-signed APK, telemetry
+      # identity on).
+      #
+      # Published by internal-lantern ONLY (#153). This file is shared with the
+      # public mirror, which still builds and uploads the run artifacts below
+      # but no longer publishes Releases: the private Releases are the single
+      # source for /download/*, read by lantern-api with a token, and
+      # /download/checksums is how anyone verifies a build. On the mirror the
+      # release gate's tags therefore stop at v0.2.0; internal-lantern's tags
+      # are the ones that enforce the version bump.
       - name: Create GitHub Release
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.repository == 'kimerran/internal-lantern'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.stage.outputs.tag }}
