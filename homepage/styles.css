@@ -231,9 +231,10 @@ section { padding: 76px 0; }
 .section-head h2 { font-size: clamp(1.9rem, 3.6vw, 2.8rem); margin: 14px 0 12px; }
 .section-head p { color: var(--on-surface-variant); font-size: 1.05rem; }
 
-/* Reveal on scroll */
-.reveal { opacity: 0; transform: translateY(26px); transition: opacity 0.7s var(--ease), transform 0.7s var(--ease); }
-.reveal.in { opacity: 1; transform: none; }
+/* Reveal on scroll. Only hidden when JS is running (html.js, set in <head>),
+   so a page without JS shows every section instead of leaving them at opacity 0. */
+.js .reveal { opacity: 0; transform: translateY(26px); transition: opacity 0.7s var(--ease), transform 0.7s var(--ease); }
+.js .reveal.in { opacity: 1; transform: none; }
 
 /* ───────── Features ───────── */
 .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
@@ -276,6 +277,57 @@ section { padding: 76px 0; }
 .shot .cap { display: block; margin-top: 16px; padding: 0 4px; }
 .shot .cap b { display: block; font-size: 1rem; font-weight: 600; color: var(--amber-bright); letter-spacing: -0.01em; }
 .shot .cap span { display: block; margin-top: 3px; color: var(--on-surface-variant); font-size: 0.9rem; line-height: 1.5; }
+
+/* ───────── Walkthrough video (click-to-play facade) ───────── */
+.video-section { border-top: 1px solid rgba(79, 70, 50, 0.4); }
+.video {
+  position: relative;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  aspect-ratio: 16 / 9; /* reserves the box, so swapping in the iframe shifts nothing */
+  border-radius: 20px;
+  overflow: hidden;
+  background: var(--surface-lowest);
+  border: 1px solid rgba(79, 70, 50, 0.5);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+}
+.video > .video-facade, .video > iframe {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  border: 0;
+}
+.video-facade {
+  display: grid; place-items: center;
+  padding: 0; margin: 0; background: none; color: inherit; font: inherit;
+  cursor: pointer;
+}
+.video-poster {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s var(--ease), filter 0.4s;
+}
+.video-play-icon {
+  position: relative;
+  width: 76px; height: 76px; border-radius: 999px;
+  display: grid; place-items: center;
+  background: var(--amber); color: var(--on-amber);
+  box-shadow: 0 0 0 10px rgba(255, 193, 7, 0.18), var(--glow-btn);
+  transition: transform 0.2s var(--ease), box-shadow 0.2s;
+}
+.video-cta {
+  position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 13px; font-weight: 600;
+  color: var(--on-surface);
+  background: rgba(6, 14, 32, 0.78);
+  border: 1px solid rgba(79, 70, 50, 0.6);
+  border-radius: 999px; padding: 6px 14px;
+}
+.video-facade:hover .video-poster { transform: scale(1.02); filter: brightness(1.08); }
+.video-facade:hover .video-play-icon { transform: scale(1.06); }
+.video-facade:focus-visible { outline: 3px solid var(--amber); outline-offset: -3px; border-radius: 20px; }
 
 /* ───────── Install steps ───────── */
 .install { background: var(--surface-lowest); border-top: 1px solid rgba(79,70,50,0.4); border-bottom: 1px solid rgba(79,70,50,0.4); }
@@ -416,11 +468,14 @@ footer { border-top: 1px solid rgba(79, 70, 50, 0.5); padding: 56px 0 40px; back
   .features { grid-template-columns: 1fr; }
   .gallery { grid-template-columns: 1fr; max-width: 380px; margin: 0 auto; }
   .cookie { left: 16px; right: 16px; bottom: 16px; max-width: none; }
+  .video { border-radius: 14px; }
+  .video-play-icon { width: 54px; height: 54px; box-shadow: 0 0 0 6px rgba(255, 193, 7, 0.18), var(--glow-btn); }
+  .video-cta { bottom: 10px; font-size: 12px; padding: 4px 12px; }
   section { padding: 60px 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
-  .reveal { opacity: 1; transform: none; }
+  .reveal, .js .reveal { opacity: 1; transform: none; }
   .reveal-load { opacity: 1; transform: none; animation: none; }
 }
