@@ -370,26 +370,28 @@ export function Guardians({ address, network, onBack }: Props) {
             </p>
           )}
 
-          {isHigh && native && !scanning ? (
-            <HoldToConfirm
-              label={submitting ? 'Saving…' : editing ? 'Hold to Update Recovery' : 'Hold to Set Up Recovery'}
-              danger
-              onConfirm={confirm}
-              disabled={submitting}
-            />
-          ) : (
-            <Button
-              fullWidth
-              onClick={confirm}
-              loading={submitting}
-              disabled={scanning || !acknowledged}
-              variant={isHigh ? 'secondary' : 'primary'}
-              trailingIcon="lock"
-              className={isHigh ? '!border-error/50 !text-error' : ''}
-            >
-              {editing ? 'Update Recovery' : 'Set Up Recovery'}
-            </Button>
-          )}
+          <div ref={recheck.ctaRef} className="scroll-mb-4">
+            {isHigh && native && !scanning ? (
+              <HoldToConfirm
+                label={submitting ? 'Saving…' : editing ? 'Hold to Update Recovery' : 'Hold to Set Up Recovery'}
+                danger
+                onConfirm={confirm}
+                disabled={submitting}
+              />
+            ) : (
+              <Button
+                fullWidth
+                onClick={confirm}
+                loading={submitting}
+                disabled={scanning || !acknowledged}
+                variant={isHigh ? 'secondary' : 'primary'}
+                trailingIcon="lock"
+                className={isHigh ? '!border-error/50 !text-error' : ''}
+              >
+                {editing ? 'Update Recovery' : 'Set Up Recovery'}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     );
