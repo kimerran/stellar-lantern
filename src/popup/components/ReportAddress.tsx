@@ -9,6 +9,7 @@ import {
   checkReport,
   describeFee,
   evidenceHash,
+  isRegistryReason,
   readReportFee,
   readSubject,
   registryFor,
@@ -77,6 +78,26 @@ export function ReportCounterparties({ reporter, network, subjects }: ListProps)
 
 type Stage = 'entry' | 'sheet' | 'submitting' | 'done';
 
+type FeeStatus = 'loading' | 'ok' | 'unknown';
+
+// Whether the sheet may submit. The reason goes on a public, permanent
+// registry, so there is no default: an untouched select must not write Scam
+// on the reporter's behalf (#151). A narrowing guard, so `submit` needs no
+// cast to hand the reason on.
+export function canSubmitReport(state: {
+  reason: RegistryReason | null;
+  fee: FeeStatus;
+  busy: boolean;
+}): state is { reason: RegistryReason; fee: FeeStatus; busy: false } {
+  return state.reason !== null && state.fee !== 'loading' && !state.busy;
+}
+
+// The select's value back to a reason: the placeholder ('') and anything
+// outside the closed set are "no reason chosen".
+export function reasonFromSelect(value: string): RegistryReason | null {
+  return isRegistryReason(value) ? value : null;
+}
+
 interface Props {
   reporter: string;
   network: NetworkConfig;
@@ -85,7 +106,7 @@ interface Props {
 
 export function ReportAddress({ reporter, network, subject }: Props) {
   const [stage, setStage] = useState<Stage>('entry');
-  const [reason, setReason] = useState<RegistryReason>('Scam');
+  const [reason, setReason] = useState<RegistryReason | null>(null);
   const [note, setNote] = useState('');
   const [fee, setFee] = useState<
     { status: 'loading' } | { status: 'ok'; fee: ReportFee } | { status: 'unknown' }
@@ -120,12 +141,17 @@ export function ReportAddress({ reporter, network, subject }: Props) {
   if (!guard.ok) return null;
 
   async function submit() {
+    // The button is disabled without a reason; this is the same rule, and it
+    // narrows `reason` for the build and the telemetry below.
+    const state = { reason, fee: fee.status, busy: stage === 'submitting' };
+    if (!canSubmitReport(state)) return;
+    const chosen = state.reason;
     setStage('submitting');
     setError(null);
     const built = await buildReportTx({
       reporter,
       subject: subject.address,
-      reason,
+      reason: chosen,
       // The commitment is sha256 of the note exactly as typed; trim only
       // decides whether there is a note at all.
       ...(note.trim() ? { evidence: evidenceHash(note) } : {}),
@@ -143,7 +169,7 @@ export function ReportAddress({ reporter, network, subject }: Props) {
       horizonUrl: network.horizonUrl,
     });
     if (!res.ok) {
-      if (__FEATURE_TELEMETRY__) track.registryReport(reason, false);
+      if (__FEATURE_TELEMETRY__) track.registryReport(chosen, false);
       setError(
         res.code === 'LOCKED'
           ? 'Wallet locked. Close and reopen to unlock, then try again.'
@@ -152,7 +178,7 @@ export function ReportAddress({ reporter, network, subject }: Props) {
       setStage('sheet');
       return;
     }
-    if (__FEATURE_TELEMETRY__) track.registryReport(reason, true);
+    if (__FEATURE_TELEMETRY__) track.registryReport(chosen, true);
     // Horizon returned after the ledger closed, so the hot read sees the
     // write: the subject's new total is `entry.reports`.
     const after = await readSubject({ network, subject: subject.address });
@@ -219,6 +245,8 @@ export function ReportAddress({ reporter, network, subject }: Props) {
           onClick={() => {
             setStage('entry');
             setError(null);
+            // Reopening starts from no reason again, like the first time.
+            setReason(null);
           }}
           className="text-on-surface-variant hover:text-on-surface"
         >
@@ -237,11 +265,15 @@ export function ReportAddress({ reporter, network, subject }: Props) {
           Reason
         </span>
         <select
-          value={reason}
+          value={reason ?? ''}
           disabled={busy}
-          onChange={(e) => setReason(e.target.value as RegistryReason)}
+          required
+          onChange={(e) => setReason(reasonFromSelect(e.target.value))}
           className="w-full rounded-lg border border-outline-variant bg-surface-container-high px-3 py-2 text-body-md text-on-surface focus:border-primary-container focus:shadow-focus-amber focus:outline-none"
         >
+          <option value="" disabled>
+            Choose a reason
+          </option>
           {REGISTRY_REASONS.map((r) => (
             <option key={r} value={r}>
               {r}
@@ -295,7 +327,7 @@ export function ReportAddress({ reporter, network, subject }: Props) {
         fullWidth
         onClick={submit}
         loading={busy}
-        disabled={fee.status === 'loading'}
+        disabled={!canSubmitReport({ reason, fee: fee.status, busy })}
         trailingIcon="lock"
       >
         {fee.status === 'unknown' ? 'Report anyway' : 'Sign & report'}
