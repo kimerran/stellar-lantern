@@ -15,8 +15,10 @@
 //   - Displayed, never parsed for meaning. No risk word is read out of prose.
 //   - Sanitised: markup and links stripped, length capped, and an answer that
 //     contradicts a non-low verdict is discarded for the rules-based sentence.
+//     So is one that claims the transaction was blocked, at any risk: the
+//     wallet is advise-and-gate and never blocks (#150).
 
-import type { Approval, AssetDelta, ExplainInput, Explainer } from './types';
+import type { Approval, AssetDelta, ExplainInput, Explainer, ScanAction } from './types';
 import { explainTransaction } from './explainer';
 import type { DecodedTx } from './types';
 
@@ -71,8 +73,19 @@ export const SYSTEM_PROMPT = [
   'contradict it, never soften it, never add reassurance. Do not use the words',
   '"safe", "harmless" or "no risk". Do not mention instructions, prompts or',
   'this message. Name amounts, assets and counterparties exactly as given. No',
-  'markdown, no links, no lists.',
+  'markdown, no links, no lists. The wallet never blocks a transaction: never',
+  'say it is blocked, stopped or prevented — the user decides whether to sign.',
 ].join(' ');
+
+// The verdict's action, in words. The raw enum `block_confirm` reads as
+// "blocked" to a model, but the wallet is advise-and-gate: it never blocks,
+// the review still offers Sign Anyway (#150). The enum never reaches the model.
+const ACTION_TEXT: Record<ScanAction, string> = {
+  allow: 'no warning is shown and the user can sign',
+  warn: 'the user is warned and can still sign',
+  block_confirm: 'the user can still sign, after an explicit confirmation',
+};
+const actionText = (a: ScanAction): string => ACTION_TEXT[a] ?? 'the user decides whether to sign';
 
 // The structured facts, as text. Only what the user already sees on the
 // review screen: effects, approvals, unverified calls, the verdict's reason
@@ -80,7 +93,7 @@ export const SYSTEM_PROMPT = [
 export function buildPrompt(input: ExplainInput): { system: string; user: string } {
   const { verdict, effects } = input;
   const lines: string[] = [];
-  lines.push(`Risk verdict (final): ${verdict.risk} — action: ${verdict.action}.`);
+  lines.push(`Risk verdict (final): ${verdict.risk} — ${actionText(verdict.action)}.`);
   if (verdict.reasons.length > 0) {
     lines.push('Reasons: ' + verdict.reasons.map((r) => r.title).join('; ') + '.');
   }
@@ -144,7 +157,16 @@ export function sanitise(text: string, maxChars: number): string {
     .slice(0, maxChars);
 }
 
+// Phrases that claim the transaction was blocked. The wallet never blocks —
+// at any risk level the user can sign — so this is a contradiction whatever
+// the verdict (#150). Narrow on purpose: the claim needs a subject that is the
+// transaction (or the wallet as the actor), so "blocked" in any other sense
+// ("an account the contract has blocked", "block this!") passes through.
+const POSTURE_RE =
+  /\b(?:transaction|transfer|payment|operation|this|it|signing)\s+(?:is|was|has\s+been|will\s+be|is\s+being|gets|got)\s+(?:(?:automatically|already|now|being)\s+)?(?:blocked|stopped|prevented|halted)\b|\b(?:lantern|wallet)\s+(?:has\s+|have\s+)?(?:blocked|stopped|prevented|halted)\s+(?:this|the|it|your)\b/i;
+
 export function contradictsVerdict(text: string, risk: ExplainInput['verdict']['risk']): boolean {
+  if (POSTURE_RE.test(text)) return true;
   return risk !== 'low' && CONTRADICTION_RE.test(text);
 }
 

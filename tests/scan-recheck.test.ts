@@ -178,6 +178,65 @@ describe('an address reported between review and confirm', () => {
   });
 });
 
+// ── Unverified at review (#148) ──────────────────────────────────────────────
+
+describe('a recipient that could not be screened at review (#148)', () => {
+  it('unknown at review and at re-check → failed on the first tap, proceeds on the second', async () => {
+    const f = fixture('classic-payment-to-flagged');
+    const reviewed = await scanTx(input(f), { screen: rpcDown });
+    // The review itself is only medium/warn — a plain Confirm & Send.
+    expect(reviewed).toMatchObject({ risk: 'medium', action: 'warn' });
+
+    const first = await recheckTx(reviewed, input(f), { depsOverride: { screen: rpcDown } });
+    expect(first).toMatchObject({ ok: false, failure: 'unverified' });
+    const d1 = decideRecheck(reviewed, first, false);
+    expect(d1).toMatchObject({ proceed: false, state: { kind: 'failed', refused: false } });
+
+    // The hook remembers the acknowledgement for the same XDR; the second tap
+    // re-checks again and proceeds.
+    const second = await recheckTx(reviewed, input(f), { depsOverride: { screen: rpcDown } });
+    const d2 = decideRecheck(reviewed, second, true);
+    expect(d2).toMatchObject({ proceed: true, verdict: reviewed, state: { kind: 'failed' } });
+  });
+
+  it('a block_confirm review with an unverified recipient still refuses, acknowledged or not', async () => {
+    const f = fixture('classic-payment-to-flagged');
+    const reviewed = await scanTx(input(f), { screen: rpcDown });
+    const high: ScanVerdict = { ...reviewed, risk: 'high', action: 'block_confirm' };
+    const result = await recheckTx(high, input(f), { depsOverride: { screen: rpcDown } });
+    expect(result).toMatchObject({ ok: false, failure: 'unverified' });
+    for (const acknowledged of [false, true]) {
+      expect(decideRecheck(high, result, acknowledged)).toMatchObject({
+        proceed: false,
+        state: { kind: 'failed', refused: true },
+      });
+    }
+  });
+
+  it('unknown at review, flagged at re-check → escalated (abort, fresh gate)', async () => {
+    const f = fixture('classic-payment-to-flagged');
+    const reviewed = await scanTx(input(f), { screen: rpcDown });
+    const result = await recheckTx(reviewed, input(f), { depsOverride: { screen: flagged } });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.drift).toMatchObject({ drifted: true, direction: 'escalated' });
+    const decision = decideRecheck(reviewed, result, true);
+    expect(decision).toMatchObject({ proceed: false, state: { kind: 'escalated' } });
+    expect(decision.verdict.action).toBe('block_confirm');
+  });
+
+  it('unknown at review, clean at re-check → proceeds on the first tap', async () => {
+    const f = fixture('classic-payment-to-flagged');
+    const reviewed = await scanTx(input(f), { screen: rpcDown });
+    const result = await recheckTx(reviewed, input(f), { depsOverride: { screen: notFlagged } });
+    expect(result.ok).toBe(true);
+    const decision = decideRecheck(reviewed, result, false);
+    expect(decision.proceed).toBe(true);
+    expect(decision.state.kind).toBe('passed');
+    expect(decision.verdict.risk).not.toBe('high');
+  });
+});
+
 // ── Things that must never count as drift ────────────────────────────────────
 
 describe('what the diff ignores', () => {
@@ -444,7 +503,8 @@ describe('a re-check that could not look is a failure, not an escalation', () =>
         ]),
       ),
     ).toBe('timeout');
-    // An address that was already unknown at review is not a new failure.
+    // An address that was already unknown at review is still unverified on
+    // the fresh run — a failure, never a silent pass (#148).
     const unknownBefore = {
       ...base,
       screening: [
@@ -463,6 +523,26 @@ describe('a re-check that could not look is a failure, not an escalation', () =>
             answer: { outcome: 'unknown', reason: 'rpc_error', source: 'registry' },
           },
         ]),
+      ),
+    ).toBe('unverified');
+    // A previously-known address now unknown for a non-transport reason
+    // (e.g. its entry was archived) is unverified, not a pass.
+    expect(
+      recheckFailureOf(
+        base,
+        fresh({}, [
+          {
+            address: FLAGGED,
+            answer: { outcome: 'unknown', reason: 'archived', source: 'registry' },
+          },
+        ]),
+      ),
+    ).toBe('unverified');
+    // Every counterparty answered: no failure.
+    expect(
+      recheckFailureOf(
+        unknownBefore,
+        fresh({}, [{ address: FLAGGED, answer: { outcome: 'not_flagged', source: 'stub' } }]),
       ),
     ).toBeNull();
   });
