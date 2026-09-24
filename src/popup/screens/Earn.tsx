@@ -368,26 +368,28 @@ export function Earn({ address, network, onBack, embedded }: Props) {
 
           {error && <p role="alert" className="text-center text-label-md text-error">{error}</p>}
 
-          {isHigh && native ? (
-            <HoldToConfirm
-              label={submitting ? 'Signing…' : 'Hold to Sign Anyway'}
-              danger
-              onConfirm={confirm}
-              disabled={submitting}
-            />
-          ) : (
-            <Button
-              fullWidth
-              onClick={confirm}
-              loading={submitting}
-              disabled={!acknowledged}
-              variant={isHigh ? 'secondary' : 'primary'}
-              trailingIcon="lock"
-              className={isHigh ? '!border-error/50 !text-error' : ''}
-            >
-              {isHigh ? 'Sign Anyway' : `Confirm & ${actionVerb(sel.action)}`}
-            </Button>
-          )}
+          <div ref={recheck.ctaRef} className="scroll-mb-4">
+            {isHigh && native ? (
+              <HoldToConfirm
+                label={submitting ? 'Signing…' : 'Hold to Sign Anyway'}
+                danger
+                onConfirm={confirm}
+                disabled={submitting}
+              />
+            ) : (
+              <Button
+                fullWidth
+                onClick={confirm}
+                loading={submitting}
+                disabled={!acknowledged}
+                variant={isHigh ? 'secondary' : 'primary'}
+                trailingIcon="lock"
+                className={isHigh ? '!border-error/50 !text-error' : ''}
+              >
+                {isHigh ? 'Sign Anyway' : `Confirm & ${actionVerb(sel.action)}`}
+              </Button>
+            )}
+          </div>
       </Shell>
     );
   }

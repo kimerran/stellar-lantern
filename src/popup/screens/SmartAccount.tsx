@@ -315,17 +315,19 @@ export function SmartAccount({ account, onForget }: Props) {
             </p>
           )}
 
-          <Button
-            fullWidth
-            onClick={confirm}
-            loading={busy}
-            disabled={!acknowledged}
-            variant={isHigh ? 'secondary' : 'primary'}
-            trailingIcon="fingerprint"
-            className={isHigh ? '!border-error/50 !text-error' : ''}
-          >
-            {isHigh ? 'Sign Anyway with Passkey' : 'Confirm with Passkey'}
-          </Button>
+          <div ref={recheck.ctaRef} className="scroll-mb-4">
+            <Button
+              fullWidth
+              onClick={confirm}
+              loading={busy}
+              disabled={!acknowledged}
+              variant={isHigh ? 'secondary' : 'primary'}
+              trailingIcon="fingerprint"
+              className={isHigh ? '!border-error/50 !text-error' : ''}
+            >
+              {isHigh ? 'Sign Anyway with Passkey' : 'Confirm with Passkey'}
+            </Button>
+          </div>
         </div>
       </Shell>
     );
