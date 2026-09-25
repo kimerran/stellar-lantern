@@ -71,12 +71,16 @@ export function RecheckNotice({ state }: { state: RecheckState }) {
             <Icon name="warning" filled size={18} className="mt-0.5 shrink-0 text-secondary" />
             <div className="min-w-0 flex-1">
               <p className="text-label-md font-semibold text-secondary">
-                Couldn't re-check just now
+                {state.failure === 'unverified'
+                  ? 'Recipient still unverified'
+                  : "Couldn't re-check just now"}
               </p>
               <p className="mt-0.5 text-label-sm text-on-surface">
                 {state.refused
                   ? 'This transaction was already high risk and Lantern could not confirm it is still the same. It will not be signed until a re-check succeeds — try again in a moment.'
-                  : state.failure === 'timeout'
+                  : state.failure === 'unverified'
+                    ? "Lantern still couldn't check who this goes to against the reported-address registry, so it would be signed unverified. Confirm again to sign anyway."
+                    : state.failure === 'timeout'
                     ? 'The network did not answer in time, so the check you saw may be out of date. Confirm again to sign anyway.'
                     : 'The network could not be reached, so the check you saw may be out of date. Confirm again to sign anyway.'}
               </p>

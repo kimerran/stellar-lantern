@@ -21,6 +21,10 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css" />
+    <!-- Marks the page as scripted before first paint, so the scroll-reveal
+         hide (.js .reveal) and other enhancements apply only when app.js runs.
+         Without JS, every section renders visible. -->
+    <script>document.documentElement.classList.add('js');</script>
   </head>
   <body>
     <!-- ───────── Navbar ───────── -->
@@ -35,12 +39,14 @@
           <a href="#screens">Screens</a>
           <a href="#install">Install</a>
           <a href="#alpha">Join the alpha</a>
-          <a href="docs/">Docs</a>
           <a href="Lantern_Pitch_Deck.pdf" target="_blank" rel="noopener">Pitch Deck</a>
           <a href="#contact">Contact</a>
         </nav>
         <a class="btn btn-primary" href="#install">
           <span class="material-symbols-outlined">download</span> Download
+        </a>
+        <a class="nav-x" href="https://x.com/lanternwallet" target="_blank" rel="noopener" aria-label="Lantern on X" title="Lantern on X">
+          <svg class="x-logo" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
         </a>
         <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu">
           <span class="material-symbols-outlined">menu</span>
@@ -80,7 +86,7 @@
             </p>
             <p class="hero-note reveal-load d5">
               <span class="material-symbols-outlined">workspace_premium</span>
-              <span>Supported by a Stellar Development Foundation <strong>Instawards</strong> grant — Philippines chapter. <a class="inline" href="docs/">See the evidence</a></span>
+              <span>Supported by a Stellar Development Foundation <strong>Instawards</strong> grant — Philippines chapter.</span>
             </p>
           </div>
 
@@ -103,69 +109,72 @@
             <p>Everything a Stellar wallet should do — send, swap, earn, and cash out — plus a safety net between you and every signature. The risk verdict is rules and a public registry you can check; the AI explains it in words.</p>
           </div>
 
-          <div class="features">
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">key</span></div>
-              <h3>Non-custodial</h3>
-              <p>Your private keys are encrypted on-device and never leave it. No accounts, no custodians — just you.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">security</span></div>
-              <h3>Scan every signature</h3>
-              <p>Payments, trustlines, contract calls — each one is decoded, explained in plain language, and gated when it's high-risk.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">campaign</span></div>
-              <h3>Report once, protect everyone</h3>
-              <p>On testnet, every review checks the counterparty against Lantern's on-chain blacklist registry, and one tap reports a scammer to it — so the next wallet is warned too. It's a live Soroban contract anyone can inspect:
-                <a class="inline" href="https://stellar.expert/explorer/testnet/contract/CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F" target="_blank" rel="noopener"><code>CBJWD6SA…G623F</code></a>
-                on testnet, WASM hash <code>40fd3771…5be23783</code>.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">code</span></div>
-              <h3>Open-source scanner</h3>
-              <p>The engine behind every review is <a class="inline" href="https://github.com/kimerran/stellar-lantern/tree/main/packages/lantern-scanner" target="_blank" rel="noopener"><code>@lantern/scanner</code></a> — MIT-licensed and standalone, so any Stellar wallet, dApp or CLI can decode, explain and screen a transaction before it's signed.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">published_with_changes</span></div>
-              <h3>Checked again at send</h3>
-              <p>Right before a transaction is submitted, Lantern simulates and screens it once more — so a counterparty reported while you were reviewing still stops you.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">shield_person</span></div>
-              <h3>Guardian recovery</h3>
-              <p>Lose your seed, keep your funds. Appoint guardians and recover onto a new device with Stellar-native multisig — no 12 words to lose.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">savings</span></div>
-              <h3>Earn yield</h3>
-              <p>Supply assets to Blend lending pools — including our own Lantern Earn pool — and earn yield. Withdraw anytime.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">account_balance</span></div>
-              <h3>Cash in &amp; out</h3>
-              <p>Move between crypto and your bank or card through regulated SEP-24 anchors, right inside the wallet.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">swap_horiz</span></div>
-              <h3>In-wallet swaps</h3>
-              <p>Swap XLM and assets at the best price across Stellar's decentralized exchange — without leaving Lantern.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">grid_view</span></div>
-              <h3>Mini-app browser</h3>
-              <p>Explore Stellar dApps in a sandboxed frame. Connecting shares only your public key — signing always needs a separate prompt.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">content_paste_search</span></div>
-              <h3>Paste-to-check</h3>
-              <p>Drop in a suspicious address or message and Lantern flags scam patterns instantly, on-device.</p>
-            </article>
-            <article class="feature reveal">
-              <div class="chip"><span class="material-symbols-outlined">devices</span></div>
-              <h3>Android &amp; Chrome</h3>
-              <p>One wallet, two homes: a Chrome/Edge extension and an Android app, built from a single codebase.</p>
-            </article>
+          <!-- Slideshow (#162): a plain grid without JS; app.js adds .is-slideshow. -->
+          <div class="slideshow" data-slideshow="Features">
+            <div class="features slides">
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">key</span></div>
+                <h3>Non-custodial</h3>
+                <p>Your private keys are encrypted on-device and never leave it. No accounts, no custodians — just you.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">security</span></div>
+                <h3>Scan every signature</h3>
+                <p>Payments, trustlines, contract calls — each one is decoded, explained in plain language, and gated when it's high-risk.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">campaign</span></div>
+                <h3>Report once, protect everyone</h3>
+                <p>On testnet, every review checks the counterparty against Lantern's on-chain blacklist registry, and one tap reports a scammer to it — so the next wallet is warned too. It's a live Soroban contract anyone can inspect:
+                  <a class="inline" href="https://stellar.expert/explorer/testnet/contract/CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F" target="_blank" rel="noopener"><code>CBJWD6SA…G623F</code></a>
+                  on testnet, WASM hash <code>40fd3771…5be23783</code>.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">code</span></div>
+                <h3>Open-source scanner</h3>
+                <p>The engine behind every review is <a class="inline" href="https://github.com/kimerran/stellar-lantern/tree/main/packages/lantern-scanner" target="_blank" rel="noopener"><code>@lantern/scanner</code></a> — MIT-licensed and standalone, so any Stellar wallet, dApp or CLI can decode, explain and screen a transaction before it's signed.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">published_with_changes</span></div>
+                <h3>Checked again at send</h3>
+                <p>Right before a transaction is submitted, Lantern simulates and screens it once more — so a counterparty reported while you were reviewing still stops you.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">shield_person</span></div>
+                <h3>Guardian recovery</h3>
+                <p>Lose your seed, keep your funds. Appoint guardians and recover onto a new device with Stellar-native multisig — no 12 words to lose.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">savings</span></div>
+                <h3>Earn yield</h3>
+                <p>Supply assets to Blend lending pools — including our own Lantern Earn pool — and earn yield. Withdraw anytime.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">account_balance</span></div>
+                <h3>Cash in &amp; out</h3>
+                <p>Move between crypto and your bank or card through regulated SEP-24 anchors, right inside the wallet.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">swap_horiz</span></div>
+                <h3>In-wallet swaps</h3>
+                <p>Swap XLM and assets at the best price across Stellar's decentralized exchange — without leaving Lantern.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">grid_view</span></div>
+                <h3>Mini-app browser</h3>
+                <p>Explore Stellar dApps in a sandboxed frame. Connecting shares only your public key — signing always needs a separate prompt.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">content_paste_search</span></div>
+                <h3>Paste-to-check</h3>
+                <p>Drop in a suspicious address or message and Lantern flags scam patterns instantly, on-device.</p>
+              </article>
+              <article class="feature reveal">
+                <div class="chip"><span class="material-symbols-outlined">devices</span></div>
+                <h3>Android &amp; Chrome</h3>
+                <p>One wallet, two homes: a Chrome/Edge extension and an Android app, built from a single codebase.</p>
+              </article>
+            </div>
           </div>
         </div>
       </section>
@@ -193,6 +202,32 @@
         </div>
       </section>
 
+      <!-- ───────── Walkthrough video ───────── -->
+      <!-- Click-to-play facade (#162 item 5). Nothing loads from YouTube until the
+           visitor presses play: the poster is a local file (video-poster.jpg), and
+           app.js swaps the link below for a <button> that injects the
+           youtube-nocookie.com iframe on click. Without JS it stays a plain link to
+           the video on YouTube. -->
+      <section id="video" class="video-section">
+        <div class="wrap">
+          <div class="section-head reveal">
+            <span class="eyebrow">Walkthrough</span>
+            <h2>See it <span class="amber-text">in action.</span></h2>
+            <p>A short tour of the wallet: the home screen, a transaction screened before you sign, swaps, yield and cash out.</p>
+          </div>
+
+          <div class="video reveal" data-video-id="E6E-frLj0WE" data-video-title="Lantern wallet walkthrough">
+            <a class="video-facade" href="https://www.youtube.com/watch?v=E6E-frLj0WE" target="_blank" rel="noopener">
+              <img class="video-poster" src="video-poster.jpg" alt="" width="1280" height="720" loading="lazy" decoding="async" />
+              <span class="video-play-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="30" height="30" focusable="false"><path fill="currentColor" d="M8 5.5v13l11-6.5z"/></svg>
+              </span>
+              <span class="video-cta">Watch the walkthrough on YouTube</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
       <!-- ───────── Screens ───────── -->
       <section id="screens" class="screens">
         <div class="wrap">
@@ -202,31 +237,34 @@
             <p>Real screens from the Lantern Android app — balances, sandboxed dApps, live yield, and guardian-grade settings.</p>
           </div>
 
-          <div class="gallery">
-            <figure class="shot reveal">
-              <img src="screenshots/1185.png" alt="Lantern home screen showing an XLM balance with Send, Receive, Swap and Earn actions" loading="lazy" />
-              <figcaption class="cap"><b>Home</b><span>Balance, send, receive, swap and earn — one clean home.</span></figcaption>
-            </figure>
-            <figure class="shot reveal">
-              <img src="screenshots/1186.png" alt="Lantern mini-app browser listing curated Stellar dApps" loading="lazy" />
-              <figcaption class="cap"><b>Discover apps</b><span>A sandboxed mini-app browser for Stellar dApps.</span></figcaption>
-            </figure>
-            <figure class="shot reveal">
-              <img src="screenshots/1187.png" alt="A dApp connection prompt showing that only the public key is shared" loading="lazy" />
-              <figcaption class="cap"><b>Connect, safely</b><span>dApps get only your public key — signing always needs a separate prompt.</span></figcaption>
-            </figure>
-            <figure class="shot reveal">
-              <img src="screenshots/1189.png" alt="Earn screen showing Blend lending pool positions and APYs" loading="lazy" />
-              <figcaption class="cap"><b>Earn yield</b><span>Supply to Blend pools and track every position.</span></figcaption>
-            </figure>
-            <figure class="shot reveal">
-              <img src="screenshots/1190.png" alt="A supply confirmation reading back the smart-contract call in plain language" loading="lazy" />
-              <figcaption class="cap"><b>Read before you sign</b><span>Even a smart-contract call is explained before you confirm.</span></figcaption>
-            </figure>
-            <figure class="shot reveal">
-              <img src="screenshots/1188.png" alt="Settings screen with guardians, scam checks, cash in/out and network toggle" loading="lazy" />
-              <figcaption class="cap"><b>Settings</b><span>Guardians, scam checks, anchors and network — all in one place.</span></figcaption>
-            </figure>
+          <!-- Slideshow (#162): a plain grid without JS; app.js adds .is-slideshow. -->
+          <div class="slideshow" data-slideshow="Screens">
+            <div class="gallery slides">
+              <figure class="shot reveal">
+                <img src="screenshots/1185.png" alt="Lantern home screen showing an XLM balance with Send, Receive, Swap and Earn actions" loading="lazy" />
+                <figcaption class="cap"><b>Home</b><span>Balance, send, receive, swap and earn — one clean home.</span></figcaption>
+              </figure>
+              <figure class="shot reveal">
+                <img src="screenshots/1186.png" alt="Lantern mini-app browser listing curated Stellar dApps" loading="lazy" />
+                <figcaption class="cap"><b>Discover apps</b><span>A sandboxed mini-app browser for Stellar dApps.</span></figcaption>
+              </figure>
+              <figure class="shot reveal">
+                <img src="screenshots/1187.png" alt="A dApp connection prompt showing that only the public key is shared" loading="lazy" />
+                <figcaption class="cap"><b>Connect, safely</b><span>dApps get only your public key — signing always needs a separate prompt.</span></figcaption>
+              </figure>
+              <figure class="shot reveal">
+                <img src="screenshots/1189.png" alt="Earn screen showing Blend lending pool positions and APYs" loading="lazy" />
+                <figcaption class="cap"><b>Earn yield</b><span>Supply to Blend pools and track every position.</span></figcaption>
+              </figure>
+              <figure class="shot reveal">
+                <img src="screenshots/1190.png" alt="A supply confirmation reading back the smart-contract call in plain language" loading="lazy" />
+                <figcaption class="cap"><b>Read before you sign</b><span>Even a smart-contract call is explained before you confirm.</span></figcaption>
+              </figure>
+              <figure class="shot reveal">
+                <img src="screenshots/1188.png" alt="Settings screen with guardians, scam checks, cash in/out and network toggle" loading="lazy" />
+                <figcaption class="cap"><b>Settings</b><span>Guardians, scam checks, anchors and network — all in one place.</span></figcaption>
+              </figure>
+            </div>
           </div>
         </div>
       </section>
@@ -305,20 +343,25 @@
       </section>
 
       <!-- ───────── Join the alpha ───────── -->
-      <!-- Sign-up by email, not a link to the tester guide: the guide is marked
-           ALPHA · CONFIDENTIAL and assumes a tester number from the invite (#125),
-           so it goes out with the invite. The subject carries src=homepage so a
-           reply is attributable; the download buttons above carry ?src=homepage
-           for /admin (#131). -->
+      <!-- Entry point is the WhatsApp group "Lantern Alpha Testing — group chat"
+           (#162 item 6), not a link to the tester guide: the guide is marked
+           ALPHA · CONFIDENTIAL and assumes a tester number (#125), so both are
+           handed out in the group. The button goes through /join on the Lantern
+           API, which records src=homepage and redirects to the invite; a WhatsApp
+           invite link can't carry the attribution itself (#131). -->
       <section id="alpha" class="contact">
         <div class="wrap">
           <div class="contact-card reveal">
             <span class="material-symbols-outlined big">science</span>
             <h2>Join the alpha</h2>
-            <p>Help us test Lantern on testnet: install the build, run six real-looking transactions through the review screen, and report a scammer to the registry. About 70 minutes, no real funds. Email us and we'll send you a tester number and the guide.</p>
-            <a class="btn btn-primary" href="mailto:lantern@artisam.xyz?subject=Join%20the%20Lantern%20alpha%20%28src%3Dhomepage%29&amp;body=Hi%20%E2%80%94%20I%27d%20like%20to%20test%20Lantern.%20I%20have%3A%20%5BAndroid%20phone%20%2F%20Chrome%20%2F%20both%5D">
-              <span class="material-symbols-outlined">science</span> Join the alpha
+            <p>Help us test Lantern on testnet: install the build, run six real-looking transactions through the review screen, and report a scammer to the registry. About 70 minutes, no real funds. It starts in our WhatsApp tester group: join it, and you'll get your tester number and the guide there.</p>
+            <a class="btn btn-primary" href="https://lantern-api-production-3fad.up.railway.app/join?src=homepage" target="_blank" rel="noopener">
+              <span class="material-symbols-outlined" aria-hidden="true">forum</span> Join on WhatsApp
             </a>
+            <p class="alpha-note">
+              <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+              <span>In a WhatsApp group, other members can see your phone number.</span>
+            </p>
           </div>
         </div>
       </section>
@@ -357,8 +400,7 @@
             <a href="#features"><span class="material-symbols-outlined">bolt</span> Features</a>
             <a href="#screens"><span class="material-symbols-outlined">photo_library</span> Screens</a>
             <a href="#install"><span class="material-symbols-outlined">menu_book</span> Install guide</a>
-            <a href="#alpha"><span class="material-symbols-outlined">science</span> Join the alpha</a>
-            <a href="docs/"><span class="material-symbols-outlined">description</span> Docs &amp; evidence</a>
+            <a href="https://lantern-api-production-3fad.up.railway.app/join?src=homepage" target="_blank" rel="noopener"><span class="material-symbols-outlined">science</span> Join the alpha (WhatsApp)</a>
           </div>
           <div class="footer-col">
             <h5>Company</h5>
@@ -369,6 +411,9 @@
               <span class="material-symbols-outlined">slideshow</span> Pitch deck
             </a>
             <a href="mailto:hello@artisam.xyz"><span class="material-symbols-outlined">mail</span> Contact us</a>
+            <a href="https://x.com/lanternwallet" target="_blank" rel="noopener" aria-label="Lantern on X">
+              <svg class="x-logo" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg> Lantern on X
+            </a>
           </div>
           <div class="footer-col">
             <h5>Legal</h5>

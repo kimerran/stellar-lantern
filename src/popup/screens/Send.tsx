@@ -372,26 +372,28 @@ export function Send({ address, network, onDone }: Props) {
         </p>
       )}
 
-        {isHigh && native && !scanning ? (
-          <HoldToConfirm
-            label={submitting ? 'Sending…' : 'Hold to Sign Anyway'}
-            danger
-            onConfirm={confirm}
-            disabled={submitting}
-          />
-        ) : (
-          <Button
-            fullWidth
-            onClick={confirm}
-            loading={submitting}
-            disabled={scanning || !acknowledged}
-            variant={isHigh ? 'secondary' : 'primary'}
-            trailingIcon="lock"
-            className={isHigh ? '!border-error/50 !text-error' : ''}
-          >
-            {isHigh ? 'Sign Anyway' : 'Confirm & Send'}
-          </Button>
-        )}
+        <div ref={recheck.ctaRef} className="scroll-mb-4">
+          {isHigh && native && !scanning ? (
+            <HoldToConfirm
+              label={submitting ? 'Sending…' : 'Hold to Sign Anyway'}
+              danger
+              onConfirm={confirm}
+              disabled={submitting}
+            />
+          ) : (
+            <Button
+              fullWidth
+              onClick={confirm}
+              loading={submitting}
+              disabled={scanning || !acknowledged}
+              variant={isHigh ? 'secondary' : 'primary'}
+              trailingIcon="lock"
+              className={isHigh ? '!border-error/50 !text-error' : ''}
+            >
+              {isHigh ? 'Sign Anyway' : 'Confirm & Send'}
+            </Button>
+          )}
+        </div>
       </div>
     );
   }

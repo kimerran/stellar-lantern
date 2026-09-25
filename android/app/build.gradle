@@ -28,7 +28,27 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // One persistent signing key for the alpha/testnet builds (#171). Without
+    // it the debug APK is signed by whatever debug keystore the machine has —
+    // a fresh one on every CI runner — so each release had a new certificate
+    // and Android refused to install it over the previous one. release.yml
+    // decodes the key from Actions secrets into LANTERN_KEYSTORE_FILE; local
+    // and PR builds have no such env and keep the machine's debug key.
+    def lanternKeystore = System.getenv('LANTERN_KEYSTORE_FILE')
+    signingConfigs {
+        if (lanternKeystore) {
+            lantern {
+                storeFile file(lanternKeystore)
+                storePassword System.getenv('LANTERN_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('LANTERN_KEY_ALIAS')
+                keyPassword System.getenv('LANTERN_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
+        debug {
+            if (lanternKeystore) signingConfig signingConfigs.lantern
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'

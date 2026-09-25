@@ -11,6 +11,7 @@ import {
   decodeEntry,
   interpretLedgerEntries,
   createRegistryScreener,
+  DEFAULT_SCREEN_RETRY_BACKOFF_MS,
   TESTNET_REGISTRY_ID,
   type RawLedgerEntriesBody,
   type RawSimulation,
@@ -250,16 +251,17 @@ describe('createRegistryScreener', () => {
     let n = 0;
     const fetchImpl: typeof fetch = async () => {
       n += 1;
-      return jsonResponse({}, n === 1 ? 503 : 200);
+      return jsonResponse({}, 503);
     };
-    const lookup = createRegistryScreener({ rpcUrl: RPC, fetchImpl });
+    const lookup = createRegistryScreener({ rpcUrl: RPC, fetchImpl, retryBackoffMs: 0 });
     const [a, b] = await Promise.all([lookup(CLEAN), lookup(CLEAN)]);
     expect(a).toEqual(b);
     expect(a.outcome).toBe('unknown');
-    expect(n).toBe(1);
+    // One shared read: its first try and its one retry.
+    expect(n).toBe(2);
     // The failure was not cached: the next call goes back to the network.
     await lookup(CLEAN);
-    expect(n).toBe(2);
+    expect(n).toBe(4);
   });
 
   it('RPC error → unknown (rpc_error)', async () => {
@@ -292,6 +294,143 @@ describe('createRegistryScreener', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  // #149: the first read of a review has no second chance, so a transient
+  // failure gets one retry inside the same budget before answering unknown.
+  for (const [label, first] of [
+    ['429', () => jsonResponse({}, 429)],
+    ['503', () => jsonResponse({}, 503)],
+    ['JSON-RPC error body', () => jsonResponse({ jsonrpc: '2.0', id: 1, error: { code: -32603, message: 'busy' } })],
+    [
+      'transport error',
+      () => {
+        throw new TypeError('fetch failed');
+      },
+    ],
+  ] as const) {
+    it(`retry: first read fails (${label}), second succeeds → flagged, not unknown`, async () => {
+      vi.useFakeTimers();
+      try {
+        const at: number[] = [];
+        const fetchImpl: typeof fetch = async () => {
+          at.push(Date.now());
+          return at.length === 1 ? first() : jsonResponse(REG.response);
+        };
+        const pending = createRegistryScreener({ rpcUrl: RPC, fetchImpl, timeoutMs: 3_000 })(FLAGGED);
+        await vi.advanceTimersByTimeAsync(300);
+        const answer = await pending;
+        expect(answer.outcome).toBe('flagged');
+        expect(answer.entry?.status).toBe('Active');
+        expect(at).toHaveLength(2);
+        // The retry waits the short backoff, not longer.
+        expect(at[1]! - at[0]!).toBe(DEFAULT_SCREEN_RETRY_BACKOFF_MS);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  }
+
+  it('retry: two consecutive failures still answer unknown (never clean), inside the timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      const start = Date.now();
+      let n = 0;
+      let settledAt = -1;
+      const fetchImpl: typeof fetch = async () => {
+        n += 1;
+        return jsonResponse({}, n === 1 ? 429 : 502);
+      };
+      const pending = createRegistryScreener({ rpcUrl: RPC, fetchImpl, timeoutMs: 2_000 })(FLAGGED).then(
+        (a) => {
+          settledAt = Date.now();
+          return a;
+        },
+      );
+      await vi.advanceTimersByTimeAsync(2_000);
+      const answer = await pending;
+      expect(answer).toMatchObject({ outcome: 'unknown', reason: 'rpc_error' });
+      expect(n).toBe(2); // one retry, not a loop
+      expect(settledAt - start).toBeLessThan(2_000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('retry: a stalled retry is cut off by the one overall deadline (timeout), never clean', async () => {
+    vi.useFakeTimers();
+    try {
+      let n = 0;
+      const fetchImpl: typeof fetch = (_url, init) => {
+        n += 1;
+        if (n === 1) return Promise.resolve(jsonResponse({}, 503));
+        return new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+        });
+      };
+      const pending = createRegistryScreener({ rpcUrl: RPC, fetchImpl, timeoutMs: 1_000 })(FLAGGED);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(await pending).toMatchObject({ outcome: 'unknown', reason: 'timeout' });
+      expect(n).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('retry: none for a non-transient 4xx, a malformed body, or when the budget cannot fit one', async () => {
+    let n = 0;
+    const bad: typeof fetch = async () => {
+      n += 1;
+      return jsonResponse({}, 400);
+    };
+    expect(await createRegistryScreener({ rpcUrl: RPC, fetchImpl: bad })(FLAGGED)).toMatchObject({
+      outcome: 'unknown',
+      reason: 'rpc_error',
+    });
+    expect(n).toBe(1);
+    n = 0;
+    const malformed: typeof fetch = async () => {
+      n += 1;
+      return jsonResponse({ jsonrpc: '2.0', id: 1, result: {} });
+    };
+    expect(await createRegistryScreener({ rpcUrl: RPC, fetchImpl: malformed })(FLAGGED)).toMatchObject({
+      outcome: 'unknown',
+      reason: 'malformed',
+    });
+    expect(n).toBe(1);
+    n = 0;
+    const busy: typeof fetch = async () => {
+      n += 1;
+      return jsonResponse({}, 503);
+    };
+    // 400 ms budget < 250 ms backoff + 250 ms minimum retry window.
+    expect(
+      await createRegistryScreener({ rpcUrl: RPC, fetchImpl: busy, timeoutMs: 400 })(FLAGGED),
+    ).toMatchObject({ outcome: 'unknown', reason: 'rpc_error' });
+    expect(n).toBe(1);
+  });
+
+  it('a retried answer that succeeds is cached like any other; attempts: 1 turns retry off', async () => {
+    let n = 0;
+    const fetchImpl: typeof fetch = async () => {
+      n += 1;
+      return n === 1 ? jsonResponse({}, 503) : jsonResponse(REG.response);
+    };
+    const lookup = createRegistryScreener({ rpcUrl: RPC, fetchImpl, retryBackoffMs: 0 });
+    expect((await lookup(FLAGGED)).outcome).toBe('flagged');
+    expect((await lookup(FLAGGED)).outcome).toBe('flagged');
+    expect(n).toBe(2);
+    let m = 0;
+    const once = createRegistryScreener({
+      rpcUrl: RPC,
+      attempts: 1,
+      fetchImpl: async () => {
+        m += 1;
+        return jsonResponse({}, 503);
+      },
+    });
+    expect((await once(FLAGGED)).outcome).toBe('unknown');
+    expect(m).toBe(1);
   });
 
   it('archived → unknown (archived) through the screener too', async () => {

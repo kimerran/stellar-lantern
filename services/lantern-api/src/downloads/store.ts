@@ -7,15 +7,23 @@
 // What a row may hold is exactly the columns below. No raw IP: the edge's
 // coarse country header is kept when present and the address is never read
 // for storage. No user-agent string: a coarse family only. The route
-// (routes/download.ts) is the only writer and a test asserts the row shape.
+// (routes/download.ts) and its sibling /join (routes/join.ts, #162) are the
+// only writers, and a test asserts the row shape for each.
+//
+// target 'alpha' is a click on /join — the alpha testers' group invite, not
+// a build. It shares this log because it is the same kind of record on the
+// same privacy basis, but it is NOT a download intent: every reader of this
+// table (the /admin funnel above all) must split it out with isJoin().
 
 export type DownloadTarget = 'android' | 'extension';
+export const JOIN_TARGET = 'alpha';
+export type LogTarget = DownloadTarget | typeof JOIN_TARGET;
 export type UaFamily = 'android' | 'chrome-desktop' | 'other';
 
 export interface DownloadRow {
   id: number;
-  target: DownloadTarget;
-  version: string; // the release version the click was sent to
+  target: LogTarget;
+  version: string; // the release version the click was sent to; '' for a join
   src: string; // ?src=<campaign>, sanitised; '' when absent
   country: string; // ISO-3166 alpha-2 from the edge, or 'unknown'
   uaFamily: UaFamily;
@@ -33,6 +41,10 @@ export const DOWNLOAD_COLUMNS = [
   'uaFamily',
   'ts',
 ] as const;
+
+export function isJoin(r: Pick<DownloadRow, 'target'>): boolean {
+  return r.target === JOIN_TARGET;
+}
 
 export interface DownloadQuery {
   since?: Date;

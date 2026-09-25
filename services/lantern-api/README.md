@@ -23,6 +23,7 @@ service is down the wallet shows its rules-based sentence instead.
 | `DELETE /v1/telemetry/install` | body `{ installId }`; that install's rows gone; `204` either way |
 | `GET /v1/telemetry/export` | `Authorization: Bearer $TELEMETRY_ADMIN_TOKEN`; `?since=&until=&after=`; `{ rows, next }`, 1000 rows a page — the report's only input |
 | `GET /download/android` · `GET /download/extension` | `302` to the newest Release asset (#131): `lantern-<version>-testnet.apk` / `lantern-extension-<version>.zip`. `?v=<version>` pins a release, `?src=<slug>` is attribution. Logs one row per click — a server log, not telemetry (below). From a private repo: a `302` to a signed, short-lived storage URL, or a `503` try-again page (#153) |
+| `GET /join` | `302` (`Cache-Control: no-store`) to the alpha testers' WhatsApp group invite (`ALPHA_JOIN_URL`, #162). `?src=<slug>` is attribution. Logs one row per click in the download log as target `alpha` — shown in `/admin` as *Alpha group joins*, never as a download intent (below) |
 | `GET /download/checksums` | The same release's `SHA256SUMS.txt` as `text/plain` (`X-Lantern-Release: <tag>`); `?v=` pins a release; `503` when unavailable. Not logged as a click (#153) |
 
 `/v1/explain` runs the scanner package's own code, imported: `buildPrompt`
@@ -127,6 +128,26 @@ telemetry. A `HEAD` is answered but not counted. Own rate limiter and daily cap.
 `/admin` shows the funnel — download intents → installs reporting (opt-in) →
 wallets that scanned — by `src`, and `/admin/downloads.csv` exports the log.
 
+### The alpha group redirect: `/join` (#162)
+
+The homepage's *Join the alpha* button opens the testers' WhatsApp group. An
+invite link cannot carry `?src=`, so the button points at
+`/join?src=homepage` and this answers a **302** to `ALPHA_JOIN_URL` after
+writing one row to the same log: target `alpha`, version `''`, and the same
+`src` / `country` / `uaFamily` rules — no IP, no user-agent string. It is a
+**302 with `Cache-Control: no-store`, never a 301**: a browser caches a 301
+and sends every later click straight to WhatsApp, uncounted.
+
+Same table because it is the same kind of record on the same privacy basis
+and retention (`target` is plain `TEXT`, so no migration). But a join is not a
+download intent: `buildDownloads` drops `alpha` rows, and `/admin` counts them
+on their own *Alpha group joins* card, by `src`. `/admin/downloads.csv`
+carries them with target `alpha`. `HEAD` is answered but not counted, garbage
+`src` is dropped to `''`, and the route shares `/download`'s limiter and
+daily cap. `ALPHA_JOIN_URL` must be a `https://chat.whatsapp.com/<code>`
+invite or boot fails — no open redirect. If the invite is reset from the group
+(abuse, scraping), set the new one there; no code change.
+
 ## The analytics page: `/admin` (#104)
 
 The activity report, served. `GET /admin` shows a one-field login (the
@@ -203,6 +224,7 @@ The upgrade path once there are real users is per-install client identity
 | `DOWNLOADS_GITHUB_TOKEN` | with a private `DOWNLOADS_REPO` | — ; fine-grained PAT, that repo only, Contents read-only. **Secret** (#153) |
 | `DOWNLOADS_DAILY_CAP` | no | `5000` |
 | `DOWNLOAD_FALLBACK_ANDROID_URL` · `DOWNLOAD_FALLBACK_EXTENSION_URL` | no | — ; pinned known-good asset URLs served when the Releases API is unreachable and nothing is cached |
+| `ALPHA_JOIN_URL` | no | `https://chat.whatsapp.com/L3bNrVe8f0ZJoE7E6AsNT9` — the alpha group invite `/join` redirects to (#162); must be `https://chat.whatsapp.com/<code>` or boot fails |
 
 The extension's origin is `chrome-extension://<extension id>`; add the demo
 site's origin alongside it.
@@ -275,11 +297,13 @@ src/telemetry/store.ts    TelemetryStore interface + in-memory implementation
 src/telemetry/pg-store.ts Postgres implementation + the migration
 src/telemetry/retention.ts the 90-day purge (telemetry + the download log)
 src/routes/download.ts    GET /download/<target> — 302 + one row (#131)
+src/routes/join.ts        GET /join — 302 to the alpha group + one row (#162)
 src/downloads/store.ts    DownloadStore interface, in-memory implementation, the row helpers
 src/downloads/releases.ts the GitHub Releases resolver (cache, stale, fallback; private-repo signed URLs, checksums)
 test/app.test.ts          offline suite (explainer)
 test/telemetry.test.ts    offline suite (ingest, export, delete, retention)
 test/download.test.ts     offline suite (redirect, row shape, fallback, limiter, /admin funnel)
+test/join.test.ts         offline suite (/join redirect, row shape, env, /admin joins card)
 test/pg-store.test.ts     Postgres integration, DATABASE_URL-gated
 Dockerfile, railway.toml  deploy
 ```

@@ -161,34 +161,61 @@ export interface RegistryScreenerOptions {
   rpcUrl: string;
   contractId?: string; // default TESTNET_REGISTRY_ID
   fetchImpl?: typeof fetch;
-  timeoutMs?: number; // default 4 s — one read on the critical path
+  timeoutMs?: number; // default 4 s — the whole read, retry included
   ttlMs?: number; // default 60 s
   now?: () => number; // injectable clock for the cache
+  // Total attempts (first try + retries) for a transient failure. Default 2.
+  attempts?: number;
+  // Pause before the retry. Default 250 ms.
+  retryBackoffMs?: number;
 }
 
 export const DEFAULT_SCREEN_TIMEOUT_MS = 4_000;
 export const DEFAULT_SCREEN_TTL_MS = 60_000;
+export const DEFAULT_SCREEN_ATTEMPTS = 2;
+export const DEFAULT_SCREEN_RETRY_BACKOFF_MS = 250;
+// A retry is only worth starting if it has at least this long to run after
+// the backoff; otherwise the budget is spent and the answer is `unknown` now.
+const MIN_RETRY_WINDOW_MS = 250;
+
+// HTTP statuses that are worth one more try: rate limits and server-side
+// trouble. Any other 4xx is the request's fault and would fail again.
+function transientStatus(status: number): boolean {
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
+// One attempt's result: an answer, plus whether a retry could change it.
+interface Attempt {
+  answer: ScreenAnswer;
+  transient: boolean;
+}
 
 // One lookup per address per TTL. Unknown answers are NOT cached: the next
 // scan should retry a flaky RPC rather than inherit its failure.
+//
+// Inside one lookup, a transient failure — a 429 / 5xx, a JSON-RPC error
+// body, a transport error — gets ONE retry after a short backoff (#149), all
+// inside the same `timeoutMs` deadline: the first read of a review has no
+// other second chance, and a flagged recipient that reads `unknown` is a
+// high-risk review downgraded to a medium one. Two failures still answer
+// `unknown` (never clean), and a read that hits the deadline is `timeout`
+// with no retry — there is no budget left to spend on one.
 export function createRegistryScreener(opts: RegistryScreenerOptions): ScreenLookup {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const contractId = opts.contractId ?? TESTNET_REGISTRY_ID;
   const timeoutMs = opts.timeoutMs ?? DEFAULT_SCREEN_TIMEOUT_MS;
   const ttlMs = opts.ttlMs ?? DEFAULT_SCREEN_TTL_MS;
+  const attempts = Math.max(1, opts.attempts ?? DEFAULT_SCREEN_ATTEMPTS);
+  const backoffMs = Math.max(0, opts.retryBackoffMs ?? DEFAULT_SCREEN_RETRY_BACKOFF_MS);
   const now = opts.now ?? (() => Date.now());
   const cache = new Map<string, { answer: ScreenAnswer; expires: number }>();
   const inflight = new Map<string, Promise<ScreenAnswer>>();
 
-  async function read(address: string): Promise<ScreenAnswer> {
-    let keyXdr: string;
-    try {
-      keyXdr = entryLedgerKey(contractId, address);
-    } catch {
-      return { outcome: 'unknown', reason: 'malformed', source: 'registry' };
-    }
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+  async function attempt(keyXdr: string, signal: AbortSignal): Promise<Attempt> {
+    const unknown = (reason: string, transient: boolean): Attempt => ({
+      answer: { outcome: 'unknown', reason, source: 'registry' },
+      transient,
+    });
     try {
       const res = await fetchImpl(opts.rpcUrl, {
         method: 'POST',
@@ -199,22 +226,47 @@ export function createRegistryScreener(opts: RegistryScreenerOptions): ScreenLoo
           method: 'getLedgerEntries',
           params: { keys: [keyXdr] },
         }),
-        signal: controller.signal,
+        signal,
       });
-      if (!res.ok) return { outcome: 'unknown', reason: 'rpc_error', source: 'registry' };
+      if (!res.ok) return unknown('rpc_error', transientStatus(res.status));
       let body: RawLedgerEntriesBody;
       try {
         body = (await res.json()) as RawLedgerEntriesBody;
       } catch {
-        return { outcome: 'unknown', reason: 'malformed', source: 'registry' };
+        if (signal.aborted) return unknown('timeout', false);
+        return unknown('malformed', false);
       }
-      return interpretLedgerEntries(body, keyXdr);
+      const answer = interpretLedgerEntries(body, keyXdr);
+      // A JSON-RPC error body is the node's trouble, not the key's: retry.
+      return { answer, transient: answer.reason === 'rpc_error' };
     } catch {
-      return {
-        outcome: 'unknown',
-        reason: controller.signal.aborted ? 'timeout' : 'rpc_error',
-        source: 'registry',
-      };
+      return signal.aborted ? unknown('timeout', false) : unknown('rpc_error', true);
+    }
+  }
+
+  async function read(address: string): Promise<ScreenAnswer> {
+    let keyXdr: string;
+    try {
+      keyXdr = entryLedgerKey(contractId, address);
+    } catch {
+      return { outcome: 'unknown', reason: 'malformed', source: 'registry' };
+    }
+    // One deadline for the whole read, retry and backoff included.
+    const deadline = Date.now() + timeoutMs;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      let last: Attempt | undefined;
+      for (let n = 1; n <= attempts; n += 1) {
+        last = await attempt(keyXdr, controller.signal);
+        if (!last.transient || n === attempts) break;
+        if (deadline - Date.now() < backoffMs + MIN_RETRY_WINDOW_MS) break;
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+        if (controller.signal.aborted) {
+          return { outcome: 'unknown', reason: 'timeout', source: 'registry' };
+        }
+      }
+      return last!.answer;
     } finally {
       clearTimeout(timer);
     }
