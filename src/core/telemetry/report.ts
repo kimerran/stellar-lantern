@@ -64,6 +64,43 @@ export interface Report {
     >;
     registry: { distinctReportedSubjects: number | null; contractId: string };
   };
+  // The public playground (#188), kept apart from everything above: its rows
+  // carry a random id per page load, not an install, so they are never users,
+  // never trails and never wallet scans. `visitor` (pasted + composed) is the
+  // only number that may count toward SOW §6.3; `seeded` is one click on a
+  // built-in example and is reported beside it, never summed into it.
+  demo: {
+    pageLoads: number;
+    visitor: number;
+    seeded: number;
+    byOrigin: Record<string, number>;
+    byRisk: { visitor: Record<string, number>; seeded: Record<string, number> };
+  };
+}
+
+export type DemoSummary = Report['demo'];
+
+/** The playground's rows (#188), tallied apart from everything else. Shared by
+ *  this report and the /admin dashboard so both count the same way. */
+export function summarizeDemo(rows: Row[]): DemoSummary {
+  const demoRows = rows.filter((r) => r.platform === 'demo');
+  const out: DemoSummary = {
+    pageLoads: new Set(demoRows.map((r) => r.installId)).size,
+    visitor: 0,
+    seeded: 0,
+    byOrigin: {},
+    byRisk: { visitor: {}, seeded: {} },
+  };
+  for (const r of demoRows) {
+    if (r.event !== 'demo_scanned') continue;
+    const origin = String(r.props.origin);
+    const risk = String(r.props.risk);
+    const kind = origin === 'seeded' ? 'seeded' : 'visitor';
+    out[kind] += 1;
+    out.byOrigin[origin] = (out.byOrigin[origin] ?? 0) + 1;
+    out.byRisk[kind][risk] = (out.byRisk[kind][risk] ?? 0) + 1;
+  }
+  return out;
 }
 
 const ONBOARDING_EVENT = 'wallet_created';
@@ -81,7 +118,10 @@ export function buildReport(
   },
 ): Report {
   const now = opts.now ?? (() => new Date());
-  const sorted = [...rows].sort((a, b) => a.ts.localeCompare(b.ts) || a.id - b.id);
+  const demoRows = rows.filter((r) => r.platform === 'demo');
+  const sorted = rows
+    .filter((r) => r.platform !== 'demo')
+    .sort((a, b) => a.ts.localeCompare(b.ts) || a.id - b.id);
 
   // First-seen order decides "User N"; the UUID goes no further than this map.
   // A mapped install takes its tester label and does not consume a number;
@@ -158,6 +198,8 @@ export function buildReport(
     else if (r.event === 'message_scanned') p.messagesScanned += 1;
   }
 
+  const demo = summarizeDemo(demoRows);
+
   return {
     window: {
       since: opts.since ?? null,
@@ -185,6 +227,7 @@ export function buildReport(
       byPlatform: q4,
       registry: { distinctReportedSubjects: opts.registryCount, contractId: opts.registryId },
     },
+    demo,
   };
 }
 
@@ -296,6 +339,18 @@ export function renderHtml(r: Report, toolbar = ''): string {
     ],
   ])}<p class="note">Read fee-free from the blacklist registry's instance storage (<code>Count</code>) on contract ${esc(r.q4.registry.contractId)}. Registry writes are observable on-chain; scans and onboarding are not — those numbers come only from the client-side events above.</p>`;
 
+  const d = r.demo;
+  const demoRisk = (o: Record<string, number>) =>
+    ['high', 'medium', 'low'].map((k) => `<td class="n">${o[k] ?? 0}</td>`).join('');
+  const demo =
+    d.pageLoads === 0
+      ? ''
+      : `<h2>Public playground (golantern.xyz/demo)</h2>${tiles([
+          ['scans of visitors’ own transactions', d.visitor],
+          ['example clicks (seeded)', d.seeded],
+          ['page loads that scanned', d.pageLoads],
+        ])}<table><tr><th>origin</th><th class="n">scans</th><th class="n">high</th><th class="n">medium</th><th class="n">low</th></tr><tr><td>pasted + composed</td><td class="n">${d.visitor}</td>${demoRisk(d.byRisk.visitor)}</tr><tr><td>seeded examples</td><td class="n">${d.seeded}</td>${demoRisk(d.byRisk.seeded)}</tr></table><p class="note">Only scans of a visitor’s own transaction (pasted or composed: ${d.byOrigin.pasted ?? 0} pasted, ${d.byOrigin.composed ?? 0} composed) count toward SOW §6.3’s “transactions scanned end-to-end”. Example clicks are shown for engagement and never added to it. A page load is a random id per visit with no cookie or storage, so it is not a person and is never counted as a wallet or an install.</p>`;
+
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lantern activity report</title><style>${CSS}</style></head><body><main>
 <h1><span>Lantern</span> activity report</h1><p class="meta">${esc(win)} · generated ${fmtDate(r.window.generatedAt)}</p>
 ${toolbar}
@@ -310,7 +365,7 @@ ${tiles([
   ),
 ])}
 ${empty ? '<div class="empty">No activity in this window yet. Everything below fills in once opted-in installs send events.</div>' : ''}
-${q1}${q2}${q3}${q4}
+${q1}${q2}${q3}${q4}${demo}
 </main></body></html>`;
 }
 

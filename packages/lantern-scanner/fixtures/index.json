@@ -14,5 +14,6 @@
   "token-admin",
   "classic-payment-to-flagged",
   "classic-two-recipients-flagged",
-  "classic-flagged-memo-injection"
+  "classic-flagged-memo-injection",
+  "classic-signer-takeover"
 ]

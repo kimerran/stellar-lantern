@@ -109,6 +109,44 @@ describe('POST /v1/telemetry', () => {
     expect(h.store.rows).toHaveLength(0);
   });
 
+  it('accepts a playground envelope (#188) and stores it under platform demo, with no account', async () => {
+    const { post, store } = harness();
+    const LOAD = '0b6f4c1e-2d3a-4b5c-8d9e-0f1a2b3c4d5e';
+    const scan = (origin: string) => ({
+      name: 'demo_scanned',
+      props: { risk: 'high', action: 'block_confirm', origin },
+      ts: Date.now(),
+    });
+    const demo = {
+      installId: LOAD,
+      platform: 'demo',
+      appVersion: 'demo',
+      network: 'testnet',
+      events: [scan('pasted'), scan('composed'), scan('seeded')],
+    };
+    expect((await post(demo)).status).toBe(204);
+    const rows = await store.export({ limit: 100 });
+    expect(rows.map((r) => [r.platform, r.event, r.props.origin, r.account])).toEqual([
+      ['demo', 'demo_scanned', 'pasted', null],
+      ['demo', 'demo_scanned', 'composed', null],
+      ['demo', 'demo_scanned', 'seeded', null],
+    ]);
+    // An address, free text, a wallet address or a wallet event: 400, nothing stored.
+    for (const bad of [
+      { ...demo, events: [{ ...scan('pasted'), props: { ...scan('pasted').props, to: ADDRESS } }] },
+      { ...demo, events: [scan('my own transaction')] },
+      { ...demo, account: ADDRESS },
+      {
+        ...demo,
+        events: [{ name: 'tx_scanned', props: { risk: 'low', action: 'allow' }, ts: Date.now() }],
+      },
+      { ...envelope(), events: [scan('pasted')] },
+    ]) {
+      expect((await post(bad)).status).toBe(400);
+    }
+    expect(await store.export({ limit: 100 })).toHaveLength(3);
+  });
+
   it('rejects an out-of-range timestamp with 400, inserting nothing — never a 503', async () => {
     const h = harness({}, () => new Date(Date.UTC(2026, 8, 16)));
     for (const ts of [1e300, -1e300, Date.UTC(2026, 8, 16) + 10 * 60_000, Date.UTC(2025, 0, 1)]) {

@@ -114,8 +114,39 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      # The persistent signing key (#171): every release APK is signed with the
+      # same certificate so it installs over the previous build in place.
+      # internal-lantern publishes the Releases, so a missing key there fails
+      # the run rather than quietly shipping a throwaway-key APK. The mirror
+      # has no key and builds with the runner's debug key (artifacts only).
+      - name: Decode APK signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.LANTERN_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            if [ "${{ github.repository }}" = "kimerran/internal-lantern" ]; then
+              echo "::error::LANTERN_KEYSTORE_BASE64 is not set; refusing to publish a throwaway-key APK (#171)"
+              exit 1
+            fi
+            echo "No signing key on this repo; the APK is signed with the runner's debug key."
+            exit 0
+          fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/lantern.jks"
+          echo "LANTERN_KEYSTORE_FILE=$RUNNER_TEMP/lantern.jks" >> "$GITHUB_ENV"
+
       - name: Build debug APK
+        env:
+          LANTERN_KEYSTORE_PASSWORD: ${{ secrets.LANTERN_KEYSTORE_PASSWORD }}
+          LANTERN_KEY_ALIAS: ${{ secrets.LANTERN_KEY_ALIAS }}
+          LANTERN_KEY_PASSWORD: ${{ secrets.LANTERN_KEY_PASSWORD }}
         run: cd android && ./gradlew assembleDebug --no-daemon
+
+      # Record the certificate in the log so two releases can be compared.
+      - name: Print APK signing certificate
+        run: |
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | tail -n 1)
+          "$APKSIGNER" verify --print-certs android/app/build/outputs/apk/debug/app-debug.apk | grep -E 'SHA-256|DN:'
+          rm -f "$RUNNER_TEMP/lantern.jks"
 
       # ── Stage the release assets under human names (#130) ──
       # The packager writes release/<name>-<version>.zip; the APK comes out of
@@ -135,12 +166,20 @@ jobs:
 
       # ── Publish: a GitHub Release with directly downloadable assets ──
       # GitHub serves each asset under its own name with no re-zipping, so the
-      # APK downloads as an .apk and installs on tap, needs no login on the
-      # public mirror, and never expires. Tagged v<version>-testnet.<run> so
-      # repeated merges of one version don't collide. Pre-release: it is the
-      # alpha (debug-signed APK, telemetry identity on).
+      # APK downloads as an .apk and installs on tap. Tagged
+      # v<version>-testnet.<run> so repeated merges of one version don't
+      # collide. Pre-release: it is the alpha (debug-signed APK, telemetry
+      # identity on).
+      #
+      # Published by internal-lantern ONLY (#153). This file is shared with the
+      # public mirror, which still builds and uploads the run artifacts below
+      # but no longer publishes Releases: the private Releases are the single
+      # source for /download/*, read by lantern-api with a token, and
+      # /download/checksums is how anyone verifies a build. On the mirror the
+      # release gate's tags therefore stop at v0.2.0; internal-lantern's tags
+      # are the ones that enforce the version bump.
       - name: Create GitHub Release
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.repository == 'kimerran/internal-lantern'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.stage.outputs.tag }}

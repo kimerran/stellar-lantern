@@ -11,8 +11,11 @@ import type {
   MiniAppId,
   RecheckDirection,
   RegistryReason,
+  RegistryUnknownReason,
   RiskLevel,
   ScanAction,
+  ScreenIdle,
+  ScreenLatency,
   TelemetryEvent,
 } from './events';
 
@@ -24,12 +27,58 @@ export function walletCreatedEvent(mode: 'create' | 'import' | 'passkey'): Telem
 export function messageScannedEvent(verdict: { risk: RiskLevel }): TelemetryEvent {
   return { name: 'message_scanned', props: { risk: verdict.risk } };
 }
-export function txScannedEvent(verdict: { risk: RiskLevel; action: ScanAction }): TelemetryEvent[] {
+// What txScannedEvent reads off a ScanVerdict: the verdict, and — for the
+// registry_unknown diagnostic (#180) — each screening answer's outcome and
+// reason, and the screening timing. Never an address.
+export interface ScannedVerdict {
+  risk: RiskLevel;
+  action: ScanAction;
+  screening?: ReadonlyArray<{ answer: { outcome: string; reason?: string } }>;
+  screenTiming?: { ms: number; sincePreviousMs: number | null };
+}
+
+const UNKNOWN_REASONS = new Set<RegistryUnknownReason>([
+  'timeout',
+  'rpc_error',
+  'malformed',
+  'archived',
+  'no_registry',
+]);
+
+export function screenLatencyBucket(ms: number): ScreenLatency {
+  if (ms < 1_000) return 'lt_1s';
+  if (ms < 2_000) return '1s_2s';
+  if (ms < 3_000) return '2s_3s';
+  return 'gte_3s';
+}
+
+export function screenIdleBucket(sincePreviousMs: number | null): ScreenIdle {
+  if (sincePreviousMs === null) return 'first';
+  if (sincePreviousMs < 30_000) return 'lt_30s';
+  if (sincePreviousMs < 120_000) return '30s_2m';
+  return 'gte_2m';
+}
+
+export function txScannedEvent(verdict: ScannedVerdict): TelemetryEvent[] {
   const out: TelemetryEvent[] = [
     { name: 'tx_scanned', props: { risk: verdict.risk, action: verdict.action } },
   ];
   if (verdict.action === 'block_confirm')
     out.push({ name: 'high_risk_gated', props: { risk: verdict.risk } });
+  // One diagnostic per review, whatever the number of unknown counterparties:
+  // the first unknown's reason. Only the pipeline path has the timing.
+  const unknown = verdict.screening?.find((s) => s.answer.outcome === 'unknown');
+  if (unknown && verdict.screenTiming) {
+    const r = unknown.answer.reason as RegistryUnknownReason | undefined;
+    out.push({
+      name: 'registry_unknown',
+      props: {
+        reason: r && UNKNOWN_REASONS.has(r) ? r : 'other',
+        latency: screenLatencyBucket(verdict.screenTiming.ms),
+        idle: screenIdleBucket(verdict.screenTiming.sincePreviousMs),
+      },
+    });
+  }
   return out;
 }
 export function swapExecutedEvent(engine: 'sdex' | 'soroswap'): TelemetryEvent {
@@ -77,8 +126,7 @@ export function txRecheckedEvent(r: { drifted: boolean; direction: RecheckDirect
 export const track = {
   walletCreated: (mode: 'create' | 'import' | 'passkey') => emit(walletCreatedEvent(mode)),
   messageScanned: (verdict: { risk: RiskLevel }) => emit(messageScannedEvent(verdict)),
-  txScanned: (verdict: { risk: RiskLevel; action: ScanAction }) =>
-    txScannedEvent(verdict).forEach(emit),
+  txScanned: (verdict: ScannedVerdict) => txScannedEvent(verdict).forEach(emit),
   swapExecuted: (engine: 'sdex' | 'soroswap') => emit(swapExecutedEvent(engine)),
   earnAction: (kind: 'supply' | 'withdraw') => emit(earnActionEvent(kind)),
   anchorFlow: (kind: 'deposit' | 'withdraw', stage: 'started' | 'completed' | 'failed') =>

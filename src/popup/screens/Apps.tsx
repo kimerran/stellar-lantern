@@ -798,7 +798,7 @@ function Browser({
             )}
             {signErr && <p className="text-center text-label-md text-error">{signErr}</p>}
 
-            <div className="flex gap-2">
+            <div ref={recheck.ctaRef} className="flex scroll-mb-4 gap-2">
               <button
                 onClick={rejectSign}
                 disabled={submitting}

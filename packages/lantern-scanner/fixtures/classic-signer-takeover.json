@@ -1,0 +1,10 @@
+{
+  "name": "classic-signer-takeover",
+  "description": "setOptions that adds ATTACKER as a signer at weight 255 (meets any threshold) and sets the master key weight to 0: the account now answers to a key its owner does not hold. How Stellar accounts actually get drained. Must score high with account_control_change (#185).",
+  "networkPassphrase": "Test SDF Network ; September 2015",
+  "source": "GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK",
+  "recordedAt": null,
+  "rpc": null,
+  "xdr": "AAAAAgAAAAAY0gqcnifD/QFRi3Um28AFmWZwoXTXZlkgmYh/UZB/SQAAAGQAAAAA/N5BswAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAA3d0gGUhbWXFrTOkhHWphO6vtKet7Q4EWfQACm13efawAAAD/AAAAAAAAAAA=",
+  "simulation": null
+}

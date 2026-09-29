@@ -132,6 +132,16 @@ h1, h2, h3 { line-height: 1.1; letter-spacing: -0.02em; font-weight: 700; }
 .nav-links a:hover { color: var(--amber-bright); }
 .nav .btn { margin-left: 28px; padding: 10px 18px; }
 .nav-toggle { display: none; margin-left: auto; background: none; border: 0; color: var(--on-surface); cursor: pointer; }
+/* X (Twitter) link: an icon-only affordance beside Download; the link's name is its aria-label. */
+.nav-x {
+  display: inline-grid; place-items: center; flex-shrink: 0;
+  width: 40px; height: 40px; margin-left: 10px;
+  border-radius: 10px; border: 1px solid var(--outline-variant);
+  color: var(--on-surface-variant);
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.nav-x:hover { color: var(--amber-bright); border-color: var(--outline); background: var(--surface-high); }
+.nav-x:focus-visible, .nav-toggle:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
 
 /* ───────── Hero ───────── */
 .hero { padding: 84px 0 72px; }
@@ -221,9 +231,10 @@ section { padding: 76px 0; }
 .section-head h2 { font-size: clamp(1.9rem, 3.6vw, 2.8rem); margin: 14px 0 12px; }
 .section-head p { color: var(--on-surface-variant); font-size: 1.05rem; }
 
-/* Reveal on scroll */
-.reveal { opacity: 0; transform: translateY(26px); transition: opacity 0.7s var(--ease), transform 0.7s var(--ease); }
-.reveal.in { opacity: 1; transform: none; }
+/* Reveal on scroll. Only hidden when JS is running (html.js, set in <head>),
+   so a page without JS shows every section instead of leaving them at opacity 0. */
+.js .reveal { opacity: 0; transform: translateY(26px); transition: opacity 0.7s var(--ease), transform 0.7s var(--ease); }
+.js .reveal.in { opacity: 1; transform: none; }
 
 /* ───────── Features ───────── */
 .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
@@ -266,6 +277,118 @@ section { padding: 76px 0; }
 .shot .cap { display: block; margin-top: 16px; padding: 0 4px; }
 .shot .cap b { display: block; font-size: 1rem; font-weight: 600; color: var(--amber-bright); letter-spacing: -0.01em; }
 .shot .cap span { display: block; margin-top: 3px; color: var(--on-surface-variant); font-size: 0.9rem; line-height: 1.5; }
+
+/* ───────── Slideshows (Features, Screens) ─────────
+   Without JS, .features / .gallery stay the grids above. app.js adds
+   .is-slideshow to the wrapper, which turns the grid into one scroll-snap row:
+   --per slides in view, swipe on touch, buttons + dots + arrow keys from JS. */
+.is-slideshow .slides {
+  --per: 3;
+  --gap: 18px;
+  position: relative;
+  display: grid;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: calc((100% - (var(--per) - 1) * var(--gap)) / var(--per));
+  gap: var(--gap);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  /* Room for the cards' hover lift, which the scroller would otherwise clip. */
+  padding: 8px 0 12px;
+  margin: -8px 0 -12px;
+}
+.is-slideshow .gallery.slides { --gap: 22px; }
+.is-slideshow .slides::-webkit-scrollbar { display: none; }
+.is-slideshow .slides > * { scroll-snap-align: start; }
+.is-slideshow .slides:focus-visible { outline: 2px solid var(--amber); outline-offset: 4px; border-radius: 6px; }
+.ss-controls { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 26px; }
+.ss-btn {
+  width: 44px; height: 44px; flex-shrink: 0;
+  display: grid; place-items: center;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface);
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s, opacity 0.2s;
+}
+.ss-btn:hover { border-color: rgba(255, 193, 7, 0.6); color: var(--amber-bright); background: var(--surface-high); }
+.ss-next svg { transform: scaleX(-1); }
+.ss-btn[aria-disabled="true"] { opacity: 0.35; cursor: default; }
+.ss-btn[aria-disabled="true"]:hover { border-color: var(--outline-variant); color: var(--on-surface); background: var(--surface); }
+.ss-dots { display: flex; flex-wrap: wrap; justify-content: center; }
+.ss-dot {
+  width: 24px; height: 24px;
+  display: grid; place-items: center;
+  background: none; border: 0; padding: 0; cursor: pointer;
+}
+.ss-dot::before {
+  content: ''; display: block;
+  width: 8px; height: 8px; border-radius: 999px;
+  background: var(--outline-variant);
+  transition: width 0.25s var(--ease), background 0.2s;
+}
+.ss-dot:hover::before { background: var(--outline); }
+.ss-dot[aria-current="true"]::before { width: 20px; background: var(--amber); }
+.ss-btn:focus-visible, .ss-dot:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; border-radius: 999px; }
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+/* ───────── Walkthrough video (click-to-play facade) ───────── */
+.video-section { border-top: 1px solid rgba(79, 70, 50, 0.4); }
+.video {
+  position: relative;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  aspect-ratio: 16 / 9; /* reserves the box, so swapping in the iframe shifts nothing */
+  border-radius: 20px;
+  overflow: hidden;
+  background: var(--surface-lowest);
+  border: 1px solid rgba(79, 70, 50, 0.5);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+}
+.video > .video-facade, .video > iframe {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  border: 0;
+}
+.video-facade {
+  display: grid; place-items: center;
+  padding: 0; margin: 0; background: none; color: inherit; font: inherit;
+  cursor: pointer;
+}
+.video-poster {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s var(--ease), filter 0.4s;
+}
+.video-play-icon {
+  position: relative;
+  width: 76px; height: 76px; border-radius: 999px;
+  display: grid; place-items: center;
+  background: var(--amber); color: var(--on-amber);
+  box-shadow: 0 0 0 10px rgba(255, 193, 7, 0.18), var(--glow-btn);
+  transition: transform 0.2s var(--ease), box-shadow 0.2s;
+}
+.video-cta {
+  position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 13px; font-weight: 600;
+  color: var(--on-surface);
+  background: rgba(6, 14, 32, 0.78);
+  border: 1px solid rgba(79, 70, 50, 0.6);
+  border-radius: 999px; padding: 6px 14px;
+}
+.video-facade:hover .video-poster { transform: scale(1.02); filter: brightness(1.08); }
+.video-facade:hover .video-play-icon { transform: scale(1.06); }
+.video-facade:focus-visible { outline: 3px solid var(--amber); outline-offset: -3px; border-radius: 20px; }
 
 /* ───────── Install steps ───────── */
 .install { background: var(--surface-lowest); border-top: 1px solid rgba(79,70,50,0.4); border-bottom: 1px solid rgba(79,70,50,0.4); }
@@ -323,6 +446,8 @@ section { padding: 76px 0; }
 .contact-card .material-symbols-outlined.big { font-size: 44px; color: var(--amber); filter: drop-shadow(0 0 16px rgba(255,193,7,0.4)); }
 .contact-card h2 { font-size: 2rem; margin: 16px 0 10px; }
 .contact-card p { color: var(--on-surface-variant); margin-bottom: 26px; }
+.contact-card .alpha-note { margin: 16px auto 0; max-width: 42ch; font-size: 0.86rem; color: var(--outline); }
+.contact-card .alpha-note .material-symbols-outlined { font-size: 16px; color: var(--amber-dim); vertical-align: -3px; margin-right: 4px; }
 .email-link {
   display: inline-flex; align-items: center; gap: 10px;
   font-family: 'Roboto Mono', monospace; font-size: 1.1rem; font-weight: 500;
@@ -343,6 +468,9 @@ footer { border-top: 1px solid rgba(79, 70, 50, 0.5); padding: 56px 0 40px; back
 .footer-col a { display: flex; align-items: center; gap: 8px; color: var(--on-surface-variant); font-size: 0.95rem; padding: 6px 0; transition: color 0.2s; }
 .footer-col a:hover { color: var(--amber-bright); }
 .footer-col a .material-symbols-outlined { font-size: 17px; }
+.footer-col a .x-logo { width: 15px; height: 15px; margin: 0 1px; }
+.footer-bottom .footer-x { display: inline-flex; align-items: center; gap: 5px; vertical-align: middle; }
+.footer-bottom .footer-x .x-logo { width: 12px; height: 12px; }
 .footer-bottom { margin-top: 44px; padding-top: 22px; border-top: 1px solid rgba(79, 70, 50, 0.4); display: flex; flex-wrap: wrap; gap: 14px; justify-content: space-between; align-items: center; color: var(--outline); font-size: 0.82rem; }
 .footer-bottom a { color: var(--outline); }
 .footer-bottom a:hover { color: var(--on-surface-variant); }
@@ -388,6 +516,8 @@ footer { border-top: 1px solid rgba(79, 70, 50, 0.5); padding: 56px 0 40px; back
   .gallery { grid-template-columns: 1fr 1fr; gap: 18px; }
   .steps { grid-template-columns: 1fr; }
   .showcase-grid { grid-template-columns: 1fr; gap: 32px; }
+  .is-slideshow .slides { --per: 2; }
+  .is-slideshow .gallery.slides { --gap: 18px; }
   .nav-links { display: none; }
   .nav-links.open {
     display: flex; flex-direction: column; gap: 0;
@@ -396,17 +526,26 @@ footer { border-top: 1px solid rgba(79, 70, 50, 0.5); padding: 56px 0 40px; back
   }
   .nav-links.open a { padding: 12px 0; }
   .nav .btn { display: none; }
-  .nav-toggle { display: inline-flex; }
+  .nav-x { margin-left: auto; }
+  .nav-toggle { display: inline-flex; margin-left: 8px; }
 }
 @media (max-width: 560px) {
   .features { grid-template-columns: 1fr; }
   .gallery { grid-template-columns: 1fr; max-width: 380px; margin: 0 auto; }
+  .is-slideshow .slides { --per: 1; }
+  .is-slideshow .gallery.slides { margin: -8px auto -12px; }
+  /* Twelve dots don't fit beside the buttons at phone width: dots get their own row. */
+  .ss-controls { flex-wrap: wrap; row-gap: 10px; }
+  .ss-dots { order: -1; flex-basis: 100%; }
   .cookie { left: 16px; right: 16px; bottom: 16px; max-width: none; }
+  .video { border-radius: 14px; }
+  .video-play-icon { width: 54px; height: 54px; box-shadow: 0 0 0 6px rgba(255, 193, 7, 0.18), var(--glow-btn); }
+  .video-cta { bottom: 10px; font-size: 12px; padding: 4px 12px; }
   section { padding: 60px 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
-  .reveal { opacity: 1; transform: none; }
+  .reveal, .js .reveal { opacity: 1; transform: none; }
   .reveal-load { opacity: 1; transform: none; animation: none; }
 }

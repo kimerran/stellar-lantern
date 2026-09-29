@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { track } from '@core/telemetry';
 import type { ScanVerdict } from '@core/scan';
 import type { WalletScanInput } from '@core/scan/wallet';
@@ -49,5 +49,19 @@ export function useRecheck() {
     setState({ kind: 'idle' });
   }, []);
 
-  return { state, guard, reset };
+  // Keep the confirm button on screen through a re-check (#152). The
+  // <RecheckNotice> renders ABOVE the CTA, so every state it shows (checking,
+  // escalated, failed, drifted) pushes the button down by the notice's height.
+  // On a review already scrolled to the bottom that moves the CTA below the
+  // scroll area's fold — on Android, behind the bottom nav, where the next tap
+  // lands on a nav tab instead. Screens wrap their CTA in `ref={ctaRef}`; after
+  // each non-idle state commits we scroll it back into view. `nearest` is a
+  // no-op when it is already fully visible, so an unscrolled review never jumps.
+  const ctaRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (state.kind === 'idle') return;
+    ctaRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [state]);
+
+  return { state, guard, reset, ctaRef };
 }

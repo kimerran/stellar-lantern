@@ -109,6 +109,23 @@ exports[`verdict: corpus snapshots > classic-payment-to-flagged 1`] = `
 }
 `;
 
+exports[`verdict: corpus snapshots > classic-signer-takeover 1`] = `
+{
+  "action": "block_confirm",
+  "reasons": [
+    "high:account_control_change",
+  ],
+  "risk": "high",
+  "signals": [
+    "ingest:classic@simulation",
+    "auth:flat@auth.calls",
+    "effects:coverage_full@effects.coverage",
+    "screen:clean@screen",
+    "verdict:account_control_change@ops[0]",
+  ],
+}
+`;
+
 exports[`verdict: corpus snapshots > classic-two-recipients-flagged 1`] = `
 {
   "action": "allow",

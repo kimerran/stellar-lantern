@@ -84,7 +84,9 @@ You'll install **both** eventually. Install your **main** platform now (either o
 4. You may also see "Play Protect doesn't recognize this developer". Tap **Install anyway**. (Expected for a pre-release build — but don't do this for apps from people you don't know.)
 5. Open **Lantern** from your app drawer.
 
-> **If it won't install:** the most common cause is an older Lantern already on the phone. Uninstall it first and try again.
+> **Updating:** from version 0.3.0 on, every build is signed with the same key, so a new APK installs straight over the old one and keeps your wallet. **Builds before 0.3.0 were each signed differently**, so moving from one of those to 0.3.0 is the last time you have to uninstall first — and uninstalling deletes the wallet on the phone. Have your 12-word recovery phrase (Part 2) to hand before you do, then import it after installing.
+>
+> **If it won't install:** the most common cause is an older (pre-0.3.0) Lantern already on the phone. Uninstall it first and try again.
 
 ### Chrome extension
 

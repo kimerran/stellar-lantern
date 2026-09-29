@@ -515,6 +515,7 @@ export async function screen(
     ),
   ).filter((a) => a !== self);
   const lookup = screenLookup(deps, request.networkPassphrase);
+  const started = performance.now();
   const hits: ScreenResult['hits'] = [];
   const unknown: ScreenResult['unknown'] = [];
   const answers: ScreenResult['answers'] = [];
@@ -547,7 +548,8 @@ export async function screen(
     }
   });
   const outcome = hits.length > 0 ? 'flagged' : unknown.length > 0 ? 'unknown' : 'clean';
-  return { outcome, checked, hits, unknown, answers };
+  const latencyMs = Math.max(0, Math.round(performance.now() - started));
+  return { outcome, checked, hits, unknown, answers, latencyMs };
 }
 
 // M… → its base G…; anything else unchanged.

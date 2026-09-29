@@ -93,6 +93,7 @@ const cleanScreen = (over: Partial<ScreenResult> = {}): ScreenResult => ({
   hits: [],
   unknown: [],
   answers: [],
+  latencyMs: 0,
   ...over,
 });
 const base = (over: Partial<VerdictInput> = {}): VerdictInput => ({

@@ -201,21 +201,23 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
             </p>
           )}
 
-          {isHigh && native && !scanning ? (
-            <HoldToConfirm label={signing ? 'Signing…' : 'Hold to Co-sign'} danger onConfirm={coSign} disabled={signing} />
-          ) : (
-            <Button
-              fullWidth
-              onClick={coSign}
-              loading={signing}
-              disabled={scanning || !acknowledged}
-              variant={isHigh ? 'secondary' : 'primary'}
-              trailingIcon="lock"
-              className={isHigh ? '!border-error/50 !text-error' : ''}
-            >
-              Co-sign Recovery
-            </Button>
-          )}
+          <div ref={recheck.ctaRef} className="scroll-mb-4">
+            {isHigh && native && !scanning ? (
+              <HoldToConfirm label={signing ? 'Signing…' : 'Hold to Co-sign'} danger onConfirm={coSign} disabled={signing} />
+            ) : (
+              <Button
+                fullWidth
+                onClick={coSign}
+                loading={signing}
+                disabled={scanning || !acknowledged}
+                variant={isHigh ? 'secondary' : 'primary'}
+                trailingIcon="lock"
+                className={isHigh ? '!border-error/50 !text-error' : ''}
+              >
+                Co-sign Recovery
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     );

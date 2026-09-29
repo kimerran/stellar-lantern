@@ -103,6 +103,11 @@ export interface ScanVerdict {
   // screening line (D3 QA plan §10.1). Absent from the legacy scan() itself;
   // the wallet adapter sets it.
   registry?: 'checked' | 'unavailable';
+  // Registry screening timing, when the pipeline ran (#180): how long stage 4
+  // took, and how long since the previous screening in this session (`null`
+  // for the first). Diagnostics for "couldn't check the recipient" — the
+  // wallet reports them bucketed, never raw. Absent from the legacy scan().
+  screenTiming?: { ms: number; sincePreviousMs: number | null };
 }
 
 // ── Paste-to-check (spec §4.5) ───────────────────────────────────────────────
@@ -434,6 +439,10 @@ export interface ScreenResult {
   // Each address's full answer, including readable-but-not-flagged entries
   // (Disputed / Revoked).
   answers: Array<{ address: string; answer: ScreenAnswer }>;
+  // Wall-clock time of the whole stage, all lookups concurrent (#180). Says
+  // whether an `unknown` came back fast (a refused request) or only at the
+  // screener's deadline (a request that stalled).
+  latencyMs: number;
 }
 
 // Audit trail: one line per thing a stage evaluated, whether or not it

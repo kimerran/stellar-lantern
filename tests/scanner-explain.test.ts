@@ -414,11 +414,34 @@ describe('explain: prompt contents', () => {
     expect(ok.user).toContain('1.0000000 USDC leaves');
   });
 
+  it('never feeds the model the raw action enum; describes the action in words (#150)', async () => {
+    const f = fixture('classic-payment');
+    const base = await stagesFor(requestFor(f), { screen: flaggedRegistry });
+    expect(base.verdict.action).toBe('block_confirm');
+    const wording = {
+      allow: 'no warning is shown and the user can sign',
+      warn: 'the user is warned and can still sign',
+      block_confirm: 'the user can still sign, after an explicit confirmation',
+    } as const;
+    for (const action of ['allow', 'warn', 'block_confirm'] as const) {
+      const { system, user } = buildPrompt({
+        verdict: { ...base.verdict, action },
+        effects: base.effects,
+      });
+      expect(user).not.toMatch(/block_confirm/);
+      expect(system).not.toMatch(/block_confirm/);
+      expect(user).toContain(wording[action]);
+    }
+    expect(SYSTEM_PROMPT).toMatch(/never say it is blocked, stopped or prevented/);
+  });
+
   it('names what the user sees: verdict, reasons, amounts, allowances, unverified calls', async () => {
     const f = fixture('deep-auth');
     const input = await stagesFor(requestFor(f), { simulate: async () => f.simulation! });
     const { user } = buildPrompt(input);
-    expect(user).toMatch(/^Risk verdict \(final\): high — action: block_confirm\./);
+    expect(user).toMatch(
+      /^Risk verdict \(final\): high — the user can still sign, after an explicit confirmation\./,
+    );
     expect(user).toMatch(/Reasons: .*Unlimited token allowance/);
     expect(user).toMatch(/allowance: GBVG…FJBP may spend an unlimited amount of/);
     expect(user).toMatch(
@@ -576,6 +599,55 @@ describe('explain: sanitise', () => {
     expect(contradictsVerdict('Sends 25 XLM to GDVE…ZA57.', 'high')).toBe(false);
     expect(contradictsVerdict('A routine payment; nothing unusual.', 'low')).toBe(false);
     expect(contradictsVerdict('This is safe.', 'low')).toBe(false);
+  });
+
+  it('a claim that the transaction is blocked is a contradiction at any risk (#150)', () => {
+    for (const risk of ['low', 'medium', 'high'] as const) {
+      expect(contradictsVerdict('This transaction is blocked.', risk)).toBe(true);
+      expect(contradictsVerdict('It has been stopped by Lantern.', risk)).toBe(true);
+      expect(contradictsVerdict('The payment was prevented.', risk)).toBe(true);
+      expect(
+        contradictsVerdict('This is being blocked because the recipient is flagged.', risk),
+      ).toBe(true);
+      expect(contradictsVerdict('Lantern has blocked this transfer.', risk)).toBe(true);
+      expect(contradictsVerdict('Your wallet stopped the payment.', risk)).toBe(true);
+    }
+    // "blocked" in any other sense is left alone.
+    expect(
+      contradictsVerdict('Sends 5 USDC; the issuer has blocked frozen accounts before.', 'high'),
+    ).toBe(false);
+    expect(
+      contradictsVerdict('Grants an allowance that can be stopped by revoking it later.', 'high'),
+    ).toBe(false);
+    expect(contradictsVerdict('Calls "block_user" on an unverified contract.', 'high')).toBe(false);
+    expect(contradictsVerdict('Nothing here is blocked; you decide whether to sign.', 'high')).toBe(
+      false,
+    );
+    expect(
+      contradictsVerdict(
+        'Sends 25 XLM to a flagged address; confirm only if you trust it.',
+        'high',
+      ),
+    ).toBe(false);
+  });
+
+  it('a model reply saying "this transaction is blocked" is replaced by the fallback (#150)', async () => {
+    const f = fixture('classic-payment');
+    const request = requestFor(f);
+    const result = await runPipeline(request, {
+      screen: flaggedRegistry,
+      explain: createHostedExplainer({
+        apiKey: 'k',
+        endpoint: ENDPOINT,
+        fetchImpl: modelSays('Sends 1 XLM to a flagged address, so this transaction is blocked.'),
+      }),
+    });
+    expect(result.action).toBe('block_confirm');
+    expect(result.explanationSource).toBe('fallback');
+    expect(result.explanation).not.toMatch(/blocked/i);
+    expect(result.explanation).toBe(
+      await explainRulesBased({ verdict: result.verdict, effects: result.effects }),
+    );
   });
 
   it('the model output is displayed, never parsed for meaning', async () => {

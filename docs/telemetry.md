@@ -97,6 +97,7 @@ data" discards it as before.
 | `tx_signed` | `kind: sign_and_submit \| sign_only \| submit_only`, `ok: boolean` | Q4 |
 | `tx_scanned` | `risk`, `action: allow \| warn \| block_confirm` | Q4 |
 | `high_risk_gated` | `risk` | Q4 |
+| `registry_unknown` | `reason: timeout \| rpc_error \| malformed \| archived \| no_registry \| other`, `latency: lt_1s \| 1s_2s \| 2s_3s \| gte_3s` (the screening stage), `idle: first \| lt_30s \| 30s_2m \| gte_2m` (since the previous screening) — sent with `tx_scanned` when the review reads "Couldn't check the recipient" (#180); no address, no raw duration | diagnostics |
 | `tx_rechecked` | `drifted: boolean`, `direction: none \| escalated \| de_escalated \| lateral \| failed` (the re-simulate before submit, #121; `failed` = could not re-check) | Q4 / §3.9 |
 | `registry_report_submitted` | `reason: Scam \| Phishing \| Drainer \| Poisoning \| Mixer \| Other`, `ok: boolean` (the one-click registry report, #120 — no subject, fee or note) | Q4 / §6.3 registry targets |
 | `consent_granted` / `consent_revoked` | — | audit |
@@ -152,6 +153,12 @@ the CDN's header when there is one, and a three-bucket browser family. **No IP
 address** (the code that writes the row never reads it) and **no user-agent
 string**. A row is a download *intent* — a click — not a completed download,
 and the dashboard says so. Same 90-day retention as everything else.
+
+`…/join?src=<slug>` (#162), the homepage's *Join the alpha* button, redirects
+to the alpha testers' WhatsApp group and writes the same kind of row to the
+same log, with `alpha` as the target and no version. It is counted on its own
+in `/admin` (*Alpha group joins*, by `src`), never as a download intent, and a
+click is not a confirmed membership.
 
 ## Retention
 

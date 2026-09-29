@@ -25,6 +25,9 @@ export interface Env {
   downloadsDailyCap: number;
   downloadFallbackAndroidUrl?: string;
   downloadFallbackExtensionUrl?: string;
+  // /join (#162): the alpha testers' WhatsApp group invite. Resettable from
+  // the group if abused, so it lives here rather than in code.
+  alphaJoinUrl: string;
 }
 
 export const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
@@ -32,6 +35,20 @@ export const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 export const DEFAULT_REGISTRY = 'CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F';
 // The public mirror: its Releases are downloadable signed out (#130).
 export const DEFAULT_DOWNLOADS_REPO = 'kimerran/stellar-lantern';
+
+export const DEFAULT_ALPHA_JOIN_URL = 'https://chat.whatsapp.com/L3bNrVe8f0ZJoE7E6AsNT9';
+// An open redirect is the risk here, so only a WhatsApp group invite passes.
+const ALPHA_JOIN_RE = /^https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]+$/;
+
+function alphaJoinUrl(raw: string | undefined): string {
+  if (raw === undefined || raw === '') return DEFAULT_ALPHA_JOIN_URL;
+  const v = raw.trim();
+  if (!ALPHA_JOIN_RE.test(v))
+    throw new Error(
+      `ALPHA_JOIN_URL must be a https://chat.whatsapp.com/<code> invite, got "${raw}"`,
+    );
+  return v;
+}
 
 function int(name: string, raw: string | undefined, dflt: number): number {
   if (raw === undefined || raw === '') return dflt;
@@ -61,7 +78,9 @@ export function readEnv(source: Record<string, string | undefined> = process.env
     retentionDays: int('TELEMETRY_RETENTION_DAYS', source.TELEMETRY_RETENTION_DAYS, 90),
     registryId: source.BLACKLIST_REGISTRY_ID || DEFAULT_REGISTRY,
     downloadsRepo: source.DOWNLOADS_REPO || DEFAULT_DOWNLOADS_REPO,
-    ...(source.DOWNLOADS_GITHUB_TOKEN ? { downloadsGithubToken: source.DOWNLOADS_GITHUB_TOKEN } : {}),
+    ...(source.DOWNLOADS_GITHUB_TOKEN
+      ? { downloadsGithubToken: source.DOWNLOADS_GITHUB_TOKEN }
+      : {}),
     downloadsDailyCap: int('DOWNLOADS_DAILY_CAP', source.DOWNLOADS_DAILY_CAP, 5_000),
     ...(source.DOWNLOAD_FALLBACK_ANDROID_URL
       ? { downloadFallbackAndroidUrl: source.DOWNLOAD_FALLBACK_ANDROID_URL }
@@ -69,5 +88,6 @@ export function readEnv(source: Record<string, string | undefined> = process.env
     ...(source.DOWNLOAD_FALLBACK_EXTENSION_URL
       ? { downloadFallbackExtensionUrl: source.DOWNLOAD_FALLBACK_EXTENSION_URL }
       : {}),
+    alphaJoinUrl: alphaJoinUrl(source.ALPHA_JOIN_URL),
   };
 }

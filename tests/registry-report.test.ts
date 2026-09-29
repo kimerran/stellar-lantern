@@ -37,7 +37,7 @@ import coSignSrc from '../src/popup/screens/CoSignRecovery.tsx?raw';
 import txDetailSrc from '../src/popup/screens/TxDetail.tsx?raw';
 import reportSrc from '../src/popup/components/ReportAddress.tsx?raw';
 import manifestSrc from '../manifest.config.ts?raw';
-import { counterpartiesOf } from '../src/popup/components/ReportAddress';
+import { canSubmitReport, counterpartiesOf, reasonFromSelect } from '../src/popup/components/ReportAddress';
 import type { ScanVerdict } from '@core/scan';
 
 const REPORTER = 'GDRXE2BQUC3AZNPVFSCEZ76NJ3WWL25FYFK6RGZGIEKWE4SOOHSUJUJ6';
@@ -483,6 +483,46 @@ describe('entry points', () => {
 
   it('never persists the note: no storage write in the component', () => {
     expect(reportSrc).not.toMatch(/localStorage|chrome\.storage|setItem|Preferences/);
+  });
+});
+
+describe('the reason is an explicit choice — no default goes on chain (#151)', () => {
+  it('cannot submit until a reason is picked, whatever the fee state', () => {
+    for (const fee of ['ok', 'unknown', 'loading'] as const) {
+      expect(canSubmitReport({ reason: null, fee, busy: false })).toBe(false);
+    }
+    expect(canSubmitReport({ reason: 'Drainer', fee: 'ok', busy: false })).toBe(true);
+    // "Report anyway" (fee unreadable) is still gated on the reason.
+    expect(canSubmitReport({ reason: 'Drainer', fee: 'unknown', busy: false })).toBe(true);
+    expect(canSubmitReport({ reason: 'Drainer', fee: 'loading', busy: false })).toBe(false);
+    expect(canSubmitReport({ reason: 'Drainer', fee: 'ok', busy: true })).toBe(false);
+  });
+
+  it('the placeholder and anything outside the closed set read back as no reason', () => {
+    expect(reasonFromSelect('')).toBeNull();
+    expect(reasonFromSelect('scam')).toBeNull();
+    expect(reasonFromSelect('free text')).toBeNull();
+    for (const r of REGISTRY_REASONS) expect(reasonFromSelect(r)).toBe(r);
+  });
+
+  it('the sheet starts with no reason, shows a placeholder, and gates the button on the same rule', () => {
+    expect(reportSrc).toContain('useState<RegistryReason | null>(null)');
+    expect(reportSrc).not.toMatch(/useState<RegistryReason>\('Scam'\)/);
+    expect(reportSrc).toMatch(/<option value="" disabled>\s*Choose a reason\s*<\/option>/);
+    expect(reportSrc).toContain("value={reason ?? ''}");
+    expect(reportSrc).toContain('disabled={!canSubmitReport({ reason, fee: fee.status, busy })}');
+    expect(reportSrc).not.toContain('as RegistryReason');
+  });
+
+  it('submits the chosen reason: the build and the telemetry both get it', () => {
+    expect(reportSrc).toMatch(/if \(!canSubmitReport\(state\)\) return;\s*const chosen = state\.reason;/);
+    expect(reportSrc).toMatch(/buildReportTx\(\{[^}]*reason: chosen,/);
+    expect(reportSrc).toContain('track.registryReport(chosen, false)');
+    expect(reportSrc).toContain('track.registryReport(chosen, true)');
+  });
+
+  it('cancelling the sheet clears the reason, so reopening starts unchosen again', () => {
+    expect(reportSrc).toMatch(/setStage\('entry'\);\s*setError\(null\);\s*\/\/[^\n]*\n\s*setReason\(null\);/);
   });
 });
 

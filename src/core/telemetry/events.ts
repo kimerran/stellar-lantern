@@ -4,16 +4,36 @@
 // an amount, a memo or a pasted message has no slot to go in. The runtime
 // validator (validate.ts) enforces the same set on the wire.
 
-export type Platform = 'extension' | 'android';
+// 'demo' is the public playground at golantern.xyz/demo (#188): no install,
+// no consent screen, a random id per page load, and only `demo_scanned`.
+export type Platform = 'extension' | 'android' | 'demo';
 export type Network = 'testnet' | 'public';
 export type RiskLevel = 'low' | 'medium' | 'high';
 export type ScanAction = 'allow' | 'warn' | 'block_confirm';
 // Mirrors the registry contract's `Reason` enum (src/core/registry/report.ts).
 export type RegistryReason = 'Scam' | 'Phishing' | 'Drainer' | 'Poisoning' | 'Mixer' | 'Other';
 export type RecheckDirection = 'none' | 'escalated' | 'de_escalated' | 'lateral' | 'failed';
+// Why a registry read answered `unknown` (#180) — the screener's own reasons,
+// with anything else as 'other'.
+export type RegistryUnknownReason =
+  | 'timeout'
+  | 'rpc_error'
+  | 'malformed'
+  | 'archived'
+  | 'no_registry'
+  | 'other';
+// How long the screening stage took, and how long the wallet had been idle
+// since the previous screening — buckets, never a raw duration.
+export type ScreenLatency = 'lt_1s' | '1s_2s' | '2s_3s' | 'gte_3s';
+export type ScreenIdle = 'first' | 'lt_30s' | '30s_2m' | 'gte_2m';
 
 // Bundled mini-app ids only (src/core/miniapps/directory.ts) — never a URL.
 // Anything not in this list is reported as 'other'.
+// Where a playground scan's transaction came from (#188). Only `pasted` and
+// `composed` are a visitor bringing their own transaction; `seeded` is one
+// click on a built-in example and never counts toward SOW §6.3's headline.
+export type DemoOrigin = 'seeded' | 'pasted' | 'composed';
+
 export type MiniAppId = 'stardust-faucet' | 'lumen-notes' | 'lantern-demo' | 'other';
 
 export type TelemetryEvent =
@@ -38,6 +58,13 @@ export type TelemetryEvent =
     }
   | { name: 'tx_scanned'; props: { risk: RiskLevel; action: ScanAction } }
   | { name: 'high_risk_gated'; props: { risk: RiskLevel } }
+  // A review whose registry screening came back `unknown` — the "Couldn't
+  // check the recipient" state (#180). Sent alongside its tx_scanned; says
+  // why, how long it took, and whether it followed an idle spell.
+  | {
+      name: 'registry_unknown';
+      props: { reason: RegistryUnknownReason; latency: ScreenLatency; idle: ScreenIdle };
+    }
   // The one-click registry report (#120) — the counter behind §6.3's registry
   // targets. The reason is the contract's closed enum; no address, no fee
   // amount, no note has a slot here.
@@ -46,6 +73,14 @@ export type TelemetryEvent =
   // down / timeout); `none` = re-checked, nothing changed. Drift frequency is
   // the number that says whether the guard earns its latency.
   | { name: 'tx_rechecked'; props: { drifted: boolean; direction: RecheckDirection } }
+  // A completed scan on the public playground (#188). Its own event rather
+  // than new props on tx_scanned: the validator requires every schema prop,
+  // so a new tx_scanned prop would make the server reject every envelope
+  // from the wallet builds already installed (the lesson of #182).
+  | {
+      name: 'demo_scanned';
+      props: { risk: RiskLevel; action: ScanAction; origin: DemoOrigin };
+    }
   // Consent lifecycle
   | { name: 'consent_granted'; props: Record<string, never> }
   | { name: 'consent_revoked'; props: Record<string, never> };
@@ -67,6 +102,11 @@ export const EVENT_SCHEMA: Record<EventName, Record<string, readonly string[] | 
   tx_signed: { kind: ['sign_and_submit', 'sign_only', 'submit_only'], ok: 'boolean' },
   tx_scanned: { risk: ['low', 'medium', 'high'], action: ['allow', 'warn', 'block_confirm'] },
   high_risk_gated: { risk: ['low', 'medium', 'high'] },
+  registry_unknown: {
+    reason: ['timeout', 'rpc_error', 'malformed', 'archived', 'no_registry', 'other'],
+    latency: ['lt_1s', '1s_2s', '2s_3s', 'gte_3s'],
+    idle: ['first', 'lt_30s', '30s_2m', 'gte_2m'],
+  },
   registry_report_submitted: {
     reason: ['Scam', 'Phishing', 'Drainer', 'Poisoning', 'Mixer', 'Other'],
     ok: 'boolean',
@@ -75,9 +115,19 @@ export const EVENT_SCHEMA: Record<EventName, Record<string, readonly string[] | 
     drifted: 'boolean',
     direction: ['none', 'escalated', 'de_escalated', 'lateral', 'failed'],
   },
+  demo_scanned: {
+    risk: ['low', 'medium', 'high'],
+    action: ['allow', 'warn', 'block_confirm'],
+    origin: ['seeded', 'pasted', 'composed'],
+  },
   consent_granted: {},
   consent_revoked: {},
 };
+
+// The events a `platform: 'demo'` envelope may carry, and the only platform
+// that may carry them. The playground sends nothing a wallet sends, and a
+// wallet can't send a playground scan.
+export const DEMO_EVENTS: ReadonlySet<EventName> = new Set<EventName>(['demo_scanned']);
 
 export interface StampedEvent {
   name: EventName;

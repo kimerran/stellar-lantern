@@ -105,12 +105,18 @@ export {
 } from './token';
 export {
   entryLedgerKey,
+  countLedgerKey,
+  indexLedgerKey,
+  decodeCount,
+  decodeIndex,
   decodeEntry,
   interpretLedgerEntries,
   createRegistryScreener,
   TESTNET_REGISTRY_ID,
   DEFAULT_SCREEN_TIMEOUT_MS,
   DEFAULT_SCREEN_TTL_MS,
+  DEFAULT_SCREEN_ATTEMPTS,
+  DEFAULT_SCREEN_RETRY_BACKOFF_MS,
   type RegistryEntry,
   type RegistryStatus,
   type ScreenAnswer,

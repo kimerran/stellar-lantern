@@ -132,6 +132,51 @@ describe('/admin login', () => {
     expect(await page.text()).toContain('Lantern</span> analytics');
   });
 
+  it('dashboard: playground scans (#188) get their own card, split by origin, and are never wallets', async () => {
+    const h = harness();
+    await h.seed();
+    const at = (d: string) => new Date(d);
+    const demo = (installId: string, origin: string, risk: string, ts: string) => ({
+      installId,
+      platform: 'demo',
+      appVersion: 'demo',
+      network: 'testnet',
+      event: 'demo_scanned',
+      props: { risk, action: risk === 'high' ? 'block_confirm' : 'allow', origin },
+      ts: at(ts),
+      account: null,
+    });
+    const L1 = '11111111-1111-4111-8111-111111111111';
+    const L2 = '22222222-2222-4222-8222-222222222222';
+    await h.store.insert(
+      [
+        demo(L1, 'pasted', 'high', '2026-09-11T10:00:00Z'),
+        demo(L1, 'seeded', 'high', '2026-09-11T10:01:00Z'),
+        demo(L2, 'composed', 'low', '2026-09-11T11:00:00Z'),
+        demo(L2, 'seeded', 'low', '2026-09-11T11:01:00Z'),
+        demo(L2, 'seeded', 'high', '2026-09-11T11:02:00Z'),
+      ],
+      at('2026-09-11T12:00:00Z'),
+    );
+    const cookie = h.cookieFrom(await h.login(TOKEN));
+    const page = await (await h.get('/admin', cookie)).text();
+    expect(page).toContain('Public playground scans');
+    expect(page).toContain(
+      '<tr><td>visitor’s own (pasted 1 · composed 1)</td><td class="n">2</td><td class="n">1</td><td class="n">0</td><td class="n">1</td></tr>',
+    );
+    expect(page).toContain(
+      '<tr><td>seeded examples</td><td class="n">3</td><td class="n">2</td><td class="n">0</td><td class="n">1</td></tr>',
+    );
+    expect(page).toContain('Only the first row counts toward §6.3');
+    // A visit that never scans sends nothing, so this is not traffic.
+    expect(page).toContain('2 page loads that scanned.');
+    // The wallet numbers are what they were: one wallet, no demo "wallets".
+    expect(page).toContain('<b>1</b><span>wallets</span>');
+    expect(page).not.toContain(L1);
+    // The platform filter offers the playground.
+    expect(page).toContain('<option value="demo"');
+  });
+
   it('rejects a forged, foreign, tampered or expired cookie, and logout clears the session', async () => {
     const h = harness();
     expect((await h.get('/admin', `${COOKIE}=${'0'.repeat(64)}`)).status).toBe(401);

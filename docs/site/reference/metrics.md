@@ -11,10 +11,14 @@ Lantern's wallet builds carry **opt-in** usage analytics (off by default; one to
 
 | Metric | Measured as |
 |---|---|
-| Transactions scanned end-to-end | Count of `tx_scanned` events across all installs in the window |
+| Transactions scanned end-to-end | Count of `tx_scanned` events across all installs in the window, **plus** demo scans (visitor-supplied) below. Never plus seeded demo scans |
+| Demo scans (visitor-supplied) | Count of `demo_scanned` events with `origin` `pasted` or `composed`: a visitor on the public playground scanned a transaction they brought themselves. Counts toward the headline above |
+| Demo scans (seeded) | Count of `demo_scanned` events with `origin` `seeded`: one click on a built-in example. Engagement only, reported separately and **never summed into the §6.3 headline**, since sixty clicks on an example would otherwise clear it |
 | Unique wallets that ran a scan | Distinct wallet addresses with at least one `tx_scanned` event in the window |
 | Transactions signed | Count of `tx_signed` events (context only; not an SOW target) |
 | Download intents | Clicks on `/download/android` and `/download/extension` — a server log, not analytics; counts a click, not a completed install (context only) |
+
+The public playground (golantern.xyz/demo) has no install and no consent screen, so it collects less than the wallet: one enum-only `demo_scanned` event per finished scan (risk, action, origin) under a random id that is new on every page load. There is no cookie and no storage, no address, amount or XDR, and never a wallet address. A demo page load is therefore not a person: it is never counted as an install or a wallet, and **unique wallets that ran a scan stays a wallet-side metric**, with nothing inferred from a pasted transaction's accounts.
 
 ## Snapshot
 

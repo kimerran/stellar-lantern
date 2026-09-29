@@ -138,7 +138,11 @@ export function recheckDepsFor(rpcUrl: string): PipelineDeps {
 // "which layer produced the sentence": 2 when the hosted explainer's prose
 // was used, 1 for the deterministic pipeline's own sentence. (Legacy used 0
 // for a heuristic low — the pipeline always did the full analysis.)
-export function toScanVerdict(result: ScanResult, latencyMs: number): ScanVerdict {
+export function toScanVerdict(
+  result: ScanResult,
+  latencyMs: number,
+  sincePreviousMs: number | null = null,
+): ScanVerdict {
   const aiSentence = __FEATURE_SCANNER_AI__ && result.explanationSource === 'explainer';
   return {
     risk: result.risk,
@@ -152,6 +156,7 @@ export function toScanVerdict(result: ScanResult, latencyMs: number): ScanVerdic
     screening: result.screen.answers.map((a) => ({ address: a.address, answer: a.answer })),
     net: result.effects.net.map((n) => ({ ...n, asset: { ...n.asset } })),
     approvals: result.effects.approvals.map((a) => ({ ...a, asset: { ...a.asset } })),
+    screenTiming: { ms: result.screen.latencyMs, sincePreviousMs },
   };
 }
 
@@ -167,6 +172,36 @@ export function usesLegacy(input: WalletScanInput): boolean {
   if (input.context.network === 'PUBLIC') return true;
   if (__FEATURE_DEMO_AFFORDANCES__ && input.context.forceScenario) return true;
   return false;
+}
+
+// When the last pipeline scan finished, for `screenTiming.sincePreviousMs`
+// (#180): a registry read that fails only after the popup sat idle points at
+// a stale connection, not at the registry. The extension popup's JS context
+// dies on every close, so the time is wall-clock (`Date.now()`) and kept in
+// localStorage across opens. A timestamp only — nothing else is stored.
+// In-memory fallback when localStorage is absent (tests) or blocked.
+const LAST_SCREEN_KEY = 'lantern.lastScreenAt';
+let lastScreenAtMemory: number | null = null;
+
+function readLastScreenAt(): number | null {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem(LAST_SCREEN_KEY);
+      return raw !== null && /^\d+$/.test(raw) ? Number(raw) : null;
+    }
+  } catch {
+    // Blocked storage: fall through to the in-memory value.
+  }
+  return lastScreenAtMemory;
+}
+
+function writeLastScreenAt(at: number): void {
+  lastScreenAtMemory = at;
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(LAST_SCREEN_KEY, String(at));
+  } catch {
+    // Blocked storage: the in-memory value still covers this popup session.
+  }
 }
 
 /**
@@ -187,6 +222,10 @@ export async function scanTx(
     return input.context.network === 'PUBLIC' ? withoutRegistry(legacy) : legacy;
   }
   const started = performance.now();
+  const previous = readLastScreenAt();
+  const now = Date.now();
+  // Missing, unparsable, or in the future (the clock moved back) → 'first'.
+  const sincePreviousMs = previous === null || now < previous ? null : now - previous;
   // No RPC (a network without Soroban and no override) → the pipeline's
   // ingest fails closed with `simulation_unavailable` for Soroban
   // transactions and the screener is absent, so every counterparty is
@@ -196,5 +235,6 @@ export async function scanTx(
     { xdr: input.xdr, networkPassphrase: input.networkPassphrase, context: input.context },
     deps,
   );
-  return toScanVerdict(result, performance.now() - started);
+  writeLastScreenAt(Date.now());
+  return toScanVerdict(result, performance.now() - started, sincePreviousMs);
 }

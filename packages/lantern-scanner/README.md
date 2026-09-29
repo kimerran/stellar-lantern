@@ -240,10 +240,14 @@ pins the derivation to the doc's worked example and to
 drift.
 
 `createRegistryScreener({ rpcUrl, contractId, timeoutMs, ttlMs, fetchImpl,
-now })` is `PipelineDeps.screen`: one read per address, bounded by a deadline
-(default 4 s), TTL-cached per address (default 60 s; in-flight lookups
-shared; `unknown` answers are not cached so a flaky RPC is retried next
-scan). `TESTNET_REGISTRY_ID` is the deployed registry.
+now, attempts, retryBackoffMs })` is `PipelineDeps.screen`: one read per
+address, bounded by a deadline (default 4 s), TTL-cached per address (default
+60 s; in-flight lookups shared; `unknown` answers are not cached so a flaky
+RPC is retried next scan). Inside that one deadline a transient failure — a
+429 / 5xx, a JSON-RPC error body, a transport error — is retried once after
+250 ms (`attempts` default 2); a non-transient 4xx, a malformed body or a read
+that hits the deadline is not, and two failures still answer `unknown`.
+`TESTNET_REGISTRY_ID` is the deployed registry.
 
 **Three outcomes, never two.** `flagged` is `status === 'Active'` only —
 Disputed and Revoked entries are readable (in `ScreenResult.answers[]`) but do

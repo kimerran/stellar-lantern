@@ -13,6 +13,8 @@ import {
   walletCreatedEvent,
   messageScannedEvent,
   txScannedEvent,
+  screenLatencyBucket,
+  screenIdleBucket,
   swapExecutedEvent,
   earnActionEvent,
   anchorFlowEvent,
@@ -141,6 +143,107 @@ describe('emit helpers build exactly the specified events', () => {
       txSignedEvent('sign_only', true),
     ];
     for (const e of all) expect(validateEvent({ ...e, ts: 1 }), e.name).toBe(true);
+  });
+});
+
+describe('registry_unknown: why "Couldn\'t check the recipient" (#180)', () => {
+  const unknown = (reason?: string) => ({
+    answer: { outcome: 'unknown', ...(reason ? { reason } : {}) },
+  });
+  const clean = { answer: { outcome: 'not_flagged' } };
+
+  it('rides along with tx_scanned when a screening answer is unknown', () => {
+    expect(
+      txScannedEvent({
+        risk: 'medium',
+        action: 'warn',
+        screening: [clean, unknown('timeout')],
+        screenTiming: { ms: 3_004, sincePreviousMs: 150_000 },
+      }),
+    ).toEqual([
+      { name: 'tx_scanned', props: { risk: 'medium', action: 'warn' } },
+      { name: 'registry_unknown', props: { reason: 'timeout', latency: 'gte_3s', idle: 'gte_2m' } },
+    ]);
+  });
+
+  it('is not sent when every answer is known, or without the pipeline timing', () => {
+    const noUnknown = txScannedEvent({
+      risk: 'low',
+      action: 'allow',
+      screening: [clean],
+      screenTiming: { ms: 300, sincePreviousMs: null },
+    });
+    expect(noUnknown.map((e) => e.name)).toEqual(['tx_scanned']);
+    const legacy = txScannedEvent({
+      risk: 'medium',
+      action: 'warn',
+      screening: [unknown('timeout')],
+    });
+    expect(legacy.map((e) => e.name)).toEqual(['tx_scanned']);
+  });
+
+  it("maps any reason outside the screener's set to other, never passing text through", () => {
+    const [, e] = txScannedEvent({
+      risk: 'medium',
+      action: 'warn',
+      screening: [unknown(`fetch failed: ${ADDRESS}`)],
+      screenTiming: { ms: 10, sincePreviousMs: 1 },
+    });
+    expect(e).toEqual({
+      name: 'registry_unknown',
+      props: { reason: 'other', latency: 'lt_1s', idle: 'lt_30s' },
+    });
+    expect(JSON.stringify(e)).not.toContain(ADDRESS);
+    const [, noReason] = txScannedEvent({
+      risk: 'medium',
+      action: 'warn',
+      screening: [unknown()],
+      screenTiming: { ms: 10, sincePreviousMs: null },
+    });
+    expect(noReason!.props).toMatchObject({ reason: 'other', idle: 'first' });
+  });
+
+  it('buckets latency and idle time at the edges', () => {
+    expect([0, 999, 1_000, 1_999, 2_000, 2_999, 3_000].map(screenLatencyBucket)).toEqual([
+      'lt_1s',
+      'lt_1s',
+      '1s_2s',
+      '1s_2s',
+      '2s_3s',
+      '2s_3s',
+      'gte_3s',
+    ]);
+    expect([null, 0, 29_999, 30_000, 119_999, 120_000].map(screenIdleBucket)).toEqual([
+      'first',
+      'lt_30s',
+      'lt_30s',
+      '30s_2m',
+      '30s_2m',
+      'gte_2m',
+    ]);
+  });
+
+  it('every reason and bucket passes the runtime validator, and a bad value does not', () => {
+    for (const reason of ['timeout', 'rpc_error', 'malformed', 'archived', 'no_registry', 'other'])
+      for (const latency of ['lt_1s', '1s_2s', '2s_3s', 'gte_3s'])
+        for (const idle of ['first', 'lt_30s', '30s_2m', 'gte_2m'])
+          expect(
+            validateEvent({ name: 'registry_unknown', props: { reason, latency, idle }, ts: 1 }),
+          ).toBe(true);
+    expect(
+      validateEvent({
+        name: 'registry_unknown',
+        props: { reason: 'timeout', latency: '3004', idle: 'first' },
+        ts: 1,
+      }),
+    ).toBe(false);
+    expect(
+      validateEvent({
+        name: 'registry_unknown',
+        props: { reason: 'timeout', latency: 'lt_1s' },
+        ts: 1,
+      }),
+    ).toBe(false);
   });
 });
 

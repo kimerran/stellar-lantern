@@ -9,6 +9,7 @@ import { healthRoute } from './routes/health';
 import { telemetryRoutes } from './routes/telemetry';
 import { adminRoutes } from './routes/admin';
 import { downloadRoutes } from './routes/download';
+import { joinRoutes } from './routes/join';
 import { createReleaseResolver, type ReleaseResolver } from './downloads/releases';
 import type { DownloadStore } from './downloads/store';
 import type { TelemetryStore } from './telemetry/store';
@@ -106,6 +107,17 @@ export function createApp(opts: AppOptions): Hono {
     ...(opts.now ? { now: opts.now } : {}),
   });
   app.use('/download/*', downloadLimiter.middleware);
+  // /join (#162) is the same kind of click, so it shares that limiter.
+  app.use('/join', downloadLimiter.middleware);
+  app.route(
+    '/',
+    joinRoutes({
+      url: env.alphaJoinUrl,
+      store: downloads,
+      ...(opts.nowDate ? { now: opts.nowDate } : {}),
+      log,
+    }),
+  );
   app.route(
     '/',
     downloadRoutes({

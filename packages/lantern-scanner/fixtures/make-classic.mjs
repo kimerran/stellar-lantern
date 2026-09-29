@@ -37,6 +37,9 @@ const build = (add) =>
     .toXDR();
 
 const FLAGGED = 'GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ';
+// A key the source account does not hold: the "attacker" in the signer-takeover
+// case (#185). A random testnet address, fixed here so the fixture is stable.
+const ATTACKER = 'GDO52IAZJBNVS4LLJTUSCHLKME52X3JJ5N5UHAIWPUAAFG253Z62YL7Q';
 
 const cases = {
   'classic-payment-to-flagged': {
@@ -89,6 +92,18 @@ const cases = {
   'classic-account-merge': {
     description: 'accountMerge: the entire XLM balance leaves and the source account closes.',
     xdr: build((b) => b.addOperation(Operation.accountMerge({ destination: DEST }))),
+  },
+  'classic-signer-takeover': {
+    description:
+      'setOptions that adds ATTACKER as a signer at weight 255 (meets any threshold) and sets the master key weight to 0: the account now answers to a key its owner does not hold. How Stellar accounts actually get drained. Must score high with account_control_change (#185).',
+    xdr: build((b) =>
+      b.addOperation(
+        Operation.setOptions({
+          signer: { ed25519PublicKey: ATTACKER, weight: 255 },
+          masterWeight: 0,
+        }),
+      ),
+    ),
   },
   'classic-multi-op': {
     description:

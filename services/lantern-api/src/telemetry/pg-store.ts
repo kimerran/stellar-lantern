@@ -3,7 +3,7 @@
 
 import pg from 'pg';
 import type { ExportQuery, NewRow, TelemetryRow, TelemetryStore } from './store';
-import type { DownloadRow, DownloadStore, DownloadTarget, UaFamily } from '../downloads/store';
+import type { DownloadRow, DownloadStore, LogTarget, UaFamily } from '../downloads/store';
 
 export const MIGRATION = `
 CREATE TABLE IF NOT EXISTS telemetry_events (
@@ -24,6 +24,8 @@ CREATE INDEX IF NOT EXISTS telemetry_events_received   ON telemetry_events (rece
 
 // The download log (#131) is its own table, never joined to the consented
 // telemetry rows: the two have different privacy bases (downloads/store.ts).
+// /join clicks (#162) land here too as target 'alpha' — target is plain TEXT
+// with no CHECK, so no migration was needed.
 export const DOWNLOADS_MIGRATION = `
 CREATE TABLE IF NOT EXISTS downloads (
   id         BIGSERIAL PRIMARY KEY,
@@ -48,7 +50,7 @@ interface DownloadDbRow {
 }
 const toDownload = (r: DownloadDbRow): DownloadRow => ({
   id: Number(r.id),
-  target: r.target as DownloadTarget,
+  target: r.target as LogTarget,
   version: r.version,
   src: r.src,
   country: r.country,

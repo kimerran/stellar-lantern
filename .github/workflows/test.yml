@@ -50,6 +50,13 @@ jobs:
       - name: Evidence site is up to date
         run: npm run docs:build -- --check
 
+      # The D4 public playground (homepage/demo, golantern.xyz/demo/) is built
+      # from src/demo by scripts/build-demo.mjs and committed, like /docs.
+      # Rebuild and fail on any difference, on a bundle that doesn't carry
+      # @lantern/scanner, or on a third-party font/CDN or retired-domain URL.
+      - name: Demo playground is up to date
+        run: npm run build:demo -- --check
+
       # Flag dead-code-elimination proof (#81 / #88): builds with the demo
       # and telemetry flags on and off and asserts the telemetry module and
       # the ingest origin are ABSENT from a flag-off bundle.

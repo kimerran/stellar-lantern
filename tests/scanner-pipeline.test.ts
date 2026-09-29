@@ -88,6 +88,7 @@ const CORPUS = [
   'classic-payment-to-flagged',
   'classic-two-recipients-flagged',
   'classic-flagged-memo-injection',
+  'classic-signer-takeover',
   'deep-auth',
   'path-payment',
   'sac-transfer',
@@ -121,6 +122,20 @@ describe('fixture corpus', () => {
       if (soroban.includes(name)) expect(f.simulation).not.toBeNull();
       else expect(f.simulation).toBeNull();
     }
+  });
+});
+
+// The playground's signer-takeover example (#185): no simulation, no
+// registry — the verdict alone must call it high.
+describe('signer takeover fixture', () => {
+  it('scores high with account_control_change, offline', async () => {
+    const result = await runPipeline(requestFor(fixture('classic-signer-takeover')));
+    expect(result.risk).toBe('high');
+    expect(result.action).toBe('block_confirm');
+    expect(result.reasons.map((r) => r.code)).toContain('account_control_change');
+    expect(result.reasons.find((r) => r.code === 'account_control_change')?.title).toBe(
+      'Gives up account control',
+    );
   });
 });
 

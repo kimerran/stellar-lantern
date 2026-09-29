@@ -4,8 +4,15 @@
 // shared report module's palette and escaping so the pages match the emailed
 // report (src/core/telemetry/report.ts).
 
-import { esc, CSS, type Row, type UserTrail } from '@lantern/telemetry-report';
-import type { DownloadRow } from '../downloads/store';
+import {
+  esc,
+  CSS,
+  summarizeDemo,
+  type DemoSummary,
+  type Row,
+  type UserTrail,
+} from '@lantern/telemetry-report';
+import { isJoin, type DownloadRow, type DownloadTarget } from '../downloads/store';
 
 // ── Model ────────────────────────────────────────────────────────────────────
 
@@ -54,6 +61,9 @@ export interface Dashboard {
   byEvent: Array<{ event: string; count: number; wallets: number }>;
   verdicts: Record<string, number>; // tx_scanned by risk
   daily: Daily[];
+  // The public playground (#188), split by where the transaction came from.
+  // Its rows carry no wallet, so none of the numbers above include them.
+  demo: DemoSummary;
 }
 
 const truncate = (a: string): string => `${a.slice(0, 4)}…${a.slice(-4)}`;
@@ -203,6 +213,7 @@ export function buildDashboard(allRows: Row[], since: string, until: string): Da
       .sort((a, b) => b.count - a.count || a.event.localeCompare(b.event)),
     verdicts,
     daily: dailySeries(rows, since, until),
+    demo: summarizeDemo(allRows),
   };
 }
 
@@ -227,11 +238,13 @@ export interface Downloads {
 }
 
 export function buildDownloads(
-  downloads: DownloadRow[],
+  log: DownloadRow[],
   rows: Row[],
   since: string,
   until: string,
 ): Downloads {
+  // /join clicks (#162) share the log but are not download intents.
+  const downloads = log.filter((d) => !isJoin(d));
   const byTarget: Record<string, number> = {};
   const byUa: Record<string, number> = {};
   const src = new Map<string, number>();
@@ -246,7 +259,7 @@ export function buildDownloads(
     const label = d.src || '(none)';
     src.set(label, (src.get(label) ?? 0) + 1);
     const day = days.get(d.ts.toISOString().slice(0, 10));
-    if (day) day[d.target] += 1;
+    if (day) day[d.target as DownloadTarget] += 1;
   }
   const scanned = new Set<string>();
   for (const r of rows) if (r.event === 'tx_scanned' && r.account) scanned.add(r.account);
@@ -289,6 +302,47 @@ export function renderDownloadsCard(d: Downloads, qs: string): string {
   return `<div class="card"><h2>Download intents</h2><p class="note">${targets}${ua ? ' · ' + ua : ''}</p>
 <div class="grid2"><div>${funnel}</div><div>${bySrc}</div></div>
 <div class="actions"><a href="/admin/downloads.csv?${esc(qs)}">Download CSV</a></div></div>`;
+}
+
+// ── Alpha group joins (#162) ─────────────────────────────────────────────────
+//
+// Clicks on /join, the redirect to the testers' WhatsApp group. Same log,
+// same privacy basis as the download clicks, but a different step: a join is
+// never counted as a download intent, so it gets its own card and its own
+// src breakdown. A click is not a confirmed membership — WhatsApp cannot tell
+// us that.
+
+export interface Joins {
+  total: number;
+  bySrc: Array<{ src: string; count: number }>;
+}
+
+export function buildJoins(log: DownloadRow[]): Joins {
+  const src = new Map<string, number>();
+  let total = 0;
+  for (const d of log) {
+    if (!isJoin(d)) continue;
+    total += 1;
+    const label = d.src || '(none)';
+    src.set(label, (src.get(label) ?? 0) + 1);
+  }
+  return {
+    total,
+    bySrc: [...src.entries()]
+      .map(([s, count]) => ({ src: s, count }))
+      .sort((a, b) => b.count - a.count || a.src.localeCompare(b.src)),
+  };
+}
+
+export function renderJoinsCard(j: Joins): string {
+  const bySrc = j.bySrc.length
+    ? `<table><tr><th>src</th><th class="n">joins</th></tr>${j.bySrc
+        .map((s) => `<tr><td><code>${esc(s.src)}</code></td><td class="n">${n(s.count)}</td></tr>`)
+        .join('')}</table>`
+    : '<p class="note">no alpha group clicks in this window</p>';
+  return `<div class="card"><h2>Alpha group joins</h2><p class="note"><span class="pill">group clicks: ${n(j.total)}</span></p>
+${bySrc}
+<p class="note">Clicks on /join, the redirect to the testers' WhatsApp group. A click is not a confirmed membership, and it is not counted as a download intent. Rows are in the downloads CSV with target <code>alpha</code>.</p></div>`;
 }
 
 // The rows of one identity, as the trail the report already renders.
@@ -410,6 +464,12 @@ export function renderDashboard(
         .map((k) => `<tr><td>${esc(k)}</td><td class="n">${n(d.verdicts[k]!)}</td></tr>`)
         .join('')}</table>`
     : '<p class="note">no transaction scans yet</p>';
+  const risks = (o: Record<string, number>) =>
+    ['high', 'medium', 'low'].map((k) => `<td class="n">${n(o[k] ?? 0)}</td>`).join('');
+  const demo =
+    d.demo.pageLoads === 0
+      ? '<p class="note">no playground scans in this window</p>'
+      : `<table><tr><th>origin</th><th class="n">scans</th><th class="n">high</th><th class="n">medium</th><th class="n">low</th></tr><tr><td>visitor’s own (pasted ${n(d.demo.byOrigin.pasted ?? 0)} · composed ${n(d.demo.byOrigin.composed ?? 0)})</td><td class="n">${n(d.demo.visitor)}</td>${risks(d.demo.byRisk.visitor)}</tr><tr><td>seeded examples</td><td class="n">${n(d.demo.seeded)}</td>${risks(d.demo.byRisk.seeded)}</tr></table><p class="note">${n(d.demo.pageLoads)} page loads that scanned. Only the first row counts toward §6.3; example clicks are never added to it.</p>`;
   const body = `<h1><span>Lantern</span> analytics</h1><p class="meta">${esc(opts.window)}</p>
 ${tabs('dashboard', opts.qs)}
 ${opts.toolbar}
@@ -417,6 +477,7 @@ ${d.events === 0 ? '<div class="empty">No activity in this window yet.</div>' : 
 ${top}
 <div class="card"><h2>Daily activity</h2>${dailyChart(d.daily)}</div>
 <div class="grid2"><div class="card"><h2>Events</h2>${events}</div><div class="card"><h2>Transaction scans by risk</h2>${verdicts}</div></div>
+<div class="card"><h2>Public playground scans</h2>${demo}</div>
 ${opts.downloads ?? ''}
 <div class="actions"><a class="primary" href="/admin/wallets${opts.qs ? '?' + esc(opts.qs) : ''}">Wallets →</a><a href="/admin/export.csv?${esc(opts.qs)}">Download CSV</a><a href="/admin/export.json?${esc(opts.qs)}">Download JSON</a></div>`;
   return pageShell('Lantern analytics', body);
