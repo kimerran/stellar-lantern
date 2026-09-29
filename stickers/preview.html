@@ -1,0 +1,70 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lantern sticker pack — preview</title>
+<style>
+  /* Stickers are drawn at a common physical scale (--in = one inch), so the
+     relative sizes on screen match the printed pack. */
+  :root { --in: 128px; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: #1c2233; background: #f4f5f8; }
+  header { padding: 28px 32px 8px; }
+  h1 { margin: 0 0 4px; font-size: 22px; }
+  header p { margin: 0; color: #4a5366; max-width: 70ch; }
+  section { padding: 28px 32px 36px; }
+  section h2 { margin: 0 0 18px; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; }
+  .light { background: #eceef3; }
+  .dark { background: #15171c; color: #e6e8ee; }
+  .sheet { display: flex; flex-wrap: wrap; gap: 30px 34px; align-items: flex-end; }
+  figure { margin: 0; text-align: center; }
+  figure img { display: block; margin: 0 auto; filter: drop-shadow(0 2px 3px rgba(0,0,0,.18)); }
+  .dark figure img { filter: drop-shadow(0 2px 4px rgba(0,0,0,.6)); }
+  figcaption { margin-top: 8px; font-size: 12.5px; line-height: 1.35; }
+  figcaption b { display: block; }
+  figcaption span { opacity: .7; }
+  @media (max-width: 640px) { :root { --in: 96px; } header, section { padding-left: 16px; padding-right: 16px; } }
+</style>
+
+<header>
+  <h1>Lantern sticker pack</h1>
+  <p>Eight stickers from one system — Night Navy plate, 6 mm corner radius, amber keyline, 3 mm white die-cut border, the traced lantern mark, Inter + Roboto Mono.
+     Shown at a common physical scale, on light and dark backgrounds, to check that they read as one pack.</p>
+</header>
+
+<section class="light">
+  <h2>On a light surface</h2>
+  <div class="sheet" id="light"></div>
+</section>
+<section class="dark">
+  <h2>On a dark surface</h2>
+  <div class="sheet" id="dark"></div>
+</section>
+
+<script>
+  // [file, title, width in, height in]
+  const STICKERS = [
+    ["01-logo", "01 · Logo", 1.77, 2.95],
+    ["02-name", "02 · Name", 3.50, 1.50],
+    ["03-lockup", "03 · Logo + name", 3.50, 1.50],
+    ["04-tagline", "04 · Tagline", 3.00, 3.00],
+    ["05-on-stellar", "05 · Lantern on Stellar", 3.00, 3.00],
+    ["06-website", "06 · Website", 4.00, 1.50],
+    ["07-meme", "07 · Meme", 3.00, 3.00],
+    ["08-built-with-soroban", "08 · Built with Soroban", 1.73, 1.89],
+  ];
+  for (const id of ["light", "dark"]) {
+    const sheet = document.getElementById(id);
+    for (const [file, title, w, h] of STICKERS) {
+      const fig = document.createElement("figure");
+      const img = new Image();
+      img.src = `${file}.png`;
+      img.alt = title;
+      img.style.width = `calc(${w} * var(--in))`;
+      img.style.height = `calc(${h} * var(--in))`;
+      const cap = document.createElement("figcaption");
+      cap.innerHTML = `<b>${title}</b><span>${w.toFixed(2)} × ${h.toFixed(2)} in</span>`;
+      fig.append(img, cap);
+      sheet.append(fig);
+    }
+  }
+</script>
