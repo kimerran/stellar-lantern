@@ -3,7 +3,16 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Keypair, Transaction, TransactionBuilder } from '@stellar/stellar-sdk';
 import { createRegistryScreener, TESTNET_REGISTRY_ID, type PipelineDeps, type ScreenAnswer } from '@lantern/scanner';
-import { composePayment, preparePasted, runDemoScan, screeningRows, DEMO_NETWORK } from '../src/demo/scan';
+import {
+  composePayment,
+  createDemoDeps,
+  preparePasted,
+  runDemoScan,
+  screeningRows,
+  DEMO_EXPLAIN_URL,
+  DEMO_NETWORK,
+} from '../src/demo/scan';
+import hotRead from '../packages/lantern-scanner/fixtures/registry-hot-read.json';
 import { ScanResultView } from '../src/demo/ScanPanel';
 import flagged from '../packages/lantern-scanner/fixtures/classic-payment-to-flagged.json';
 import clean from '../packages/lantern-scanner/fixtures/classic-payment.json';
@@ -192,4 +201,48 @@ describe('screeningRows', () => {
       expect(row?.label).toBe('Not checked — unverified');
     },
   );
+});
+
+describe('the playground’s live dependencies (#184)', () => {
+  // A stubbed network: the registry answers from the recording, and the
+  // explainer proxy answers `explain`.
+  function stub(explain: () => Response) {
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const impl = (async (url: string, init?: { body?: string }) => {
+      const body = init?.body ? (JSON.parse(init.body) as Record<string, unknown>) : {};
+      calls.push({ url, body });
+      if (url === DEMO_EXPLAIN_URL) return explain();
+      const keys = (body.params as { keys: string[] }).keys;
+      const entries = hotRead.response.result.entries.filter((e) => keys.includes(e.key));
+      const latestLedger = hotRead.response.result.latestLedger;
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { entries, latestLedger } }));
+    }) as unknown as typeof fetch;
+    return { impl, calls };
+  }
+  const input = { xdr: flagged.xdr, source: flagged.source };
+  const says = (explanation: string) => () => new Response(JSON.stringify({ explanation }));
+
+  it('asks the Lantern API’s explainer, and labels its sentence as the AI’s', async () => {
+    const net = stub(says('You are about to pay a reported scammer.'));
+    const out = await runDemoScan(input, createDemoDeps(net.impl));
+    if (!out.ok) throw new Error(out.error);
+    expect(out.scan.summarySource).toBe('explainer');
+    expect(out.scan.result.explanation).toBe('You are about to pay a reported scammer.');
+    expect(out.scan.result.risk).toBe('high');
+    // The proxy gets the frozen verdict and effects: nothing else, no key.
+    const asked = net.calls.find((c) => c.url === DEMO_EXPLAIN_URL);
+    expect(Object.keys(asked!.body).sort()).toEqual(['effects', 'verdict']);
+  });
+
+  it('when the demo budget is spent (429), the rules-based sentence is labelled and the verdict is unchanged', async () => {
+    const ok = await runDemoScan(input, createDemoDeps(stub(says('An AI sentence.')).impl));
+    const spent = () => new Response(JSON.stringify({ error: 'daily_cap' }), { status: 429 });
+    const capped = await runDemoScan(input, createDemoDeps(stub(spent).impl));
+    if (!ok.ok || !capped.ok) throw new Error('scan failed');
+    expect(capped.scan.summarySource).toBe('fallback');
+    expect(capped.scan.result.risk).toBe(ok.scan.result.risk);
+    expect(capped.scan.result.action).toBe(ok.scan.result.action);
+    const html = renderToStaticMarkup(createElement(ScanResultView, { scan: capped.scan }));
+    expect(html).toContain('rules-based (no AI)');
+  });
 });

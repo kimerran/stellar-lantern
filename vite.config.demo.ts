@@ -22,7 +22,11 @@ export default defineConfig({
   define: flagDefines({}),
   plugins: [
     react(),
-    nodePolyfills({ globals: { Buffer: true, global: true, process: true } }),
+    // No `crypto` polyfill: nothing in the playground uses it, and tweetnacl
+    // (xBull's connector, #187) has a Node-only require('crypto') fallback
+    // that would otherwise pull ~740 KB of crypto-browserify into its chunk.
+    // The browser path uses window.crypto.getRandomValues.
+    nodePolyfills({ globals: { Buffer: true, global: true, process: true }, exclude: ['crypto'] }),
   ],
   // No public/ copy: the wallet's public dir carries extension icons and
   // mini-apps. The self-hosted fonts (#128) are pulled in through the alias

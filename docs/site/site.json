@@ -27,6 +27,7 @@
       "pages": [
         { "path": "reference/scanner", "title": "Scanner package", "file": "reference/scanner.md" },
         { "path": "reference/registry", "title": "Registry contract", "file": "reference/registry.md" },
+        { "path": "reference/verify", "title": "Verify it yourself", "file": "reference/verify.md" },
         { "path": "reference/metrics", "title": "Metrics", "file": "reference/metrics.md" },
         { "path": "reference/evidence", "title": "Evidence index", "file": "reference/evidence.md" },
         { "path": "reference/changelog", "title": "Full changelog", "file": "reference/changelog.md" }

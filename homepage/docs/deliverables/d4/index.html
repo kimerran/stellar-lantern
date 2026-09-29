@@ -21,13 +21,16 @@
       </div>
     </header>
     <div class="docs-layout">
-      <nav class="side" aria-label="Pages"><ul><li><a href="/docs/">Overview</a></li><li><a href="/docs/sow/">Statement of Work</a></li><li class="group"><span>Weekly reports</span><ul><li><a href="/docs/weekly/week-1/">Week 1 — 7–13 Sep</a></li><li><a href="/docs/weekly/week-2/">Week 2 — 14–20 Sep</a></li><li><a href="/docs/weekly/week-3/">Week 3 — 21–27 Sep</a></li><li><a href="/docs/weekly/week-4/">Week 4 — 28 Sep – 4 Oct</a></li></ul></li><li class="group"><span>Deliverables</span><ul><li><a href="/docs/deliverables/d1/">D1 — On-chain blacklist registry</a></li><li><a href="/docs/deliverables/d2/">D2 — Transaction security scanner</a></li><li><a href="/docs/deliverables/d3/">D3 — Scanner in the wallet</a></li><li class="on"><a href="/docs/deliverables/d4/">D4 — Public demo</a></li></ul></li><li class="group"><span>Reference</span><ul><li><a href="/docs/reference/scanner/">Scanner package</a></li><li><a href="/docs/reference/registry/">Registry contract</a></li><li><a href="/docs/reference/metrics/">Metrics</a></li><li><a href="/docs/reference/evidence/">Evidence index</a></li><li><a href="/docs/reference/changelog/">Full changelog</a></li></ul></li></ul></nav>
+      <nav class="side" aria-label="Pages"><ul><li><a href="/docs/">Overview</a></li><li><a href="/docs/sow/">Statement of Work</a></li><li class="group"><span>Weekly reports</span><ul><li><a href="/docs/weekly/week-1/">Week 1 — 7–13 Sep</a></li><li><a href="/docs/weekly/week-2/">Week 2 — 14–20 Sep</a></li><li><a href="/docs/weekly/week-3/">Week 3 — 21–27 Sep</a></li><li><a href="/docs/weekly/week-4/">Week 4 — 28 Sep – 4 Oct</a></li></ul></li><li class="group"><span>Deliverables</span><ul><li><a href="/docs/deliverables/d1/">D1 — On-chain blacklist registry</a></li><li><a href="/docs/deliverables/d2/">D2 — Transaction security scanner</a></li><li><a href="/docs/deliverables/d3/">D3 — Scanner in the wallet</a></li><li class="on"><a href="/docs/deliverables/d4/">D4 — Public demo</a></li></ul></li><li class="group"><span>Reference</span><ul><li><a href="/docs/reference/scanner/">Scanner package</a></li><li><a href="/docs/reference/registry/">Registry contract</a></li><li><a href="/docs/reference/verify/">Verify it yourself</a></li><li><a href="/docs/reference/metrics/">Metrics</a></li><li><a href="/docs/reference/evidence/">Evidence index</a></li><li><a href="/docs/reference/changelog/">Full changelog</a></li></ul></li></ul></nav>
       <main class="docs-main">
         <p class="crumbs"><a href="/docs/">Lantern — Instawards Phase 1</a> <span class="sep">/</span> <span>Deliverables</span> <span class="sep">/</span> <span>D4 — Public demo</span></p>
         <article class="prose">
 <h1>D4 — Public demo</h1>
-<p><strong>Statement of Work:</strong> Deliverable 4 · <strong>Target:</strong> Week 4 (28 Sep – 4 Oct) · <strong>Status:</strong> Planned</p>
-<p>A public playground where a visitor with no wallet and no key can paste a transaction and see the scanner's structured effects, verdict and sentence — the surface that puts Lantern in front of strangers, and the second route to the §6.3 metrics.</p>
+<p><strong>Statement of Work:</strong> Deliverable 4 · <strong>Target:</strong> Week 4 (28 Sep – 4 Oct) · <strong>Status:</strong> Playground live. Walkthrough video, the two transaction hashes and the launch cross-posts pending</p>
+<blockquote>
+<p><em>&quot;A public testnet demo playground where anyone, including a non-technical reviewer, can paste or compose a transaction and see Lantern's summary, verdict, and blacklist screening live (with a pre-seeded malicious example caught on camera), plus a 3-minute walkthrough video and a launch post cross-posted to the ecosystem.&quot;</em> — SOW §4.1</p>
+</blockquote>
+<p>The scanner from Deliverable 2, in a web page anyone can open: no wallet, no install, no key. It is the surface that puts Lantern in front of strangers, and the second route to the §6.3 scan metric.</p>
 <h2>Evidence</h2>
 <div class="table"><table><thead>
 <tr>
@@ -39,14 +42,51 @@
 </thead>
 <tbody>
 <tr>
-<td>To be confirmed against the SOW text</td>
-<td>—</td>
-<td>—</td>
+<td>The public demo URL</td>
+<td><a href="https://golantern.xyz/demo/" target="_blank" rel="noopener">golantern.xyz/demo</a></td>
+<td>Paste or compose a testnet transaction and see its effects, verdict, summary and registry screening; six seeded examples with an offline fallback; the live registry; reporting an address with your own wallet</td>
+<td>Live</td>
+</tr>
+<tr>
+<td>On-chain testnet transaction hash for a <strong>report</strong></td>
+<td><em>TODO: link</em></td>
+<td>A report filed from the public playground, on stellar.expert, against the live registry</td>
 <td>Pending</td>
+</tr>
+<tr>
+<td>On-chain testnet transaction hash for a <strong>status update</strong></td>
+<td><em>TODO: link</em></td>
+<td>An admin <code>set_status</code> (for example Active → Disputed) on the live registry, and the playground no longer warning on that entry</td>
+<td>Pending</td>
+</tr>
+<tr>
+<td>3-minute captioned walkthrough</td>
+<td><em>TODO: link</em></td>
+<td>Open the demo → scan a safe transaction → scan a malicious one that is flagged → report the address → re-scan shows it flagged, recorded against the public URL</td>
+<td>Pending</td>
+</tr>
+<tr>
+<td>Launch post, in the repository and cross-posted to at least three channels</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/blob/main/docs/launch/lantern-instawards-launch.md" target="_blank" rel="noopener"><code>docs/launch/lantern-instawards-launch.md</code></a></td>
+<td>The post, and the cross-post URLs at its foot</td>
+<td>Draft in the repository; cross-posts pending</td>
+</tr>
+<tr>
+<td>QA sweep by a non-team reviewer</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/blob/main/docs/qa/d4-playground-test-plan.md" target="_blank" rel="noopener"><code>docs/qa/d4-playground-test-plan.md</code></a></td>
+<td>An eleven-section plan runnable from the public URL alone, with five hard-blocker cases and an empty results table for an independent reviewer</td>
+<td>Plan written; sweep not yet run</td>
 </tr>
 </tbody>
 </table></div><h2>What a user can do when this is done</h2>
-<p>To be written when the deliverable ships.</p>
+<p>Anyone can open <a href="https://golantern.xyz/demo/" target="_blank" rel="noopener">golantern.xyz/demo</a> on a phone or a laptop and:</p>
+<ul>
+<li><strong>Paste</strong> any Stellar testnet transaction, or <strong>compose</strong> a payment from two addresses and an amount, and see what it would move, to whom, the risk verdict, one plain-language sentence, and whether each counterparty is in the scam registry. Nothing asks for a key, and nothing is signed or submitted.</li>
+<li><strong>Run six built-in examples</strong>, including a payment to a reported scammer that is caught every time. Each runs live first. When the network can't be reached it replays a recorded copy and says <em>Using cached simulation</em>.</li>
+<li><strong>Browse the registry</strong>: every reported address, its reason, status, report count and reporter, read straight from the ledger with no account.</li>
+<li><strong>Report an address</strong>, signed by their own Stellar wallet (Albedo works in the browser with nothing to install). Lantern scans the report transaction first, like any other, and the address reads as reported straight afterwards.</li>
+</ul>
+<p>A registry answer that can't be read shows as <em>Not checked — unverified</em>, never as clean.</p>
 <h2>Traceability</h2>
 <div class="table"><table><thead>
 <tr>
@@ -58,16 +98,76 @@
 </thead>
 <tbody>
 <tr>
-<td>To be listed from the SOW text</td>
-<td>—</td>
-<td>—</td>
-<td>Planned</td>
+<td>A public testnet playground, reachable by anyone</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/4cea229" target="_blank" rel="noopener"><code>4cea229</code></a> — a static page built from the same scanner package the wallet imports, committed with a build check that fails on any drift, a missing scanner, or a third-party font or CDN</td>
+<td><a href="https://golantern.xyz/demo/" target="_blank" rel="noopener">golantern.xyz/demo</a></td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>Paste <strong>or</strong> compose a transaction, and see the summary, verdict and blacklist screening live</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/6dcbc56" target="_blank" rel="noopener"><code>6dcbc56</code></a> — the wallet's six-stage pipeline against live testnet; an unreachable registry never reads as clean</td>
+<td>The live page; the offline test suite</td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>A pre-seeded malicious example, caught on demand</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/6d913c8" target="_blank" rel="noopener"><code>6d913c8</code></a>, <a href="https://github.com/kimerran/stellar-lantern/commit/c8ed5f3" target="_blank" rel="noopener"><code>c8ed5f3</code></a> — six examples from the scanner's recorded fixtures, including a new signer-takeover case; live first, with a labelled offline fallback</td>
+<td>Example 2 reads high risk, <em>Reported in the scam registry</em>, live and offline</td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>Blacklist screening, and the registry in use</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/0f4619b" target="_blank" rel="noopener"><code>0f4619b</code></a> — the live registry panel, read from ledger entries with no account</td>
+<td>The panel: addresses reported and reports filed</td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>Report an address from the demo</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/737e71e" target="_blank" rel="noopener"><code>737e71e</code></a>, <a href="https://github.com/kimerran/stellar-lantern/commit/fa4f595" target="_blank" rel="noopener"><code>fa4f595</code></a> — signed by the visitor's own wallet; scanned first; only the scanned transaction can be submitted</td>
+<td>The report transaction hash (above)</td>
+<td>Built; first live report pending</td>
+</tr>
+<tr>
+<td>Summary written by the hosted model, on its own budget</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/5f78bd3" target="_blank" rel="noopener"><code>5f78bd3</code></a>, <a href="https://github.com/kimerran/stellar-lantern/commit/2e4b036" target="_blank" rel="noopener"><code>2e4b036</code></a> — the playground's explain calls count against their own daily cap; the privacy policy discloses what they send</td>
+<td>A summary labelled <em>written by Lantern's AI explainer</em> on the live page</td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>§6.3 — demo scans counted honestly</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/a99b49b" target="_blank" rel="noopener"><code>a99b49b</code></a> — one enum-only event per finished scan; scans of a visitor's own transaction counted apart from example clicks</td>
+<td><a href="/docs/reference/metrics/">Metrics</a></td>
+<td>Evidenced</td>
+</tr>
+<tr>
+<td>QA sweep with a non-team reviewer</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/ba27ec5" target="_blank" rel="noopener"><code>ba27ec5</code></a> — the manual test plan</td>
+<td>The results table, once the sweep is run</td>
+<td>Plan written</td>
+</tr>
+<tr>
+<td>Launch post</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/commit/2a5287f" target="_blank" rel="noopener"><code>2a5287f</code></a> — the draft, with the video and final numbers left as marked placeholders</td>
+<td>The published post and its cross-posts</td>
+<td>Draft</td>
 </tr>
 </tbody>
 </table></div><h2>Scope notes</h2>
-<p>None yet.</p>
+<ul>
+<li><strong>Testnet only.</strong> The playground has no network switch. Mainnet has no registry, so a mainnet scan could only say &quot;not checked&quot; for every counterparty.</li>
+<li><strong>Nothing is signed except a report</strong>, and a report is signed by the visitor's own wallet. A web page cannot reach the Lantern extension, so the playground uses the visitor's Stellar wallet rather than a bridge into ours, which would be exactly the surface wallet phishing attacks.</li>
+<li><strong>Our own contract gets no shortcut.</strong> The report transaction is scanned like any other before the wallet sees it, and it reads <em>Caution</em> (a contract Lantern treats as unverified). That is the rule working, not a bug.</li>
+<li><strong>Example clicks are never counted as scans.</strong> One click on a built-in example is reported separately and never added to §6.3's &quot;transactions scanned end-to-end&quot;. Otherwise sixty clicks would clear the target.</li>
+<li><strong>Privacy.</strong> No cookie and nothing stored in the browser; the analytics event carries no address, amount or transaction. The plain-language summary does send the scan's effects to our server and on to the AI provider, unstored, and the <a href="https://golantern.xyz/privacy-policy.html" target="_blank" rel="noopener">privacy policy</a> says so.</li>
+</ul>
 <h2>Implementation choices</h2>
-<p>None yet.</p>
+<ul>
+<li><strong>One scanner, two surfaces.</strong> The page imports the same package the wallet does, and the build check fails if the scan pipeline isn't in the bundle, so &quot;the same scanner&quot; is checked on the output, not asserted.</li>
+<li><strong>A committed, drift-checked build.</strong> The homepage is a static site, so the playground's build output is committed and the test lane rebuilds it and fails on any difference, the same arrangement as this evidence site.</li>
+<li><strong>Recorded fixtures as the offline fallback.</strong> The examples replay the scanner test suite's own recorded testnet responses, so the demo survives a slow or reset testnet and the recording is reproducible on any day.</li>
+<li><strong>The registry panel reads ledger entries.</strong> <code>count()</code> and <code>list()</code> need a simulated transaction and a source account; a visitor has none. The panel reads the contract's instance, index and entries directly: three requests for the whole registry, not one per entry.</li>
+<li><strong>Wallet code loads on demand.</strong> The four wallet connectors are fetched only when a visitor opens the wallet list, so the page's first load is unchanged.</li>
+</ul>
 
         </article>
         <footer class="docs-foot">

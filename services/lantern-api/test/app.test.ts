@@ -337,6 +337,38 @@ describe('limits', () => {
     expect((await post(app, INPUT, { 'X-Forwarded-For': '10.0.0.9' })).status).toBe(200);
   });
 
+  it('the playground (#184) has its own daily cap: it can never use up the wallet’s', async () => {
+    const DEMO = 'https://demo.lantern.invalid';
+    const app = createApp({
+      env: env({ DAILY_CAP: '3', DEMO_ORIGINS: DEMO, DEMO_DAILY_CAP: '2' }),
+      fetchImpl: modelSays('ok'),
+    });
+    const demo = (i: number) =>
+      post(app, INPUT, { Origin: DEMO, 'X-Forwarded-For': `10.1.0.${i}` });
+    const wallet = (i: number) => post(app, INPUT, { 'X-Forwarded-For': `10.2.0.${i}` });
+    // The playground fills its own cap…
+    expect((await demo(1)).status).toBe(200);
+    expect((await demo(2)).status).toBe(200);
+    const capped = await demo(3);
+    expect(capped.status).toBe(429);
+    expect(await capped.json()).toEqual({ error: 'daily_cap' });
+    // …and the wallet still has its whole budget.
+    for (let i = 0; i < 3; i += 1) expect((await wallet(i)).status).toBe(200);
+    expect((await wallet(9)).status).toBe(429);
+    const health = await json(await app.request('/healthz'));
+    expect(health.today).toBe(3);
+    expect(health.demoToday).toBe(2);
+  });
+
+  it('the demo origin defaults to golantern.xyz and the demo cap to 500', () => {
+    const e = readEnv({ ANTHROPIC_API_KEY: 'k' });
+    expect(e.demoOrigins).toEqual(['https://golantern.xyz']);
+    expect(e.demoDailyCap).toBe(500);
+    expect(() => readEnv({ ANTHROPIC_API_KEY: 'k', DEMO_DAILY_CAP: '0' })).toThrow(
+      /DEMO_DAILY_CAP/,
+    );
+  });
+
   it('a rate-limited request does not spend the daily cap or reach upstream', async () => {
     let calls = 0;
     const fetchImpl: typeof fetch = async () => {

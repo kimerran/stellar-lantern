@@ -1,6 +1,6 @@
 {
   "name": "lantern-stellar-wallet",
-  "version": "0.4.0",
+  "version": "0.4.2",
   "description": "Lantern — a non-custodial Stellar browser-extension wallet (MV3).",
   "private": true,
   "license": "MIT",
@@ -33,6 +33,7 @@
     "@capacitor/preferences": "^8.0.1",
     "@capacitor/status-bar": "^8.0.2",
     "@capgo/capacitor-native-biometric": "^8.0.0",
+    "@creit.tech/stellar-wallets-kit": "2.7.0",
     "@noble/hashes": "1.8.0",
     "@stellar/stellar-sdk": "16.0.1",
     "bip39": "3.1.0",

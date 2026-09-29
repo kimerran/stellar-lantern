@@ -23,6 +23,7 @@
 
 - [Scanner package](https://golantern.xyz/docs/reference/scanner.md)
 - [Registry contract](https://golantern.xyz/docs/reference/registry.md)
+- [Verify it yourself](https://golantern.xyz/docs/reference/verify.md)
 - [Metrics](https://golantern.xyz/docs/reference/metrics.md)
 - [Evidence index](https://golantern.xyz/docs/reference/evidence.md)
 - [Full changelog](https://golantern.xyz/docs/reference/changelog.md)

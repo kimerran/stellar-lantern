@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Verify it yourself — Lantern — Instawards Phase 1</title>
+    <meta name="description" content="Evidence site for Lantern's Stellar Development Foundation Instawards sprint: weekly reports, deliverable traceability, and an index of every on-chain and off-chain artifact." />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/docs/docs.css" />
+  </head>
+  <body class="docs">
+    <header class="docs-top">
+      <div class="docs-top-inner">
+        <a class="brand" href="/docs/"><img src="/logo.jpg" alt="Lantern logo" /><span>Lantern</span><em>Instawards evidence</em></a>
+        <a class="md-link" href="/docs/reference/verify.md" title="This page as markdown">view as markdown</a>
+      </div>
+    </header>
+    <div class="docs-layout">
+      <nav class="side" aria-label="Pages"><ul><li><a href="/docs/">Overview</a></li><li><a href="/docs/sow/">Statement of Work</a></li><li class="group"><span>Weekly reports</span><ul><li><a href="/docs/weekly/week-1/">Week 1 — 7–13 Sep</a></li><li><a href="/docs/weekly/week-2/">Week 2 — 14–20 Sep</a></li><li><a href="/docs/weekly/week-3/">Week 3 — 21–27 Sep</a></li><li><a href="/docs/weekly/week-4/">Week 4 — 28 Sep – 4 Oct</a></li></ul></li><li class="group"><span>Deliverables</span><ul><li><a href="/docs/deliverables/d1/">D1 — On-chain blacklist registry</a></li><li><a href="/docs/deliverables/d2/">D2 — Transaction security scanner</a></li><li><a href="/docs/deliverables/d3/">D3 — Scanner in the wallet</a></li><li><a href="/docs/deliverables/d4/">D4 — Public demo</a></li></ul></li><li class="group"><span>Reference</span><ul><li><a href="/docs/reference/scanner/">Scanner package</a></li><li><a href="/docs/reference/registry/">Registry contract</a></li><li class="on"><a href="/docs/reference/verify/">Verify it yourself</a></li><li><a href="/docs/reference/metrics/">Metrics</a></li><li><a href="/docs/reference/evidence/">Evidence index</a></li><li><a href="/docs/reference/changelog/">Full changelog</a></li></ul></li></ul></nav>
+      <main class="docs-main">
+        <p class="crumbs"><a href="/docs/">Lantern — Instawards Phase 1</a> <span class="sep">/</span> <span>Reference</span> <span class="sep">/</span> <span>Verify it yourself</span></p>
+        <article class="prose">
+<h1>Verify it yourself</h1>
+<p>A reviewer packet: how someone outside the team can check two things without trusting us.</p>
+<ol>
+<li><strong>The registry contract running on testnet is built from the public source.</strong></li>
+<li><strong>A wallet build you downloaded is the one we published.</strong></li>
+</ol>
+<p>Both come down to comparing SHA-256 hashes. Each takes about ten minutes. When you're done, please send us what you got (the section at the end says what).</p>
+<h2>1. The registry contract's bytecode</h2>
+<p>The claim: the contract at <a href="https://stellar.expert/explorer/testnet/contract/CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F" target="_blank" rel="noopener"><code>CBJWD6SA…G623F</code></a> runs WASM whose SHA-256 is</p>
+<pre><code>40fd37718c3fbc7f849c4d414364cdd86c01b4db9ab86be9099007ba5be23783
+</code></pre>
+<p>This is the hash <a href="https://github.com/kimerran/stellar-lantern#testnet-smart-contracts" target="_blank" rel="noopener">the README publishes</a>, and a build of the public source produces the same bytes.</p>
+<h3>What you need</h3>
+<ul>
+<li><code>git</code> and <code>sha256sum</code> (on macOS, <code>shasum -a 256</code> does the same).</li>
+<li><strong>Rust via <a href="https://rustup.rs" target="_blank" rel="noopener">rustup</a>.</strong> The repository pins the compiler in <code>contracts/rust-toolchain.toml</code> (Rust <strong>1.95.0</strong>, target <code>wasm32v1-none</code>), and rustup installs exactly that version the first time you build. A different compiler can produce different bytes, which is why it's pinned.</li>
+<li><strong>The Stellar CLI, version 26.0.0</strong>, the one the project's CI builds with: <a href="https://github.com/stellar/stellar-cli/releases/tag/v26.0.0" target="_blank" rel="noopener">stellar-cli v26.0.0 releases</a>. Check with <code>stellar --version</code>.</li>
+</ul>
+<h3>Build it from the tagged source</h3>
+<pre><code class="language-bash">git clone --depth 1 --branch v0.2.0-testnet.13 https://github.com/kimerran/stellar-lantern.git
+cd stellar-lantern/contracts/blacklist-registry
+stellar contract build
+sha256sum target/wasm32v1-none/release/blacklist_registry.wasm
+</code></pre>
+<p><strong>Expected:</strong> <code>40fd37718c3fbc7f849c4d414364cdd86c01b4db9ab86be9099007ba5be23783</code></p>
+<p>The contract's source is unchanged from this tag to the current <code>main</code>, so a clone of <code>main</code> gives the same hash.</p>
+<h3>Fetch what's actually deployed, and compare</h3>
+<pre><code class="language-bash">stellar contract fetch --id CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F \
+  --network testnet --out-file deployed.wasm
+sha256sum deployed.wasm
+</code></pre>
+<p><strong>Expected:</strong> the same hash. This downloads the bytecode from the Stellar testnet itself, not from us. As a third check, the <a href="https://stellar.expert/explorer/testnet/contract/CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F" target="_blank" rel="noopener">contract's page on stellar.expert</a> shows the WASM hash it runs.</p>
+<h3>What a match proves</h3>
+<p>Your build of the public source, the bytes on the ledger, and the README all agree. So the contract anyone can call is this source code, and nothing else.</p>
+<h2>2. A wallet build you downloaded</h2>
+<p>Wallet builds are served through <code>https://lantern-api-production-3fad.up.railway.app/download/…</code>, and each release publishes a <code>SHA256SUMS.txt</code> beside them.</p>
+<pre><code class="language-bash"># The build (Chrome extension shown; use /download/android for the APK):
+curl -sLOJ https://lantern-api-production-3fad.up.railway.app/download/extension
+# The checksums for the same release:
+curl -sL https://lantern-api-production-3fad.up.railway.app/download/checksums -o SHA256SUMS.txt
+sha256sum --check --ignore-missing SHA256SUMS.txt
+</code></pre>
+<p><strong>Expected:</strong> your file's name followed by <code>OK</code>, for example <code>lantern-extension-0.2.0.zip: OK</code>. Anything else, <code>FAILED</code> or no line at all, means don't install it, and tell us.</p>
+<h2>Send us your result</h2>
+<p>For the evidence record, send the Lantern team (hello@artisam.xyz):</p>
+<ul>
+<li>the three hashes from section 1: your build, <code>deployed.wasm</code>, and what stellar.expert shows;</li>
+<li>your <code>stellar --version</code> and <code>rustc --version</code>, and your operating system;</li>
+<li>for section 2, the <code>sha256sum --check</code> line.</li>
+</ul>
+<p>If anything doesn't match, that's exactly what this page is for. Please send it too.</p>
+
+        </article>
+        <footer class="docs-foot">
+          <p>Unlisted evidence site for the Stellar Development Foundation Instawards programme. Not indexed; no links from the landing page. Machine-readable index: <a href="/docs/llms.txt">llms.txt</a>.</p>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

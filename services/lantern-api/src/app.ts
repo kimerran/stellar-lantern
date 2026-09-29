@@ -40,6 +40,14 @@ export function createApp(opts: AppOptions): Hono {
     dailyCap: env.dailyCap,
     ...(opts.now ? { now: opts.now } : {}),
   });
+  // The playground's own explain budget (#184). The wallet keeps `limiter`
+  // and its DAILY_CAP whatever the playground does.
+  const demoLimiter = createRateLimiter({
+    perMinute: env.rateLimitPerMin,
+    dailyCap: env.demoDailyCap,
+    ...(opts.now ? { now: opts.now } : {}),
+  });
+  const demoOrigins = new Set(env.demoOrigins);
   const store = opts.store ?? null;
   const downloads = opts.downloads ?? null;
   const telemetryLimiter = createRateLimiter({
@@ -50,8 +58,11 @@ export function createApp(opts: AppOptions): Hono {
   const app = new Hono();
   app.route(
     '/',
-    healthRoute(env.model, limiter.dailyCount, () =>
-      store ? store.ping() : Promise.resolve(null),
+    healthRoute(
+      env.model,
+      limiter.dailyCount,
+      () => (store ? store.ping() : Promise.resolve(null)),
+      demoLimiter.dailyCount,
     ),
   );
   // A browser page (the D4 playground) preflights with OPTIONS; the MV3
@@ -72,7 +83,14 @@ export function createApp(opts: AppOptions): Hono {
   // the export is admin-only and skips the per-IP window.
   app.use('/v1/telemetry', telemetryLimiter.middleware);
   app.use('/v1/telemetry/install', telemetryLimiter.middleware);
-  app.use('/v1/explain', limiter.middleware);
+  // A request whose Origin is the playground's spends the demo budget. The
+  // header is forgeable outside a browser, but that only moves spend onto
+  // the smaller demo cap, never off it.
+  app.use('/v1/explain', (c, next) =>
+    demoOrigins.has(c.req.header('origin') ?? '')
+      ? demoLimiter.middleware(c, next)
+      : limiter.middleware(c, next),
+  );
   app.use('/v1/*', bodyLimit());
   app.route(
     '/',

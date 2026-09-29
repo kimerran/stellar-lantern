@@ -11,6 +11,7 @@ import {
   type RegistryRead,
   type Row,
 } from './registry';
+import { REGISTRY_CHANGED } from './report';
 
 const EXPLORER = 'https://stellar.expert/explorer/testnet';
 // A registry subject or reporter is a Soroban Address: an account (G…) or a
@@ -192,6 +193,14 @@ export function RegistryPanel() {
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  // A report filed from the playground (#187) reloads the panel once, so the
+  // new entry and the count show without a page reload. Not a poll.
+  useEffect(() => {
+    const onChange = () => void load();
+    addEventListener(REGISTRY_CHANGED, onChange);
+    return () => removeEventListener(REGISTRY_CHANGED, onChange);
   }, [load]);
 
   return (

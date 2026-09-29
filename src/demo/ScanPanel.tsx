@@ -14,6 +14,7 @@ import {
   type DemoScan,
   type ScreeningTone,
 } from './scan';
+import { reportSubject } from './report';
 import { demoTelemetry } from './telemetry';
 
 type Mode = 'paste' | 'compose';
@@ -220,7 +221,15 @@ export function ScanResultView({ scan }: { scan: DemoScan }) {
                   {short(r.address)}
                 </span>{' '}
                 <span className={`font-semibold ${TONE[r.tone]}`}>{r.label}</span>
-                {r.detail && <span className="text-on-surface-variant"> — {r.detail}</span>}
+                {r.detail && <span className="text-on-surface-variant"> — {r.detail}</span>}{' '}
+                <button
+                  type="button"
+                  onClick={() => reportSubject(r.address)}
+                  className="text-xs text-primary underline"
+                  aria-label={`Report ${r.address}`}
+                >
+                  Report
+                </button>
               </li>
             ))}
           </ul>

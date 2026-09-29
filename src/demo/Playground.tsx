@@ -8,6 +8,7 @@ import { TESTNET_REGISTRY_ID } from '@lantern/scanner';
 import { DEMO_NETWORK } from './scan';
 import { Examples } from './Examples';
 import { RegistryPanel } from './RegistryPanel';
+import { ReportPanel } from './ReportPanel';
 import { ScanPanel } from './ScanPanel';
 
 const REGISTRY_URL = `https://stellar.expert/explorer/testnet/contract/${TESTNET_REGISTRY_ID}`;
@@ -61,6 +62,9 @@ export function Playground() {
             <Region id="examples" title="Try an example">
               <Examples />
             </Region>
+            <Region id="report" title="Report an address">
+              <ReportPanel />
+            </Region>
           </div>
           <Region id="registry" title="Scam registry">
             <RegistryPanel />
@@ -71,8 +75,8 @@ export function Playground() {
       <footer className="border-t border-outline-variant">
         <div className="mx-auto flex max-w-5xl flex-col gap-1 px-4 py-4 text-xs text-on-surface-variant sm:flex-row sm:justify-between">
           <span>
-            Lantern · Stellar {DEMO_NETWORK.id.toLowerCase()} · Each finished scan sends one anonymous count (risk,
-            action, and pasted / composed / example). No transaction, address or amount, no cookie, nothing stored.{' '}
+            Lantern · Stellar {DEMO_NETWORK.id.toLowerCase()} · Anonymous scan counts, no cookies. Summaries: the scan’s
+            effects go to Lantern’s AI explainer.{' '}
             <a href="/privacy-policy.html" className="underline hover:text-on-surface">
               Privacy
             </a>

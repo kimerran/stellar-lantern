@@ -12,6 +12,7 @@ import {
   createRpcSimulator,
   createRpcTokenResolver,
   createTokenMetadataCache,
+  createHostedExplainer,
   TESTNET_REGISTRY_ID,
   type PipelineDeps,
   type ScanResult,
@@ -28,18 +29,42 @@ const SIMULATE_TIMEOUT_MS = 3_500;
 const SCREEN_TIMEOUT_MS = 3_000;
 const HORIZON_TIMEOUT_MS = 5_000;
 
+// The Lantern API's explainer proxy: the model key stays server-side. Its
+// requests from this page's origin spend their own daily budget (#184), so
+// public traffic can never use up the wallet's. Fixed here, like the
+// telemetry ingest, so the committed bundle doesn't depend on the build env.
+export const DEMO_EXPLAIN_URL = 'https://lantern-api-production-3fad.up.railway.app/v1/explain';
+// Same deadline as the wallet (src/core/scan/wallet.ts EXPLAIN_TIMEOUT_MS).
+const EXPLAIN_TIMEOUT_MS = 3_000;
+
 let liveDeps: PipelineDeps | null = null;
 
-/** The live testnet dependencies, built once per page so the screener's and
- *  the token resolver's caches survive between scans. No explainer yet: the
- *  hosted one waits on the lantern-api origin allow-list (#184). */
-export function demoDeps(): PipelineDeps {
-  liveDeps ??= {
-    simulate: createRpcSimulator({ rpcUrl: RPC_URL, timeoutMs: SIMULATE_TIMEOUT_MS, attempts: 2 }),
-    screen: createRegistryScreener({ rpcUrl: RPC_URL, contractId: TESTNET_REGISTRY_ID, timeoutMs: SCREEN_TIMEOUT_MS }),
-    resolveToken: createTokenMetadataCache(createRpcTokenResolver({ rpcUrl: RPC_URL })),
+/** The live testnet dependencies. `fetchImpl` is a test seam; the page uses
+ *  `demoDeps()`, which builds these once so the caches survive between scans. */
+export function createDemoDeps(fetchImpl?: typeof fetch): PipelineDeps {
+  const f = fetchImpl ? { fetchImpl } : {};
+  return {
+    simulate: createRpcSimulator({ rpcUrl: RPC_URL, timeoutMs: SIMULATE_TIMEOUT_MS, attempts: 2, ...f }),
+    screen: createRegistryScreener({ rpcUrl: RPC_URL, contractId: TESTNET_REGISTRY_ID, timeoutMs: SCREEN_TIMEOUT_MS, ...f }),
+    resolveToken: createTokenMetadataCache(createRpcTokenResolver({ rpcUrl: RPC_URL, ...f })),
+    // The hosted explainer writes the sentence and nothing else: the verdict
+    // is frozen before it runs, and any failure is the labelled rules-based
+    // sentence with the same verdict.
+    explain: createHostedExplainer({ mode: 'proxy', apiKey: '', endpoint: DEMO_EXPLAIN_URL, timeoutMs: EXPLAIN_TIMEOUT_MS, ...f }),
+    explainTimeoutMs: EXPLAIN_TIMEOUT_MS,
   };
+}
+
+export function demoDeps(): PipelineDeps {
+  liveDeps ??= createDemoDeps();
   return liveDeps;
+}
+
+/** Forget the page's cached answers. The screener keeps a not-flagged answer
+ *  for 60 s, so after a report lands the next scan must re-read the registry,
+ *  or scanning the same payment again would still say "not in the registry". */
+export function resetDemoScreening(): void {
+  liveDeps = null;
 }
 
 // ── Input ────────────────────────────────────────────────────────────────────

@@ -7,6 +7,11 @@ export interface Env {
   allowedOrigins: string[]; // empty = allow all (dev only)
   rateLimitPerMin: number;
   dailyCap: number;
+  // The public playground (#184): explain calls from these origins count
+  // against their own daily cap, so public traffic can never use up the
+  // wallet's `dailyCap`. Not an allowlist; ALLOWED_ORIGINS still gates.
+  demoOrigins: string[];
+  demoDailyCap: number;
   upstreamTimeoutMs: number;
   port: number;
   // Telemetry ingest (#85). Both optional: without a DATABASE_URL the
@@ -70,6 +75,11 @@ export function readEnv(source: Record<string, string | undefined> = process.env
       .filter(Boolean),
     rateLimitPerMin: int('RATE_LIMIT_PER_MIN', source.RATE_LIMIT_PER_MIN, 10),
     dailyCap: int('DAILY_CAP', source.DAILY_CAP, 2000),
+    demoOrigins: (source.DEMO_ORIGINS ?? 'https://golantern.xyz')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+    demoDailyCap: int('DEMO_DAILY_CAP', source.DEMO_DAILY_CAP, 500),
     upstreamTimeoutMs: int('UPSTREAM_TIMEOUT_MS', source.UPSTREAM_TIMEOUT_MS, 4000),
     port: int('PORT', source.PORT, 8080),
     ...(source.DATABASE_URL ? { databaseUrl: source.DATABASE_URL } : {}),
