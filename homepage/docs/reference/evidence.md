@@ -20,6 +20,8 @@ Every contract id, hash, address, transaction, recording, deck, document and CI 
 | Sandbox report transaction | Transaction | [`eda0d8e042773a1a83a6c7d955829b3fe0aca9654cf41b5435fcda1b99a852aa`](https://stellar.expert/explorer/testnet/tx/eda0d8e042773a1a83a6c7d955829b3fe0aca9654cf41b5435fcda1b99a852aa) | Week 1 |
 | Sandbox `set_status(Disputed)` transaction | Transaction | [`ae57d1890c5ef6198e08e9723d063b1186889bef4b20286c826deb984b9130b8`](https://stellar.expert/explorer/testnet/tx/ae57d1890c5ef6198e08e9723d063b1186889bef4b20286c826deb984b9130b8) | Week 1 |
 | USDC SAC used by the scanner fixtures | Contract | [`CAQCFVLOBK5GIULPNZRGATJJMIZL5BSP7X5YJVMGCPTUEPFM4AVSRCJU`](https://stellar.expert/explorer/testnet/contract/CAQCFVLOBK5GIULPNZRGATJJMIZL5BSP7X5YJVMGCPTUEPFM4AVSRCJU) | Week 2 |
+| Report transaction filed from the public playground (published deployment) | Transaction | *TODO: link — filed during the D4 walkthrough* | Week 4 |
+| `set_status` transaction on the published deployment | Transaction | *TODO: link — needs the admin key* | Week 4 |
 
 ## Code and releases
 
@@ -34,6 +36,10 @@ Every contract id, hash, address, transaction, recording, deck, document and CI 
 | Contracts CI lane | CI | [contracts.yml](https://github.com/kimerran/stellar-lantern/actions/workflows/contracts.yml) | Week 1 |
 | Tests CI lane (offline suite, build, flag proof) | CI | [test.yml](https://github.com/kimerran/stellar-lantern/actions/workflows/test.yml) | Week 1 |
 | Services CI lane (Lantern API) | CI | [services.yml](https://github.com/kimerran/stellar-lantern/actions/workflows/services.yml) | Week 2 |
+| Wallet builds with checksums (Chrome extension zip, Android APK) | Release · Service | [`/download/extension`](https://lantern-api-production-3fad.up.railway.app/download/extension) · [`/download/android`](https://lantern-api-production-3fad.up.railway.app/download/android) · [`/download/checksums`](https://lantern-api-production-3fad.up.railway.app/download/checksums) — currently serving 0.2.0; the switch to the current builds is pending | Week 3 |
+| D3 and D4 releases to `main` (0.3.0 and 0.4.0) | Release | [Release: D3 wallet hardening and the D4 playground](https://github.com/kimerran/stellar-lantern/pull/157) | Week 4 |
+| Playground releases to `main` (0.4.1 and 0.4.2) | Release | [Release: report from the playground, AI summaries, D4 evidence pages](https://github.com/kimerran/stellar-lantern/pull/158) | Week 4 |
+| Public playground | Live URL · Code | [golantern.xyz/demo](https://golantern.xyz/demo/) · source in [`src/demo/`](https://github.com/kimerran/stellar-lantern/tree/main/src/demo) | Week 4 |
 
 ## Documents, plans and decks
 
@@ -45,10 +51,17 @@ Every contract id, hash, address, transaction, recording, deck, document and CI 
 | Analytics disclosure | Document | [`docs/telemetry.md`](https://github.com/kimerran/stellar-lantern/blob/develop/docs/telemetry.md) | Week 2 |
 | Dated delivery log | Document | [`docs/features.md`](https://github.com/kimerran/stellar-lantern/blob/main/docs/features.md) | — |
 | D2 manual test plan + results table | QA | [`docs/qa/d2-transaction-scanner-test-plan.md`](https://github.com/kimerran/stellar-lantern/blob/develop/docs/qa/d2-transaction-scanner-test-plan.md) | Week 2 |
+| D3 manual test plan + results table | QA | [`docs/qa/d3-wallet-integration-test-plan.md`](https://github.com/kimerran/stellar-lantern/blob/main/docs/qa/d3-wallet-integration-test-plan.md) | Week 3 |
+| D4 manual test plan + results table, for a reviewer outside the team | QA | [`docs/qa/d4-playground-test-plan.md`](https://github.com/kimerran/stellar-lantern/blob/main/docs/qa/d4-playground-test-plan.md) | Week 4 |
+| Reviewer packet: rebuild the registry from source and match its hash; verify a download | Page | [Verify it yourself](/docs/reference/verify/) | Week 4 |
+| D4 walkthrough runbook, shot list and script | Document | [`docs/evidence/d4/walkthrough.md`](https://github.com/kimerran/stellar-lantern/blob/main/docs/evidence/d4/walkthrough.md) | Week 4 |
+| Launch post | Document | [`docs/launch/lantern-instawards-launch.md`](https://github.com/kimerran/stellar-lantern/blob/main/docs/launch/lantern-instawards-launch.md) — draft; cross-post URLs *TODO* | Week 4 |
 | D1 QA sign-off | QA | *TODO: link* | Week 1 |
 | D1 evidence decks (Proof of Deliverables; Technical Documentation & Demo Evidence) | Deck | *TODO: link* | Week 1 |
 | D2 evidence decks + raw captures per slide | Deck | [`docs/evidence/d2/`](https://github.com/kimerran/stellar-lantern/tree/develop/docs/evidence/d2) | Week 2 |
 | D1 recording — registry end to end (1:40) | Recording | *TODO: link* | Week 1 |
 | D1 recording — captioned terminal capture (1:07) | Recording | *TODO: link* | Week 1 |
 | D2 recording (90–120 s) | Recording | *TODO: link — not yet recorded* | Week 2 |
+| D3 recording (connect → pre-sign review → one-click report) | Recording | *TODO: link — not yet recorded* | Week 3 |
+| D4 walkthrough (3 min, captioned) | Recording | *TODO: link — not yet recorded* | Week 4 |
 | Analytics dashboard (admin, token-protected) | Dashboard | `https://lantern-api-production-3fad.up.railway.app/admin` — reviewers receive snapshots on the [Metrics](/docs/reference/metrics/) page rather than a login | Week 2 |

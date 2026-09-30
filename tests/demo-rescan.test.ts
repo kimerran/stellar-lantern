@@ -5,8 +5,9 @@ import flagged from '../packages/lantern-scanner/fixtures/classic-payment-to-fla
 
 // After a report, scanning the same payment again must read the registry
 // afresh (#187, the walkthrough's "re-scan shows it flagged"). The page's
-// screener caches a not-flagged answer for 60 s, so without a reset a re-scan
-// within a minute would still say "Not in the scam registry".
+// screener used to cache a not-flagged answer for 60 s; it now has no cache at
+// all (D4 QA F-D4-1), so a re-scan sees a new entry straight away, and
+// resetDemoScreening() (still called after a report) is merely harmless.
 
 describe('re-scanning after a report', () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -39,7 +40,8 @@ describe('re-scanning after a report', () => {
 
     expect(await outcome()).toEqual(['not_flagged']);
     reported = true; // the visitor's report is now on the ledger
-    expect(await outcome()).toEqual(['not_flagged']); // cached: the bug scene 5 would hit
+    // No cache: the very next scan sees the new entry, reset or not.
+    expect(await outcome()).toEqual(['flagged']);
     resetDemoScreening(); // what the report panel does on success
     expect(await outcome()).toEqual(['flagged']);
   });

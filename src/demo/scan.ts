@@ -45,7 +45,11 @@ export function createDemoDeps(fetchImpl?: typeof fetch): PipelineDeps {
   const f = fetchImpl ? { fetchImpl } : {};
   return {
     simulate: createRpcSimulator({ rpcUrl: RPC_URL, timeoutMs: SIMULATE_TIMEOUT_MS, attempts: 2, ...f }),
-    screen: createRegistryScreener({ rpcUrl: RPC_URL, contractId: TESTNET_REGISTRY_ID, timeoutMs: SCREEN_TIMEOUT_MS, ...f }),
+    // No answer cache (ttlMs 0): every scan reads the registry. A remembered
+    // answer let an offline scan read clean and an offline example claim a
+    // live answer (D4 QA F-D4-1, F-D4-2), and hid a report filed elsewhere
+    // for up to a minute. The wallet keeps its cache; this page scans rarely.
+    screen: createRegistryScreener({ rpcUrl: RPC_URL, contractId: TESTNET_REGISTRY_ID, timeoutMs: SCREEN_TIMEOUT_MS, ttlMs: 0, ...f }),
     resolveToken: createTokenMetadataCache(createRpcTokenResolver({ rpcUrl: RPC_URL, ...f })),
     // The hosted explainer writes the sentence and nothing else: the verdict
     // is frozen before it runs, and any failure is the labelled rules-based
