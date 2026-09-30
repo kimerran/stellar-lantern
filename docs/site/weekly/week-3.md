@@ -34,7 +34,7 @@ Deliverable 3 shipped: the D2 scanner now runs in the Lantern wallet's review be
 | The scanner in the wallet's pre-sign review: summary, verdict and registry screening | D3 | Evidenced | [D3 page](/docs/deliverables/d3/) |
 | A one-click report to the on-chain registry | D3 | Evidenced | Report transactions in the [registry's history](https://stellar.expert/explorer/testnet/contract/CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F) |
 | §3.9 — re-check immediately before submit | D3 | Evidenced | [D3 page](/docs/deliverables/d3/) |
-| §6.1 — installable wallet build | D3 | Built and published; public links still serve 0.2.0 | [`/download/checksums`](https://lantern-api-production-3fad.up.railway.app/download/checksums) |
+| §6.1 — installable wallet build | D3 | Built and published; the website's download links caught up on 30 September (0.4.3) | [`/download/checksums`](https://lantern-api-production-3fad.up.railway.app/download/checksums) |
 | §6.1 — screen recording | D3 | Pending | — |
 | §6.1 — QA sign-off | D3 | Executed; two defects open; not signed off | [D3 test plan](https://github.com/kimerran/stellar-lantern/blob/main/docs/qa/d3-wallet-integration-test-plan.md) |
 

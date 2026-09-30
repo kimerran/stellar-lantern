@@ -10,7 +10,11 @@ import { flagDefines } from './vite.flags';
 // each other (e.g. a loaded unpacked extension stays intact across build:mobile).
 export default defineConfig(({ mode }) => ({
   // Same feature-flag defines as vite.config.ts, via the shared helper (no drift).
-  define: flagDefines(loadEnv(mode, process.cwd(), 'VITE_FEATURE_')),
+  define: {
+    ...flagDefines(loadEnv(mode, process.cwd(), 'VITE_FEATURE_')),
+    // The Android build: native-only imports (the QR scanner, #226) are kept.
+    __NATIVE_BUILD__: 'true',
+  },
   plugins: [
     react(),
     nodePolyfills({ globals: { Buffer: true, global: true, process: true } }),

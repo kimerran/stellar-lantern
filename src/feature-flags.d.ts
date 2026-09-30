@@ -14,3 +14,7 @@ declare const __FEATURE_PASSKEY__: boolean;
 declare const __FEATURE_SCANNER_AI__: boolean;
 declare const __FEATURE_TELEMETRY__: boolean;
 declare const __FEATURE_TELEMETRY_IDENTITY__: boolean;
+
+// True only in the Android build (vite.config.mobile.ts). Guards native-only
+// imports so the extension bundle doesn't carry them (#226).
+declare const __NATIVE_BUILD__: boolean;

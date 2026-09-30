@@ -11,7 +11,12 @@ import { flagDefines } from './vite.flags';
 export default defineConfig(({ mode }) => ({
   // Build-time feature flags (#81): inline `__FEATURE_*__` so disabled features
   // dead-code-eliminate. Same helper as vite.config.mobile.ts (no drift).
-  define: flagDefines(loadEnv(mode, process.cwd(), 'VITE_FEATURE_')),
+  define: {
+    ...flagDefines(loadEnv(mode, process.cwd(), 'VITE_FEATURE_')),
+    // Not the Android build: native-only imports (the QR scanner, #226)
+    // dead-code-eliminate. vite.config.mobile.ts sets it true.
+    __NATIVE_BUILD__: 'false',
+  },
   plugins: [
     react(),
     nodePolyfills({ globals: { Buffer: true, global: true, process: true } }),

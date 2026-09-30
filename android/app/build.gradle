@@ -62,7 +62,18 @@ repositories {
     }
 }
 
+// The QR scanner (#226) uses Google's code scanner, which runs in Play
+// services. The plugin also links ML Kit's *bundled* barcode model for its
+// live-camera mode, which we don't use: ~20 MB of native libraries
+// (libbarhopper for four ABIs) plus a TFLite model. Swap it for the
+// *unbundled* artifact: the same com.google.mlkit.vision.barcode API, with the
+// model delivered by Play services instead of shipped in the APK.
+configurations.all {
+    exclude group: 'com.google.mlkit', module: 'barcode-scanning'
+}
+
 dependencies {
+    implementation 'com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1'
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"

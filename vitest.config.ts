@@ -9,6 +9,8 @@ export default defineConfig({
   // exercised (the build defaults decide what actually ships).
   define: {
     ...allFlagDefinesOn(),
+    // Tests run as the web build; the native scanner is never loaded (#226).
+    __NATIVE_BUILD__: 'false',
     // Live-network opt-in (#53 e2e): resolved HERE because the node-polyfills
     // plugin shims `process`/`node:process` inside test files, hiding real env.
     __LANTERN_LIVE_E2E__: JSON.stringify(process.env.LANTERN_LIVE_E2E === '1'),

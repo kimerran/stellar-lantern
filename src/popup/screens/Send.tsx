@@ -9,6 +9,8 @@ import { buildTransferXdr, computeMaxXlm, memoByteLength, type AssetRef } from '
 import { fetchHistory, recentRecipients } from '@core/history/history';
 import { isValidPublicKey } from '@core/wallet/wallet';
 import { isNativePlatform } from '@shared/kv';
+import { scanQrCode } from '@core/qr/scan';
+import { parseScannedRecipient } from '@core/qr/recipient';
 import { MAX_MEMO_BYTES } from '@shared/constants';
 import { formatAmount, truncateAddress } from '@shared/format';
 import { scanTx, type WalletScanInput } from '@core/scan/wallet';
@@ -51,6 +53,8 @@ export function Send({ address, network, onDone }: Props) {
   const [assetKey, setAssetKey] = useState('XLM');
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
+  // What the last QR scan couldn't fill, or why it failed (#226).
+  const [qrNote, setQrNote] = useState<string | null>(null);
 
   const [building, setBuilding] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -398,6 +402,25 @@ export function Send({ address, network, onDone }: Props) {
     );
   }
 
+  // Scan a QR code into the form (#226, Android). It only fills fields; the
+  // payment still goes through the full review and scan. An amount is filled
+  // only when the request is for XLM, so the asset is set to match it.
+  async function scanRecipient() {
+    setQrNote(null);
+    const result = await scanQrCode();
+    if (result.kind === 'cancelled') return;
+    if (result.kind === 'unavailable') return setQrNote(result.error);
+    const parsed = parseScannedRecipient(result.raw);
+    if (!parsed.ok) return setQrNote(parsed.error);
+    setTo(parsed.destination);
+    if (parsed.amount) {
+      setAssetKey('XLM');
+      setAmount(parsed.amount);
+    }
+    if (parsed.memo) setMemo(parsed.memo);
+    if (parsed.note) setQrNote(parsed.note);
+  }
+
   // ── Form ──
   return (
     <div className="space-y-4 pt-2">
@@ -417,15 +440,32 @@ export function Send({ address, network, onDone }: Props) {
               onChange={(e) => setTo(e.target.value)}
             />
           </div>
-          <button
-            aria-label="Scan QR code (coming soon)"
-            title="Scan QR (coming soon)"
-            disabled
-            className="mb-0.5 flex h-12 w-12 items-center justify-center rounded-lg border border-outline-variant text-outline opacity-50"
-          >
-            <Icon name="qr_code_scanner" size={22} />
-          </button>
+          {__NATIVE_BUILD__ && isNativePlatform() ? (
+            <button
+              type="button"
+              aria-label="Scan a QR code"
+              title="Scan a QR code"
+              onClick={() => void scanRecipient()}
+              className="mb-0.5 flex h-12 w-12 items-center justify-center rounded-lg border border-outline-variant text-on-surface"
+            >
+              <Icon name="qr_code_scanner" size={22} />
+            </button>
+          ) : (
+            <button
+              aria-label="Scan QR code (coming soon)"
+              title="Scan QR (coming soon)"
+              disabled
+              className="mb-0.5 flex h-12 w-12 items-center justify-center rounded-lg border border-outline-variant text-outline opacity-50"
+            >
+              <Icon name="qr_code_scanner" size={22} />
+            </button>
+          )}
         </div>
+        {qrNote && (
+          <p role="status" className="text-label-sm text-on-surface-variant">
+            {qrNote}
+          </p>
+        )}
       </div>
 
       {/* Recent recipients — one tap to refill the destination. */}

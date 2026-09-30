@@ -115,7 +115,19 @@ const scannerOffHas = bundleHas('/v1/explain') || bundleHas(SCANNER_API);
 // Leave dist/ in the default (flag-off) state.
 build(false);
 
+// The QR scanner (#226) is Android-only: the extension build sets
+// `__NATIVE_BUILD__` false, so its dynamic import of the ML Kit plugin must
+// dead-code-eliminate. Checked on the default extension build just made.
+const QR_PLUGIN_MARKER = 'isGoogleBarcodeScannerModuleAvailable';
+const qrInExtension = bundleHas(QR_PLUGIN_MARKER) || bundleHas('capacitor-mlkit');
+
 let failed = false;
+if (qrInExtension) {
+  console.error('✗ FAIL: the Android QR scanner plugin is in the extension bundle (__NATIVE_BUILD__ guard broken).');
+  failed = true;
+} else {
+  console.log('✓ QR scanner plugin ABSENT from the extension bundle (Android-only).');
+}
 if (telemetryOffHas) {
   console.error('✗ FAIL: telemetry code or the ingest URL is in the bundle with TELEMETRY=false.');
   failed = true;

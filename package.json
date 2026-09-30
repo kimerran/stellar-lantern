@@ -1,6 +1,6 @@
 {
   "name": "lantern-stellar-wallet",
-  "version": "0.4.3",
+  "version": "0.5.0",
   "description": "Lantern — a non-custodial Stellar browser-extension wallet (MV3).",
   "private": true,
   "license": "MIT",
@@ -28,6 +28,7 @@
     "version:check": "node scripts/check-release-version.mjs"
   },
   "dependencies": {
+    "@capacitor-mlkit/barcode-scanning": "8.2.1",
     "@capacitor/app": "^8.1.0",
     "@capacitor/core": "^8.4.1",
     "@capacitor/preferences": "^8.0.1",

@@ -44,17 +44,21 @@ AAAAAgAAAAAY0gqcnifD/QFRi3Um28AFmWZwoXTXZlkgmYh/UZB/SQAAAGQAAAAA/N5BswAAAAEAAAAA
 
 Every example card also has **Copy XDR**, so you can get the same text from the page itself.
 
-### Status of the slices when this plan was written
+### Status of the slices (updated 30 September, build 0.4.3)
 
-| Section | Slice | State |
-|---|---|---|
-| §1–§6, §10, §11 | #183, #184 (paste / compose), #185, #186 | Merged to `develop`. They are live once the next release is pushed |
-| §7 Report | #187 | **Not built** (waiting on the signer decision). Mark every §7 case **blocked** until it ships |
-| §8 AI explainer | #184, explainer part | **Not built** (waiting on `ALLOWED_ORIGINS` and the explain budget). Until then the summary is rules-based: run §8.1, mark §8.2–§8.3 **blocked** |
-| §9 Wallet unaffected | #184, explainer part | Runs **after** the `ALLOWED_ORIGINS` change. Blocked until then |
-| §10.3 Telemetry | #188 | **Not built.** Mark **blocked** |
+| Section | State |
+|---|---|
+| §1–§6, §10, §11 | Live |
+| §7 Report | Live. **7.1 files a real, permanent report**: use a fresh, never-reported address and send back the stellar.expert transaction link |
+| §8 AI explainer | Live. Summaries read *written by Lantern's AI explainer* |
+| §9 Wallet unaffected | **N/A**: `ALLOWED_ORIGINS` stays unset |
+| §10.3 Telemetry | Live (the footer notice and the privacy policy) |
+
+Check the build first: the page should load `index-BHRTWAwu.js` (DevTools → Network).
 
 ## 1. Cold open
+
+**Run 1.1–1.3 by hand**, not with browser automation: the point is to show that a person can use the page cold, with no help.
 
 | # | Step | Expected |
 |---|---|---|
@@ -74,7 +78,7 @@ Every example card also has **Copy XDR**, so you can get the same text from the 
 | 2.4 | Type `hello world` → **Scan it** | A plain sentence saying it isn't a transaction. No code, no stack trace, no `Error:` |
 | 2.5 | Paste the safe XDR but delete its last 10 characters → **Scan it** | A plain sentence saying it couldn't be read as a Stellar transaction |
 | 2.6 | Paste the safe XDR with extra spaces and line breaks in the middle → **Scan it** | Scans exactly as in 2.1: whitespace is ignored |
-| 2.7 | Each summary box | Above it: *Summary · rules-based (no AI)* (or *written by Lantern's AI explainer* once §8 ships). The label always says which one wrote it |
+| 2.7 | Each summary box | Above it: *Summary · written by Lantern's AI explainer* (or *rules-based (no AI)* if the explainer can't be reached). The label always says which one wrote it |
 
 ## 3. Compose a payment (#184)
 
@@ -131,7 +135,7 @@ Open the page first, then turn the network off: Wi-Fi off / airplane mode on the
 | 6.8 | With more than 50 entries: **Older →** / **← Newer** | 50 per page, newest first. (Fewer than 50 entries: no page buttons, mark N/A) |
 | 6.9 | **Refresh** | The panel reloads. It never reloads on its own |
 
-## 7. Report an address (#187) — blocked until #187 ships
+## 7. Report an address
 
 | # | Step | Expected |
 |---|---|---|
@@ -146,13 +150,13 @@ Open the page first, then turn the network off: Wi-Fi off / airplane mode on the
 
 | # | Step | Expected |
 |---|---|---|
-| 8.1 | Any scan | A sentence in the summary box, labelled with who wrote it: *rules-based (no AI)* today |
-| 8.2 | *(Blocked until the explainer ships)* The same example twice | Labelled *written by Lantern's AI explainer*. The risk and action are the same both times |
-| 8.3 | *(Blocked until the explainer ships)* With the Lantern API unreachable (ask the team to block it, or DevTools → Network request blocking on `lantern-api`) | The summary falls back to *rules-based (no AI)*, and **the risk and action are unchanged**. **Hard blocker if the verdict changes** |
+| 8.1 | Any scan | A sentence in the summary box, labelled with who wrote it: *written by Lantern's AI explainer* |
+| 8.2 | The same example twice | Labelled *written by Lantern's AI explainer*. The risk and action are the same both times |
+| 8.3 | With the Lantern API unreachable (ask the team to block it, or DevTools → Network request blocking on `lantern-api`) | The summary falls back to *rules-based (no AI)*, and **the risk and action are unchanged**. **Hard blocker if the verdict changes** |
 
-## 9. Wallet unaffected — blocked until `ALLOWED_ORIGINS` is set (#184)
+## 9. Wallet unaffected — N/A: `ALLOWED_ORIGINS` stays unset (decided 30 Sep)
 
-This needs the team to confirm in writing that lantern-api's `ALLOWED_ORIGINS` now lists the playground. It is the regression most likely to ship unnoticed.
+**Mark 9.1 and 9.2 N/A.** On 30 September the product owner decided `ALLOWED_ORIGINS` stays unset: the Chrome extension has no fixed id, so an allowlist would break the AI summary for testers, and a separate daily budget already protects the wallet's summaries. The cases are kept for the record in case the decision changes.
 
 | # | Step | Expected |
 |---|---|---|
@@ -167,7 +171,7 @@ Desktop browser, DevTools open.
 |---|---|---|
 | 10.1 | DevTools → **Network**, reload the page | Requests go only to `golantern.xyz` and `soroban-testnet.stellar.org`. No fonts or scripts from anyone else (no Google Fonts, no CDN) |
 | 10.2 | Run a few examples, paste, compose. Then **Application** → Cookies, Local storage, Session storage, IndexedDB | **All empty.** No cookie, nothing stored. (Composing also contacts `horizon-testnet.stellar.org`. That is expected) |
-| 10.3 | *(Blocked until #188 ships)* Page footer and `golantern.xyz/privacy-policy.html` | Both say what the playground counts: only enum values, no addresses, amounts or XDR, and no identifier that links two visits |
+| 10.3 | Page footer and `golantern.xyz/privacy-policy.html` | Both say what the playground counts: only enum values, no addresses, amounts or XDR, and no identifier that links two visits |
 
 ## 11. Accessibility
 
@@ -246,7 +250,7 @@ Fill one row per case: **pass**, **fail** (with a one-line description and a scr
 | 11.3 | | | |
 | 11.4 | | | |
 
-Reviewer (not on the Lantern team): ______ · Date: ______ · Browser/phone: ______ · Build (commit shown in the release, or the date the URL was opened): ______ · Sign-off: ☐
+Reviewer (not on the Lantern team): **AJ Maranan** · Date: ______ · Browser/phone: ______ · Build (commit shown in the release, or the date the URL was opened): ______ · Sign-off: ☐
 
 ## Coverage
 

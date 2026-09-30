@@ -28,6 +28,8 @@ Deliverable 4's playground is live at [golantern.xyz/demo](https://golantern.xyz
 | 2026-09-29 | The walkthrough's runbook, shot list and script | [`acb7834`](https://github.com/kimerran/stellar-lantern/commit/acb7834), [`eebbbd5`](https://github.com/kimerran/stellar-lantern/commit/eebbbd5) |
 | 2026-09-29 | Release 0.4.2 | [`8477fe7`](https://github.com/kimerran/stellar-lantern/commit/8477fe7) |
 | 2026-09-30 | 0.4.1 and 0.4.2 published to the public site | — |
+| 2026-09-30 | Release 0.4.3: offline, the playground never reads clean or claims a live answer | [`25d5a65`](https://github.com/kimerran/stellar-lantern/commit/25d5a65) |
+| 2026-09-30 | The website's download links serve the current build (0.4.3) | [`v0.4.3-testnet.14`](https://github.com/kimerran/stellar-lantern/releases/tag/v0.4.3-testnet.14) |
 
 ## Statement of Work progress
 
@@ -75,7 +77,7 @@ Registry, read from the ledger on 30 September: **19 addresses reported, 30 repo
 
 ## Maintenance
 
-- The download links still serve build 0.2.0; switching them to the current builds is an operations step, pending.
+- The website's download links served build 0.2.0 until 30 September, when 0.4.3 was published to them by hand, checked against its checksums and the Android release key. Publishing each new release to them automatically is still to set up.
 - The dependency lockfile is written with the npm version CI runs.
 
 ## Next week
