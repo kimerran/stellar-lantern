@@ -65,7 +65,7 @@ curl -sL https://lantern-api-production-3fad.up.railway.app/download/checksums -
 sha256sum --check --ignore-missing SHA256SUMS.txt
 ```
 
-**Expected:** your file's name followed by `OK`, for example `lantern-extension-0.4.3.zip: OK`. Anything else, `FAILED` or no line at all, means don't install it, and tell us.
+**Expected:** your file's name followed by `OK`, for example `lantern-extension-0.5.0.zip: OK`. Anything else, `FAILED` or no line at all, means don't install it, and tell us.
 
 ## Send us your result
 
