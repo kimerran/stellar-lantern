@@ -20,7 +20,7 @@ Every contract id, hash, address, transaction, recording, deck, document and CI 
 | Sandbox report transaction | Transaction | [`eda0d8e042773a1a83a6c7d955829b3fe0aca9654cf41b5435fcda1b99a852aa`](https://stellar.expert/explorer/testnet/tx/eda0d8e042773a1a83a6c7d955829b3fe0aca9654cf41b5435fcda1b99a852aa) | Week 1 |
 | Sandbox `set_status(Disputed)` transaction | Transaction | [`ae57d1890c5ef6198e08e9723d063b1186889bef4b20286c826deb984b9130b8`](https://stellar.expert/explorer/testnet/tx/ae57d1890c5ef6198e08e9723d063b1186889bef4b20286c826deb984b9130b8) | Week 1 |
 | USDC SAC used by the scanner fixtures | Contract | [`CAQCFVLOBK5GIULPNZRGATJJMIZL5BSP7X5YJVMGCPTUEPFM4AVSRCJU`](https://stellar.expert/explorer/testnet/contract/CAQCFVLOBK5GIULPNZRGATJJMIZL5BSP7X5YJVMGCPTUEPFM4AVSRCJU) | Week 2 |
-| Report transaction filed from the public playground (published deployment) | Transaction | *TODO: link — filed during the D4 walkthrough* | Week 4 |
+| Report transaction filed from the public playground (published deployment) | Transaction | *TODO: link — filed from the live playground during the D4 QA re-test* | Week 4 |
 | `set_status` transaction on the published deployment | Transaction | *TODO: link — needs the admin key* | Week 4 |
 
 ## Code and releases
@@ -39,6 +39,8 @@ Every contract id, hash, address, transaction, recording, deck, document and CI 
 | Wallet builds with checksums (Chrome extension zip, Android APK) | Release · Service | [`/download/extension`](https://lantern-api-production-3fad.up.railway.app/download/extension) · [`/download/android`](https://lantern-api-production-3fad.up.railway.app/download/android) · [`/download/checksums`](https://lantern-api-production-3fad.up.railway.app/download/checksums) — serving 0.5.0 from the public release [`v0.5.0-testnet.15`](https://github.com/kimerran/stellar-lantern/releases/tag/v0.5.0-testnet.15) | Week 3 |
 | D3 and D4 releases to `main` (0.3.0 and 0.4.0) | Release | [Release: D3 wallet hardening and the D4 playground](https://github.com/kimerran/stellar-lantern/pull/157) | Week 4 |
 | Playground releases to `main` (0.4.1 and 0.4.2) | Release | [Release: report from the playground, AI summaries, D4 evidence pages](https://github.com/kimerran/stellar-lantern/pull/158) | Week 4 |
+| Playground offline fixes to `main` (0.4.3) | Release | [Release 0.4.3: the playground never reads clean or live offline](https://github.com/kimerran/stellar-lantern/pull/159) · [`v0.4.3-testnet.14`](https://github.com/kimerran/stellar-lantern/releases/tag/v0.4.3-testnet.14) | Week 4 |
+| Wallet release to `main` (0.5.0, Android QR scan; not D4) | Release | [Release 0.5.0: scan a QR code to fill the Send recipient](https://github.com/kimerran/stellar-lantern/pull/160) · [`v0.5.0-testnet.15`](https://github.com/kimerran/stellar-lantern/releases/tag/v0.5.0-testnet.15) | Week 4 |
 | Public playground | Live URL · Code | [golantern.xyz/demo](https://golantern.xyz/demo/) · source in [`src/demo/`](https://github.com/kimerran/stellar-lantern/tree/main/src/demo) | Week 4 |
 
 ## Documents, plans and decks

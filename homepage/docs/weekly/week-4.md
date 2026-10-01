@@ -6,7 +6,7 @@
 
 ## Summary
 
-Deliverable 4's playground is live at [golantern.xyz/demo](https://golantern.xyz/demo/): the D2 scanner in a web page anyone can open, with no wallet, no install and no key. A visitor can paste or compose a testnet transaction and see its effects, verdict, plain-language summary and registry screening; run six seeded examples, including a payment to a reported scammer that is caught every time, even offline; browse the live registry; and report an address, signed by their own Stellar wallet. Nineteen merges built it in three days, shipped as three releases (0.4.0, 0.4.1 and 0.4.2), and it reached the public site on 30 September. Around it: a manual test plan written for a reviewer outside the team, honest demo analytics that never count an example click as a scan, a separate AI budget so public traffic can't use up the wallet's, the D3 and D4 evidence pages, a reviewer packet for rebuilding the contract from source, and the walkthrough's runbook. What remains needs people: the recording, a report filed from the live page and an admin status change (the two transaction hashes), the QA sweep, and the launch.
+Deliverable 4's playground is live at [golantern.xyz/demo](https://golantern.xyz/demo/): the D2 scanner in a web page anyone can open, with no wallet, no install and no key. A visitor can paste or compose a testnet transaction and see its effects, verdict, plain-language summary and registry screening; run six seeded examples, including a payment to a reported scammer that is caught every time, even offline; browse the live registry; and report an address, signed by their own Stellar wallet. Nineteen merges built it in three days, shipped as four releases (0.4.0, 0.4.1, 0.4.2 and 0.4.3, the last fixing two offline findings from QA), and it reached the public site on 30 September. A fifth release that week, 0.5.0, is wallet-only (scanning a QR code on Android) and not part of D4. Around it: a manual test plan written for a reviewer outside the team, honest demo analytics that never count an example click as a scan, a separate AI budget so public traffic can't use up the wallet's, the D3 and D4 evidence pages, a reviewer packet for rebuilding the contract from source, and the walkthrough's runbook. What remains needs people: the recording, a report filed from the live page and an admin status change (the two transaction hashes), the QA sweep, and the launch.
 
 ## Changelog
 
@@ -40,12 +40,12 @@ Deliverable 4's playground is live at [golantern.xyz/demo](https://golantern.xyz
 | §4.1 — a public testnet playground anyone can use | D4 | Evidenced | [golantern.xyz/demo](https://golantern.xyz/demo/) |
 | §4.1 — paste or compose a transaction; summary, verdict and blacklist screening live | D4 | Evidenced | The live page |
 | §4.1 — a pre-seeded malicious example, caught on demand | D4 | Evidenced | Example 2 reads high risk, reported, live and offline |
-| §5.1 — report an address from the demo | D4 | Built; first live report pending | Filed on camera during the walkthrough |
+| §5.1 — report an address from the demo | D4 | Built; first live report pending | Filed from the live playground by the QA reviewer during the re-test, against a never-reported address |
 | §6.1 — the /demo URL | D4 | Evidenced | [golantern.xyz/demo](https://golantern.xyz/demo/) |
-| §6.1 — testnet transaction hashes for a report and a status update | D4 | Pending | The report comes from the walkthrough; the status update needs the admin key |
+| §6.1 — testnet transaction hashes for a report and a status update | D4 | Pending | The report comes from the QA re-test; the status update needs the admin key |
 | §6.1 — the 3-minute captioned walkthrough | D4 | Pending | [Runbook and script](https://github.com/kimerran/stellar-lantern/blob/main/docs/evidence/d4/walkthrough.md) ready |
 | §6.1 — the launch post, in the repository and cross-posted | D4 | Draft | [Draft](https://github.com/kimerran/stellar-lantern/blob/main/docs/launch/lantern-instawards-launch.md) |
-| §5.1 — a QA sweep by a non-team reviewer | D4 | Plan written | [Test plan](https://github.com/kimerran/stellar-lantern/blob/main/docs/qa/d4-playground-test-plan.md); reviewer not yet named |
+| §5.1 — a QA sweep by a non-team reviewer | D4 | Plan written | [Test plan](https://github.com/kimerran/stellar-lantern/blob/main/docs/qa/d4-playground-test-plan.md); reviewer named (AJ Maranan), sweep scheduled for the re-test |
 
 ## Evidence added
 
@@ -84,4 +84,4 @@ Registry, read from the ledger on 30 September: **19 addresses reported, 30 repo
 
 ## Next week
 
-This is the sprint's last week. To close it: the captioned walkthrough (which files the first report from the live page), the admin status change, the non-team QA sweep, the final §6.3 snapshot, the launch post with at least three cross-posts, and the evidence handoff to the Chapter Lead.
+This is the sprint's last week. To close it: the first report from the live page (filed during the QA re-test), the captioned walkthrough, the admin status change, the non-team QA sweep, the final §6.3 snapshot, the launch post with at least three cross-posts, and the evidence handoff to the Chapter Lead.

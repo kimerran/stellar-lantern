@@ -30,7 +30,7 @@
 <p><strong>In progress.</strong> This report covers 28–30 September and is updated as the week closes. The walkthrough recording, the two transaction hashes, the non-team QA sweep and the launch post are still to come.</p>
 </blockquote>
 <h2>Summary</h2>
-<p>Deliverable 4's playground is live at <a href="https://golantern.xyz/demo/" target="_blank" rel="noopener">golantern.xyz/demo</a>: the D2 scanner in a web page anyone can open, with no wallet, no install and no key. A visitor can paste or compose a testnet transaction and see its effects, verdict, plain-language summary and registry screening; run six seeded examples, including a payment to a reported scammer that is caught every time, even offline; browse the live registry; and report an address, signed by their own Stellar wallet. Nineteen merges built it in three days, shipped as three releases (0.4.0, 0.4.1 and 0.4.2), and it reached the public site on 30 September. Around it: a manual test plan written for a reviewer outside the team, honest demo analytics that never count an example click as a scan, a separate AI budget so public traffic can't use up the wallet's, the D3 and D4 evidence pages, a reviewer packet for rebuilding the contract from source, and the walkthrough's runbook. What remains needs people: the recording, a report filed from the live page and an admin status change (the two transaction hashes), the QA sweep, and the launch.</p>
+<p>Deliverable 4's playground is live at <a href="https://golantern.xyz/demo/" target="_blank" rel="noopener">golantern.xyz/demo</a>: the D2 scanner in a web page anyone can open, with no wallet, no install and no key. A visitor can paste or compose a testnet transaction and see its effects, verdict, plain-language summary and registry screening; run six seeded examples, including a payment to a reported scammer that is caught every time, even offline; browse the live registry; and report an address, signed by their own Stellar wallet. Nineteen merges built it in three days, shipped as four releases (0.4.0, 0.4.1, 0.4.2 and 0.4.3, the last fixing two offline findings from QA), and it reached the public site on 30 September. A fifth release that week, 0.5.0, is wallet-only (scanning a QR code on Android) and not part of D4. Around it: a manual test plan written for a reviewer outside the team, honest demo analytics that never count an example click as a scan, a separate AI budget so public traffic can't use up the wallet's, the D3 and D4 evidence pages, a reviewer packet for rebuilding the contract from source, and the walkthrough's runbook. What remains needs people: the recording, a report filed from the live page and an admin status change (the two transaction hashes), the QA sweep, and the launch.</p>
 <h2>Changelog</h2>
 <div class="table"><table><thead>
 <tr>
@@ -173,7 +173,7 @@
 <td>§5.1 — report an address from the demo</td>
 <td>D4</td>
 <td>Built; first live report pending</td>
-<td>Filed on camera during the walkthrough</td>
+<td>Filed from the live playground by the QA reviewer during the re-test, against a never-reported address</td>
 </tr>
 <tr>
 <td>§6.1 — the /demo URL</td>
@@ -185,7 +185,7 @@
 <td>§6.1 — testnet transaction hashes for a report and a status update</td>
 <td>D4</td>
 <td>Pending</td>
-<td>The report comes from the walkthrough; the status update needs the admin key</td>
+<td>The report comes from the QA re-test; the status update needs the admin key</td>
 </tr>
 <tr>
 <td>§6.1 — the 3-minute captioned walkthrough</td>
@@ -203,7 +203,7 @@
 <td>§5.1 — a QA sweep by a non-team reviewer</td>
 <td>D4</td>
 <td>Plan written</td>
-<td><a href="https://github.com/kimerran/stellar-lantern/blob/main/docs/qa/d4-playground-test-plan.md" target="_blank" rel="noopener">Test plan</a>; reviewer not yet named</td>
+<td><a href="https://github.com/kimerran/stellar-lantern/blob/main/docs/qa/d4-playground-test-plan.md" target="_blank" rel="noopener">Test plan</a>; reviewer named (AJ Maranan), sweep scheduled for the re-test</td>
 </tr>
 </tbody>
 </table></div><h2>Evidence added</h2>
@@ -269,7 +269,7 @@
 <li>The dependency lockfile is written with the npm version CI runs.</li>
 </ul>
 <h2>Next week</h2>
-<p>This is the sprint's last week. To close it: the captioned walkthrough (which files the first report from the live page), the admin status change, the non-team QA sweep, the final §6.3 snapshot, the launch post with at least three cross-posts, and the evidence handoff to the Chapter Lead.</p>
+<p>This is the sprint's last week. To close it: the first report from the live page (filed during the QA re-test), the captioned walkthrough, the admin status change, the non-team QA sweep, the final §6.3 snapshot, the launch post with at least three cross-posts, and the evidence handoff to the Chapter Lead.</p>
 
         </article>
         <footer class="docs-foot">
