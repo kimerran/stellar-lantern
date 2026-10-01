@@ -7,6 +7,8 @@
 // so the extension's bundler removes the import and the plugin never ships in
 // the extension, not even as an unused chunk.
 
+import { whileSystemScreen } from '@core/session/foreground';
+
 export type QrScan =
   | { kind: 'scanned'; raw: string }
   | { kind: 'cancelled' }
@@ -16,7 +18,13 @@ const UNAVAILABLE = 'The QR scanner isn’t available on this device. Paste the 
 
 export async function scanQrCode(): Promise<QrScan> {
   if (!__NATIVE_BUILD__) return { kind: 'unavailable', error: UNAVAILABLE };
-  const { BarcodeScanner, BarcodeFormat } = await import('@capacitor-mlkit/barcode-scanning');
+  return runScan(await import('@capacitor-mlkit/barcode-scanning'));
+}
+
+type ScannerPlugin = Pick<typeof import('@capacitor-mlkit/barcode-scanning'), 'BarcodeScanner' | 'BarcodeFormat'>;
+
+// Exported for tests: the plugin is passed in, so no native build is needed.
+export async function runScan({ BarcodeScanner, BarcodeFormat }: ScannerPlugin): Promise<QrScan> {
   try {
     if (!(await BarcodeScanner.isSupported()).supported) {
       return { kind: 'unavailable', error: UNAVAILABLE };
@@ -29,7 +37,11 @@ export async function scanQrCode(): Promise<QrScan> {
         error: 'The QR scanner is being installed by Google Play services. Try again in a moment.',
       };
     }
-    const { barcodes } = await BarcodeScanner.scan({ formats: [BarcodeFormat.QrCode] });
+    // The scanner pauses the app; without this the wallet locks, the Send
+    // screen unmounts and the result is lost.
+    const { barcodes } = await whileSystemScreen(() =>
+      BarcodeScanner.scan({ formats: [BarcodeFormat.QrCode] }),
+    );
     const raw = barcodes[0]?.rawValue;
     return raw ? { kind: 'scanned', raw } : { kind: 'cancelled' };
   } catch (e) {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { sendMessage, type WalletStatus } from '@shared/messages';
 import { isNativePlatform } from '@shared/kv';
+import { onAppPause } from '@core/session/foreground';
 
 // Tracks the wallet's lifecycle (initialized / locked / address) by talking to
 // the background worker. The popup NEVER holds the decrypted secret.
@@ -46,8 +47,9 @@ export function useWallet() {
     void (async () => {
       try {
         const { App } = await import('@capacitor/app');
+        // Except while a screen we opened is up, e.g. the QR scanner (#226).
         const handle = await App.addListener('pause', () => {
-          void lock();
+          onAppPause(() => void lock());
         });
         if (cancelled) void handle.remove();
         else removeListener = () => void handle.remove();
