@@ -1,5 +1,6 @@
 // Platform-selected key-value port. The extension uses chrome.storage.local;
-// native (Capacitor) uses @capacitor/preferences. Values are always strings
+// native (Capacitor) uses @capacitor/preferences; the web-app build (#237)
+// uses IndexedDB. Values are always strings
 // so both backends behave identically (Preferences only stores strings).
 
 export interface KV {
@@ -34,7 +35,10 @@ let cached: KV | null = null;
 
 export async function getKV(): Promise<KV> {
   if (cached) return cached;
-  if (isNativePlatform()) {
+  if (__WEB_BUILD__) {
+    const { createIdbKV } = await import('./idb-kv');
+    cached = createIdbKV();
+  } else if (isNativePlatform()) {
     const { Preferences } = await import('@capacitor/preferences');
     cached = {
       get: async (key) => (await Preferences.get({ key })).value,

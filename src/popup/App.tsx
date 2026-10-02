@@ -123,6 +123,9 @@ export function App() {
   // Already in a full tab? Then don't offer "expand" again.
   const isExpanded = new URLSearchParams(window.location.search).has('expanded');
   const openExpanded = () => {
+    // Extension only: the web app (#237) is already a full tab, and its bundle
+    // must carry no chrome.* calls.
+    if (__WEB_BUILD__) return;
     const url = chrome.runtime.getURL('index.html?expanded=1');
     if (chrome.tabs?.create) {
       void chrome.tabs.create({ url });
@@ -183,7 +186,7 @@ export function App() {
         address={address}
         network={settings.network}
         onCopyAddress={copyAddress}
-        onExpand={isExpanded || isNativePlatform() ? undefined : openExpanded}
+        onExpand={isExpanded || __WEB_BUILD__ || isNativePlatform() ? undefined : openExpanded}
       />
 
       <main className="no-scrollbar relative flex-1 overflow-y-auto">

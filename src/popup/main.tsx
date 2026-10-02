@@ -4,6 +4,8 @@ import { createRoot } from 'react-dom/client';
 import { isNativePlatform } from '@shared/kv';
 import { App } from './App';
 import { ToastProvider } from './components/Toast';
+import { OpenInAnotherTab } from './screens/OpenInAnotherTab';
+import { holdWalletTab } from '@shared/tab-lock';
 import '../styles/tailwind.css';
 
 // On Android (Capacitor) fill the whole device viewport + respect safe areas,
@@ -30,13 +32,29 @@ if (new URLSearchParams(window.location.search).has('expanded')) {
   document.documentElement.classList.add('expanded');
 }
 
-const root = document.getElementById('root');
-if (!root) throw new Error('Root element not found');
+const rootEl = document.getElementById('root');
+if (!rootEl) throw new Error('Root element not found');
+const root = createRoot(rootEl);
 
-createRoot(root).render(
-  <React.StrictMode>
-    <ToastProvider>
-      <App />
-    </ToastProvider>
-  </React.StrictMode>,
-);
+const renderWallet = () =>
+  root.render(
+    <React.StrictMode>
+      <ToastProvider>
+        <App />
+      </ToastProvider>
+    </React.StrictMode>,
+  );
+
+if (__WEB_BUILD__) {
+  // The web app (#237): full viewport like Android, a cache-only service
+  // worker for the offline shell, and one wallet per browser profile.
+  document.documentElement.classList.add('web');
+  if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+    void navigator.serviceWorker.register('/sw.js').catch(() => {
+      /* no offline shell; the app still works online */
+    });
+  }
+  void holdWalletTab(navigator.locks, () => root.render(<OpenInAnotherTab />)).then(renderWallet);
+} else {
+  renderWallet();
+}

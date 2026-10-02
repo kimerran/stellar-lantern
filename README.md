@@ -65,12 +65,14 @@ npm run typecheck   # tsc --noEmit
 npm run lint        # eslint
 npm run test        # vitest run
 npm run build:mobile && npm run cap:sync   # build web assets and sync into the Android project
+npm run build:web   # installable web app → webapp/ (committed; `-- --check` fails on drift)
 npm run icons       # regenerate extension icons  (icons:android for Android)
 npm run verify:flags # prove disabled features are stripped from the release bundle
 ```
 
 **Load the extension:** `npm run build` → `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select `dist/` → pin **Lantern**.
 **Android:** `npm run build:mobile && npm run cap:sync`, then open `android/` in Android Studio (or use the `build-debug-apk` CI job).
+**Web app:** `npm run build:web`, then serve `webapp/` as a static site over HTTPS (it will be hosted at `app.golantern.xyz`). One wallet per browser profile, stored in IndexedDB. A new deploy takes effect on the next launch: an open tab keeps running the build it loaded.
 
 ---
 

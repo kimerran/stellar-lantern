@@ -121,7 +121,20 @@ build(false);
 const QR_PLUGIN_MARKER = 'isGoogleBarcodeScannerModuleAvailable';
 const qrInExtension = bundleHas(QR_PLUGIN_MARKER) || bundleHas('capacitor-mlkit');
 
+// The web app (#237) is the reverse: `__WEB_BUILD__` is false in the extension
+// build, so its IndexedDB vault, one-tab lock and "open in another tab" screen
+// must all dead-code-eliminate. (The web bundle's own absence of chrome.* and
+// the Android plugins is asserted by `build:web`.)
+const WEB_MARKERS = ['IndexedDB transaction aborted', 'lantern.wallet', 'Lantern is open in another tab'];
+const webInExtension = WEB_MARKERS.filter((m) => bundleHas(m));
+
 let failed = false;
+if (webInExtension.length) {
+  console.error(`✗ FAIL: web-app-only code is in the extension bundle (__WEB_BUILD__ guard broken): ${webInExtension.join(', ')}`);
+  failed = true;
+} else {
+  console.log('✓ web-app-only code ABSENT from the extension bundle (IndexedDB vault, tab lock).');
+}
 if (qrInExtension) {
   console.error('✗ FAIL: the Android QR scanner plugin is in the extension bundle (__NATIVE_BUILD__ guard broken).');
   failed = true;

@@ -57,6 +57,13 @@ jobs:
       - name: Demo playground is up to date
         run: npm run build:demo -- --check
 
+      # The web app (webapp/, app.golantern.xyz, #237) is built from the wallet
+      # with __WEB_BUILD__ and committed, like the playground. Rebuild and fail
+      # on any difference, an incomplete PWA shell, or a chrome.* / Android-only
+      # call that should have been dead-code-eliminated.
+      - name: Web app is up to date
+        run: npm run build:web -- --check
+
       # Flag dead-code-elimination proof (#81 / #88): builds with the demo
       # and telemetry flags on and off and asserts the telemetry module and
       # the ingest origin are ABSENT from a flag-off bundle.
