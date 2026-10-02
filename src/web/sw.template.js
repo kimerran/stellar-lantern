@@ -6,18 +6,21 @@
 // offline. It never caches anything at runtime: Horizon, Soroban RPC and the
 // Lantern API are other origins and pass straight through, and a same-origin
 // request that isn't a precached file goes to the network untouched.
+//
+// Updates take effect on the next launch. A new build installs a new worker,
+// which precaches the new files and then waits: it activates only once no tab
+// is still running the old build. Every screen is a lazy-loaded, content-hashed
+// chunk, so an open tab keeps asking for the old build's chunks; the old worker
+// keeps serving them from the old cache, which is deleted only on activation.
+// (Activating at once, with skipWaiting, deleted that cache under a running tab
+// and its next screen failed to load.)
 
 const CACHE = '__CACHE_NAME__';
 const PRECACHE = __PRECACHE__;
 const SHELL = '/index.html';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches
-      .open(CACHE)
-      .then((cache) => cache.addAll(PRECACHE))
-      .then(() => self.skipWaiting()),
-  );
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)));
 });
 
 self.addEventListener('activate', (event) => {
