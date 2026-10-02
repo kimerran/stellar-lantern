@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { track } from '@core/telemetry';
 import { sendMessage } from '@shared/messages';
 import { isNativePlatform } from '@shared/kv';
-import { normalizeMnemonic } from '@core/wallet/wallet';
+import { BACKUP_CHECK_POSITIONS, isBackupConfirmed } from '@core/wallet/backup';
+import { requestPersistentStorage } from '@shared/web/persist';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { Icon } from '../components/Icon';
@@ -32,6 +33,9 @@ export function Onboarding({
   const [step, setStep] = useState<Step>('welcome');
   const [mnemonic, setMnemonic] = useState('');
   const [importInput, setImportInput] = useState('');
+  // The backup check's answers, kept here so creating the wallet can re-check
+  // them (#238, backup before funding).
+  const [backupAnswers, setBackupAnswers] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +48,7 @@ export function Onboarding({
     setBusy(false);
     if (res.ok) {
       setMnemonic(res.data.mnemonic);
+      setBackupAnswers({}); // a new phrase needs its own check
       setStep('create-seed');
     } else {
       setError(res.error);
@@ -51,12 +56,21 @@ export function Onboarding({
   }
 
   async function finishCreate(password: string) {
+    // Never create (and so never show the Receive address of) a wallet whose
+    // recovery phrase the user hasn't confirmed they saved.
+    if (!isBackupConfirmed(words, backupAnswers)) {
+      setError('Confirm your recovery phrase first.');
+      setStep('create-confirm');
+      return;
+    }
     setBusy(true);
     setError(null);
     const res = await sendMessage({ type: 'CREATE_WALLET', mnemonic, password });
     setBusy(false);
     if (res.ok) {
       if (__FEATURE_TELEMETRY__) track.walletCreated('create');
+      // The web app keeps the vault in the browser: ask it not to evict it (#238).
+      if (__WEB_BUILD__) await requestPersistentStorage();
       onDone();
     }
     else setError(res.error);
@@ -69,6 +83,7 @@ export function Onboarding({
     setBusy(false);
     if (res.ok) {
       if (__FEATURE_TELEMETRY__) track.walletCreated('import');
+      if (__WEB_BUILD__) await requestPersistentStorage();
       onDone();
     }
     else setError(res.error);
@@ -100,6 +115,8 @@ export function Onboarding({
       {step === 'create-confirm' && (
         <SeedConfirm
           words={words}
+          answers={backupAnswers}
+          setAnswers={setBackupAnswers}
           onBack={() => setStep('create-seed')}
           onConfirmed={() => setStep('create-password')}
         />
@@ -206,11 +223,21 @@ function SeedReveal({ words, onBack, onNext }: { words: string[]; onBack: () => 
 }
 
 // Word-position verification (SPEC §6.1, preferred path).
-function SeedConfirm({ words, onBack, onConfirmed }: { words: string[]; onBack: () => void; onConfirmed: () => void }) {
-  // Deterministic-but-spread positions; avoids needing a RNG in this component.
-  const positions = [2, 7];
-  const [answers, setAnswers] = useState<Record<number, string>>({});
-  const allCorrect = positions.every((p) => normalizeMnemonic(answers[p] ?? '') === words[p]);
+function SeedConfirm({
+  words,
+  answers,
+  setAnswers,
+  onBack,
+  onConfirmed,
+}: {
+  words: string[];
+  answers: Record<number, string>;
+  setAnswers: React.Dispatch<React.SetStateAction<Record<number, string>>>;
+  onBack: () => void;
+  onConfirmed: () => void;
+}) {
+  const positions = BACKUP_CHECK_POSITIONS;
+  const allCorrect = isBackupConfirmed(words, answers);
 
   return (
     <div className="flex h-full flex-col">

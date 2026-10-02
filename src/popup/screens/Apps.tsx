@@ -39,6 +39,10 @@ import { ScanBadge } from '../components/ScanBadge';
 import { HoldToConfirm } from '../components/HoldToConfirm';
 import { isNativePlatform } from '@shared/kv';
 
+// The web app (#238) lists only the bundled mini-apps: its CSP allows frames
+// from its own origin alone, so a remote dApp couldn't load there.
+const DIRECTORY = __WEB_BUILD__ ? MINI_APPS.filter((a) => !a.url) : MINI_APPS;
+
 // In-app mini-app browser (README "Mini-app browser for Stellar dApps").
 //
 // Bundled apps are self-contained static pages; the URL bar is best-effort (most
@@ -113,38 +117,40 @@ export function Apps({
     );
   }
 
-  const favoriteApps = orderedFavoriteApps(favorites);
+  const favoriteApps = orderedFavoriteApps(favorites, DIRECTORY);
 
   return (
     <div className="space-y-5 pt-1">
-      {/* URL bar */}
-      <section className="space-y-2">
-        <div className="flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-high px-3 py-2 focus-within:border-primary-container focus-within:shadow-focus-amber">
-          <Icon name="public" size={18} className="text-on-surface-variant" />
-          <input
-            value={urlText}
-            onChange={(e) => {
-              setUrlText(e.target.value);
-              if (urlError) setUrlError(false);
-            }}
-            onKeyDown={(e) => e.key === 'Enter' && go()}
-            inputMode="url"
-            placeholder="Enter a dApp URL…"
-            className="min-w-0 flex-1 bg-transparent text-body-md text-on-surface placeholder:text-outline focus:outline-none"
-          />
-          <button
-            onClick={go}
-            disabled={!urlText.trim()}
-            className="shrink-0 text-on-surface-variant hover:text-on-surface disabled:opacity-30"
-            aria-label="Open URL"
-          >
-            <Icon name="arrow_forward" size={18} />
-          </button>
-        </div>
-        {urlError && (
-          <p className="px-1 text-label-sm text-error">That doesn’t look like a web address.</p>
-        )}
-      </section>
+      {/* URL bar. Not in the web app: its CSP frames only its own origin (#238). */}
+      {!__WEB_BUILD__ && (
+        <section className="space-y-2">
+          <div className="flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-high px-3 py-2 focus-within:border-primary-container focus-within:shadow-focus-amber">
+            <Icon name="public" size={18} className="text-on-surface-variant" />
+            <input
+              value={urlText}
+              onChange={(e) => {
+                setUrlText(e.target.value);
+                if (urlError) setUrlError(false);
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && go()}
+              inputMode="url"
+              placeholder="Enter a dApp URL…"
+              className="min-w-0 flex-1 bg-transparent text-body-md text-on-surface placeholder:text-outline focus:outline-none"
+            />
+            <button
+              onClick={go}
+              disabled={!urlText.trim()}
+              className="shrink-0 text-on-surface-variant hover:text-on-surface disabled:opacity-30"
+              aria-label="Open URL"
+            >
+              <Icon name="arrow_forward" size={18} />
+            </button>
+          </div>
+          {urlError && (
+            <p className="px-1 text-label-sm text-error">That doesn’t look like a web address.</p>
+          )}
+        </section>
+      )}
 
       {/* My apps — favorited/"installed" apps, pinned above the directory. Same
           sandboxed launch as Discover; installing is a bookmark, not access. */}
@@ -181,7 +187,7 @@ export function Apps({
         </div>
 
         <div className="space-y-2">
-          {MINI_APPS.map((app) => (
+          {DIRECTORY.map((app) => (
             <AppRow
               key={app.id}
               app={app}

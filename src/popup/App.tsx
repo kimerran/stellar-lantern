@@ -13,6 +13,7 @@ import { usePasskeyAccount } from './hooks/usePasskeyAccount';
 // First-paint path stays eager: splash → unlock/onboarding → home (assets),
 // plus Settings which shares the home shell. (#127)
 import { Onboarding } from './screens/Onboarding';
+import { WebOnboarding } from './web/WebOnboarding';
 import { AnalyticsPrompt } from './screens/AnalyticsPrompt';
 import { shouldShowConsentPrompt } from '@core/telemetry';
 import { Unlock } from './screens/Unlock';
@@ -96,6 +97,8 @@ export function App() {
 
   // Onboarding — no wallet yet.
   if (!status.initialized) {
+    // The web app adds the Home Screen step and an install prompt (#238).
+    if (__WEB_BUILD__) return <WebOnboarding onDone={refresh} />;
     return <Onboarding onDone={refresh} onPasskeyDone={refreshPasskey} />;
   }
 

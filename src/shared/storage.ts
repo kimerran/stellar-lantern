@@ -54,7 +54,10 @@ const DEFAULT_SETTINGS: Settings = {
 
 export async function getSettings(): Promise<Settings> {
   const kv = await getKV();
-  return { ...DEFAULT_SETTINGS, ...(parse<Partial<Settings>>(await kv.get(SETTINGS_KEY)) ?? {}) };
+  const saved = { ...DEFAULT_SETTINGS, ...(parse<Partial<Settings>>(await kv.get(SETTINGS_KEY)) ?? {}) };
+  // The web app is testnet only (#236): no switch, and its CSP allows only
+  // testnet Horizon and RPC (#238).
+  return __WEB_BUILD__ ? { ...saved, network: 'TESTNET' } : saved;
 }
 
 // In-process settings subscribers, used on native and the web app (#237). The

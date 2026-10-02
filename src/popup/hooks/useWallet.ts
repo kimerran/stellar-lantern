@@ -40,6 +40,22 @@ export function useWallet() {
   // waiting for the idle timer — the OS can keep the process (and the in-memory
   // session) alive indefinitely while backgrounded, so the idle window alone
   // leaves the wallet unlocked behind the app switcher / lock screen.
+  // The web app (#238) does the same when its page is hidden: another app or
+  // tab in front, the phone locked, or the Home Screen app backgrounded. The
+  // wallet holds its unlocked session in this page, like Android.
+  useEffect(() => {
+    if (!__WEB_BUILD__) return;
+    const onHidden = () => {
+      if (document.visibilityState === 'hidden') void lock();
+    };
+    document.addEventListener('visibilitychange', onHidden);
+    window.addEventListener('pagehide', onHidden);
+    return () => {
+      document.removeEventListener('visibilitychange', onHidden);
+      window.removeEventListener('pagehide', onHidden);
+    };
+  }, [lock]);
+
   useEffect(() => {
     if (!isNativePlatform()) return;
     let cancelled = false;

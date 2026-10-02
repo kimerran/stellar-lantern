@@ -6,6 +6,8 @@ import { App } from './App';
 import { ToastProvider } from './components/Toast';
 import { OpenInAnotherTab } from './screens/OpenInAnotherTab';
 import { holdWalletTab } from '@shared/tab-lock';
+import { captureInstallPrompt } from '@shared/web/install';
+import { FramedRefusal } from './web/FramedRefusal';
 import '../styles/tailwind.css';
 
 // On Android (Capacitor) fill the whole device viewport + respect safe areas,
@@ -47,14 +49,39 @@ const renderWallet = () =>
 
 if (__WEB_BUILD__) {
   // The web app (#237): full viewport like Android, a cache-only service
-  // worker for the offline shell, and one wallet per browser profile.
+  // worker for the offline shell, and one wallet per browser profile. Every
+  // screen sits under the testnet banner (#238).
   document.documentElement.classList.add('web');
-  if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-    void navigator.serviceWorker.register('/sw.js').catch(() => {
-      /* no offline shell; the app still works online */
-    });
+  const web = (screen: React.ReactNode) =>
+    root.render(
+      <div className="web-frame">
+        <div role="note" className="web-banner">
+          Testnet web app — not for real funds.
+        </div>
+        <div className="web-body">{screen}</div>
+      </div>,
+    );
+  if (window.top !== window.self) {
+    // Inside someone else's page (clickjacking): refuse to start. The host's
+    // frame-ancestors header blocks this too; a <meta> CSP can't (#238).
+    web(<FramedRefusal />);
+  } else {
+    captureInstallPrompt();
+    if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+      void navigator.serviceWorker.register('/sw.js').catch(() => {
+        /* no offline shell; the app still works online */
+      });
+    }
+    void holdWalletTab(navigator.locks, () => web(<OpenInAnotherTab />)).then(() =>
+      web(
+        <React.StrictMode>
+          <ToastProvider>
+            <App />
+          </ToastProvider>
+        </React.StrictMode>,
+      ),
+    );
   }
-  void holdWalletTab(navigator.locks, () => root.render(<OpenInAnotherTab />)).then(renderWallet);
 } else {
   renderWallet();
 }
