@@ -18,3 +18,8 @@ declare const __FEATURE_TELEMETRY_IDENTITY__: boolean;
 // True only in the Android build (vite.config.mobile.ts). Guards native-only
 // imports so the extension bundle doesn't carry them (#226).
 declare const __NATIVE_BUILD__: boolean;
+
+// True only in the web-app build (vite.config.web.ts, #237): the wallet runs
+// in the page on IndexedDB. The extension and Android bundles drop the web
+// branch, and the web bundle drops the chrome.* and native ones.
+declare const __WEB_BUILD__: boolean;
