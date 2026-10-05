@@ -67,22 +67,42 @@
               before you sign (on testnet, against an on-chain scam registry too), and has an AI
               tell you in plain language what it does. So scams never make it past the glow.
             </p>
+            <!-- Every option is listed here, which is what a visitor without JS
+                 sees. app.js hides the ones that can't apply on this device
+                 (data-cta): iPhone/iPad and other browsers get the web app in
+                 place of the APK; Android and desktop Chrome keep their buttons
+                 and get a small web-app link. -->
             <div class="hero-cta reveal-load d4">
               <!-- /download on the Lantern API (#131): a 302 to the newest Release
                    asset, logged as a download intent. ?src=homepage attributes it. -->
-              <a class="btn btn-primary" href="https://lantern-api-production-3fad.up.railway.app/download/android?src=homepage">
+              <a class="btn btn-primary" data-cta="android" href="https://lantern-api-production-3fad.up.railway.app/download/android?src=homepage">
                 <span class="material-symbols-outlined">android</span> Android APK
               </a>
-              <a class="btn btn-primary" href="https://lantern-api-production-3fad.up.railway.app/download/extension?src=homepage">
+              <a class="btn btn-primary" data-cta="extension" href="https://lantern-api-production-3fad.up.railway.app/download/extension?src=homepage">
                 <span class="material-symbols-outlined">extension</span> Chrome extension
+              </a>
+              <!-- The testnet web app. app.js sets ?src=homepage-ios on iOS. -->
+              <a class="btn btn-primary" data-cta="web" href="https://app.golantern.xyz/?src=homepage">
+                <span class="material-symbols-outlined">open_in_browser</span> Open the web app
               </a>
               <a class="btn btn-ghost" href="#install">
                 <span class="material-symbols-outlined">menu_book</span> How to install
               </a>
             </div>
+            <p class="cta-hint reveal-load d4" data-cta="web-hint">
+              <span class="material-symbols-outlined" aria-hidden="true">ios_share</span>
+              <span>On iPhone or iPad, tap Share, then <strong>Add to Home Screen</strong>.<br />Open Lantern from there, so your wallet isn't erased after 7 days.</span>
+            </p>
+            <p class="cta-hint reveal-load d4" data-cta="web-hint-browser" hidden>
+              <span class="material-symbols-outlined" aria-hidden="true">public</span>
+              <span>The wallet runs in this browser, with nothing to install.<br />Testnet only, not for real funds.</span>
+            </p>
+            <p class="cta-alt reveal-load d4" data-cta="web-alt" hidden>
+              or <a class="inline" href="https://app.golantern.xyz/?src=homepage">use the web app</a>, right in your browser
+            </p>
             <p class="hero-note reveal-load d5">
               <span class="material-symbols-outlined">science</span>
-              Public Beta — Chrome extension &amp; Android APK, ready in about a minute.
+              Public Beta — Chrome extension, Android APK or the web app, ready in about a minute.
             </p>
             <p class="hero-note reveal-load d5">
               <span class="material-symbols-outlined">workspace_premium</span>
@@ -275,7 +295,7 @@
           <div class="section-head reveal">
             <span class="beta-tag"><span class="material-symbols-outlined" style="font-size:14px">science</span> Beta install</span>
             <h2 style="margin-top:16px">Install the Beta</h2>
-            <p>Lantern isn't in the app stores yet. On Android, it's a one-tap APK. On Chrome or Edge, load the extension in Developer Mode — about a minute either way. Both are published on every release, with <a class="inline" href="https://lantern-api-production-3fad.up.railway.app/download/checksums">SHA-256 checksums</a> to check your download against.</p>
+            <p>Lantern isn't in the app stores yet. On Android, it's a one-tap APK. On Chrome or Edge, load the extension in Developer Mode — about a minute either way. On iPhone, or any other browser, open the testnet web app. Both are published on every release, with <a class="inline" href="https://lantern-api-production-3fad.up.railway.app/download/checksums">SHA-256 checksums</a> to check your download against.</p>
           </div>
 
           <div class="steps">
@@ -284,6 +304,13 @@
               <div>
                 <h4>On Android? Just the APK</h4>
                 <p>Download <a class="inline" href="https://lantern-api-production-3fad.up.railway.app/download/android?src=homepage"><strong>lantern-&lt;version&gt;-testnet.apk</strong></a> on the phone, open it, and allow installs from this source if asked. That's it — the steps below are only for the desktop extension.</p>
+              </div>
+            </div>
+            <div class="step reveal" style="border-color: rgba(132,213,255,0.3); background: rgba(132,213,255,0.05);">
+              <div class="num"><span class="material-symbols-outlined" style="font-size:18px">phone_iphone</span></div>
+              <div>
+                <h4>On iPhone? Open the web app</h4>
+                <p>Open <a class="inline" href="https://app.golantern.xyz/?src=homepage"><strong>app.golantern.xyz</strong></a> in Safari, tap Share, then <strong>Add to Home Screen</strong>, and open Lantern from there — so your wallet isn't erased after 7 days. It's testnet only, and works in any other browser too.</p>
               </div>
             </div>
             <div class="step reveal">
@@ -331,12 +358,16 @@
           </div>
 
           <div class="install-cta reveal">
-            <a class="btn btn-primary" href="https://lantern-api-production-3fad.up.railway.app/download/android?src=homepage">
+            <a class="btn btn-primary" data-cta="android" href="https://lantern-api-production-3fad.up.railway.app/download/android?src=homepage">
               <span class="material-symbols-outlined">android</span> Android APK
             </a>
-            <a class="btn btn-primary" href="https://lantern-api-production-3fad.up.railway.app/download/extension?src=homepage">
+            <a class="btn btn-primary" data-cta="extension" href="https://lantern-api-production-3fad.up.railway.app/download/extension?src=homepage">
               <span class="material-symbols-outlined">extension</span> Chrome extension
             </a>
+            <a class="btn btn-primary" data-cta="web" href="https://app.golantern.xyz/?src=homepage">
+              <span class="material-symbols-outlined">open_in_browser</span> Open the web app
+            </a>
+            <span class="cta-alt" data-cta="web-alt" hidden>or <a class="inline" href="https://app.golantern.xyz/?src=homepage">use the web app</a></span>
             <span class="muted" style="font-size:0.9rem">Always the newest testnet build. Chrome, Edge, Brave and other Chromium browsers.</span>
           </div>
         </div>
@@ -396,6 +427,9 @@
             </a>
             <a href="https://lantern-api-production-3fad.up.railway.app/download/extension?src=homepage">
               <span class="material-symbols-outlined">extension</span> Chrome extension
+            </a>
+            <a href="https://app.golantern.xyz/?src=homepage">
+              <span class="material-symbols-outlined">open_in_browser</span> Web app (testnet)
             </a>
             <a href="#features"><span class="material-symbols-outlined">bolt</span> Features</a>
             <a href="#screens"><span class="material-symbols-outlined">photo_library</span> Screens</a>
