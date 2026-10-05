@@ -125,8 +125,11 @@ default, delete on request) and the same events. It adds one:
 - **Attribution.** On the very first open, the web app reads the first
   `?src=` value and keeps it in its own storage as one of `homepage-ios`,
   `homepage`, `launch` or `other` (anything unrecognised). The raw value is
-  never stored or sent; an open without `src` records nothing, and later
-  opens never change it (`src/shared/web/attribution.ts`). After opt-in it
+  never stored or sent. An open without `src` records `launch` when the app
+  runs installed (from the Home Screen), and nothing in a browser tab; later
+  opens never change it (`src/shared/web/attribution.ts`). On iOS the Home
+  Screen app has its own storage, so `homepage-ios` is only seen there when
+  the Home Screen icon keeps the `?src=` URL. After opt-in it
   is sent once, as `web_attributed`. The server accepts that event only from
   `web`, and rejects `demo_scanned` from `web`.
 - **Off until the server is ready.** `vite.config.web.ts` pins the web

@@ -86,6 +86,21 @@ describe('recordFirstOpenSource', () => {
     expect(await recordedWebSource()).toBeNull();
   });
 
+  it('an installed first open without src records launch', async () => {
+    await recordFirstOpenSource('', () => true);
+    expect(await recordedWebSource()).toBe('launch');
+  });
+
+  it('an installed first open with src keeps the src', async () => {
+    await recordFirstOpenSource('?src=homepage-ios', () => true);
+    expect(await recordedWebSource()).toBe('homepage-ios');
+  });
+
+  it('a first open in a browser tab without src still records nothing', async () => {
+    await recordFirstOpenSource('', () => false);
+    expect(kv.store.has(WEB_SOURCE_KEY)).toBe(false);
+  });
+
   it('a stored value outside the enum is ignored', async () => {
     kv.store.set(WEB_SOURCE_KEY, 'tampered');
     expect(await recordedWebSource()).toBeNull();
