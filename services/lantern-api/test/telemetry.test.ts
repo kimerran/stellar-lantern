@@ -147,6 +147,44 @@ describe('POST /v1/telemetry', () => {
     expect(await store.export({ limit: 100 })).toHaveLength(3);
   });
 
+  it('accepts a web app envelope (#239) with wallet events and its attribution; rejects a playground scan from web and web_attributed from elsewhere', async () => {
+    const { post, store } = harness();
+    const ev = (name: string, props: Record<string, string | boolean> = {}) => ({
+      name,
+      props,
+      ts: Date.now(),
+    });
+    const web = {
+      ...envelope(),
+      platform: 'web',
+      account: ADDRESS,
+      events: [
+        ev('session_start'),
+        ev('web_attributed', { src: 'homepage-ios' }),
+        ev('tx_scanned', { risk: 'low', action: 'allow' }),
+      ],
+    };
+    expect((await post(web)).status).toBe(204);
+    const rows = await store.export({ limit: 100 });
+    expect(rows.map((r) => [r.platform, r.event, r.account])).toEqual([
+      ['web', 'session_start', ADDRESS],
+      ['web', 'web_attributed', ADDRESS],
+      ['web', 'tx_scanned', ADDRESS],
+    ]);
+    for (const bad of [
+      {
+        ...web,
+        events: [ev('demo_scanned', { risk: 'low', action: 'allow', origin: 'pasted' })],
+      },
+      { ...web, events: [ev('web_attributed', { src: 'some-raw-campaign' })] },
+      { ...envelope(), events: [ev('web_attributed', { src: 'homepage' })] },
+      { ...envelope(), platform: 'android', events: [ev('web_attributed', { src: 'homepage' })] },
+    ]) {
+      expect((await post(bad)).status).toBe(400);
+    }
+    expect(await store.export({ limit: 100 })).toHaveLength(3);
+  });
+
   it('rejects an out-of-range timestamp with 400, inserting nothing — never a 503', async () => {
     const h = harness({}, () => new Date(Date.UTC(2026, 8, 16)));
     for (const ts of [1e300, -1e300, Date.UTC(2026, 8, 16) + 10 * 60_000, Date.UTC(2025, 0, 1)]) {

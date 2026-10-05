@@ -6,7 +6,9 @@
 
 // 'demo' is the public playground at golantern.xyz/demo (#188): no install,
 // no consent screen, a random id per page load, and only `demo_scanned`.
-export type Platform = 'extension' | 'android' | 'demo';
+// 'web' is the browser build at app.golantern.xyz (#239): a wallet like the
+// other two, under the same opt-in, plus its own `web_attributed`.
+export type Platform = 'extension' | 'android' | 'web' | 'demo';
 export type Network = 'testnet' | 'public';
 export type RiskLevel = 'low' | 'medium' | 'high';
 export type ScanAction = 'allow' | 'warn' | 'block_confirm';
@@ -33,6 +35,12 @@ export type ScreenIdle = 'first' | 'lt_30s' | '30s_2m' | 'gte_2m';
 // `composed` are a visitor bringing their own transaction; `seeded` is one
 // click on a built-in example and never counts toward SOW §6.3's headline.
 export type DemoOrigin = 'seeded' | 'pasted' | 'composed';
+
+// Where a web-app visitor came from (#239): the first `?src=` the web app
+// was opened with, folded into this closed set on the device. The raw query
+// string is never stored or sent; anything unrecognised is 'other'.
+export const WEB_SOURCES = ['homepage-ios', 'homepage', 'launch', 'other'] as const;
+export type WebSource = (typeof WEB_SOURCES)[number];
 
 export type MiniAppId = 'stardust-faucet' | 'lumen-notes' | 'lantern-demo' | 'other';
 
@@ -81,6 +89,10 @@ export type TelemetryEvent =
       name: 'demo_scanned';
       props: { risk: RiskLevel; action: ScanAction; origin: DemoOrigin };
     }
+  // The web app's attribution (#239), sent once after opt-in. Its own event,
+  // not a new prop on app_first_open, for the same reason as demo_scanned:
+  // installed builds would start failing the validator.
+  | { name: 'web_attributed'; props: { src: WebSource } }
   // Consent lifecycle
   | { name: 'consent_granted'; props: Record<string, never> }
   | { name: 'consent_revoked'; props: Record<string, never> };
@@ -120,6 +132,7 @@ export const EVENT_SCHEMA: Record<EventName, Record<string, readonly string[] | 
     action: ['allow', 'warn', 'block_confirm'],
     origin: ['seeded', 'pasted', 'composed'],
   },
+  web_attributed: { src: WEB_SOURCES },
   consent_granted: {},
   consent_revoked: {},
 };
@@ -128,6 +141,11 @@ export const EVENT_SCHEMA: Record<EventName, Record<string, readonly string[] | 
 // that may carry them. The playground sends nothing a wallet sends, and a
 // wallet can't send a playground scan.
 export const DEMO_EVENTS: ReadonlySet<EventName> = new Set<EventName>(['demo_scanned']);
+
+// Events only a `platform: 'web'` envelope may carry (#239). Unlike the
+// playground, the web app also sends every wallet event; this set only stops
+// the other wallets from sending web-only ones.
+export const WEB_EVENTS: ReadonlySet<EventName> = new Set<EventName>(['web_attributed']);
 
 export interface StampedEvent {
   name: EventName;

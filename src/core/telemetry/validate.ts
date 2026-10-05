@@ -5,7 +5,7 @@
 // looks like a Stellar key (G/S/C/M StrKey), anything that looks like an
 // amount, and any free text at all. A rejected event is dropped, never sent.
 
-import { DEMO_EVENTS, EVENT_SCHEMA, type Envelope, type StampedEvent } from './events';
+import { DEMO_EVENTS, EVENT_SCHEMA, WEB_EVENTS, type Envelope, type StampedEvent } from './events';
 
 const STRKEY_RE = /\b[GSCM][A-Z2-7]{55}\b/;
 // Alpha identity (#100): the only key-shaped value allowed, and only as the
@@ -45,7 +45,7 @@ export function isPublicAccount(v: unknown): v is string {
   return raw[33] === (expect & 0xff) && raw[34] === expect >>> 8;
 }
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const PLATFORMS = new Set(['extension', 'android', 'demo']);
+const PLATFORMS = new Set(['extension', 'android', 'web', 'demo']);
 const NETWORKS = new Set(['testnet', 'public']);
 
 export function validateEvent(e: unknown): e is StampedEvent {
@@ -99,6 +99,9 @@ export function validateEnvelope(env: unknown): env is Envelope {
   const demo = platform === 'demo';
   if (demo && (network !== 'testnet' || account !== undefined)) return false;
   if (events.some((e) => DEMO_EVENTS.has(e.name) !== demo)) return false;
+  // The web app (#239) is a wallet, so it sends wallet events too; only its
+  // attribution is its own, and no other platform may send it.
+  if (platform !== 'web' && events.some((e) => WEB_EVENTS.has(e.name))) return false;
   // Nothing anywhere else in the serialised envelope may look like a key.
   return !STRKEY_RE.test(JSON.stringify({ ...(env as object), account: undefined }));
 }
