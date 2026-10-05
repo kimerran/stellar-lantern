@@ -36,7 +36,11 @@ function lanternPlatform(userAgent, maxTouchPoints) {
   show('web-hint-browser', platform === 'other');
   show('web-alt', !webFirst);
   if (platform === 'ios') {
-    each('web', function (a) { a.href = 'https://app.golantern.xyz/?src=homepage-ios'; });
+    // Every web-app link, not just the buttons: the install card and the
+    // footer count toward homepage-ios too.
+    document.querySelectorAll('a[href^="https://app.golantern.xyz/"]').forEach(function (a) {
+      a.href = 'https://app.golantern.xyz/?src=homepage-ios';
+    });
   }
 
   // ── Cookie consent ──

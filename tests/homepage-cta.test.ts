@@ -46,10 +46,20 @@ function run(userAgent: string, maxTouchPoints = 0) {
   const els = new Map<string, FakeEl>(
     names.map((n) => [n, { hidden: false, href: 'https://app.golantern.xyz/?src=homepage' }]),
   );
+  // Web-app links without a data-cta (the install card, the footer).
+  const plainLinks: FakeEl[] = [0, 1].map(() => ({
+    hidden: false,
+    href: 'https://app.golantern.xyz/?src=homepage',
+  }));
   const document = {
     documentElement: { classList: { add() {} } },
     getElementById: () => null,
     querySelectorAll: (sel: string) => {
+      if (sel === 'a[href^="https://app.golantern.xyz/"]') {
+        return [els.get('web') as FakeEl, ...plainLinks].filter((a) =>
+          a.href.startsWith('https://app.golantern.xyz/'),
+        );
+      }
       const el = els.get(/^\[data-cta="([\w-]+)"\]$/.exec(sel)?.[1] ?? '');
       return el ? [el] : [];
     },
@@ -64,7 +74,13 @@ function run(userAgent: string, maxTouchPoints = 0) {
   vm.createContext(ctx);
   vm.runInContext(appJs, ctx);
   const visible = names.filter((n) => !els.get(n)?.hidden);
-  return { visible, webHref: els.get('web')?.href, platform: ctx.lanternPlatform as (ua: string, t: number) => string };
+  const webLinks = [els.get('web')?.href, ...plainLinks.map((a) => a.href)];
+  return {
+    visible,
+    webHref: els.get('web')?.href,
+    webLinks,
+    platform: ctx.lanternPlatform as (ua: string, t: number) => string,
+  };
 }
 
 describe('homepage: which download fits the visitor', () => {
@@ -114,6 +130,17 @@ describe('homepage: the buttons app.js leaves visible', () => {
     const r = run(UA.firefoxLinux);
     expect(r.visible).toEqual(['web', 'web-hint-browser']);
     expect(r.webHref).toBe('https://app.golantern.xyz/?src=homepage');
+  });
+
+  it('iPhone: every web-app link carries src=homepage-ios; elsewhere they stay homepage', () => {
+    for (const href of run(UA.iphone, 5).webLinks) {
+      expect(href).toBe('https://app.golantern.xyz/?src=homepage-ios');
+    }
+    for (const ua of [UA.android, UA.chromeWin, UA.firefoxLinux]) {
+      for (const href of run(ua).webLinks) {
+        expect(href).toBe('https://app.golantern.xyz/?src=homepage');
+      }
+    }
   });
 
   it('Android and desktop Chrome keep their buttons, plus the small web-app link', () => {
