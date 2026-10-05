@@ -166,7 +166,7 @@ daily chart and full trail, and
 `/admin/report` is the emailed-style report — the same code as `npm run
 report:activity` (both import `src/core/telemetry/report.ts`, aliased here as
 `@lantern/telemetry-report`). Every page takes
-`?since=YYYY-MM-DD&until=YYYY-MM-DD&platform=extension|android` (default
+`?since=YYYY-MM-DD&until=YYYY-MM-DD&platform=extension|android|web|demo` (default
 window: the last 30 days). Raw data: `/admin/export.csv` and
 `/admin/export.json` for the same filters, plus `&wallet=<key>` for one
 identity — the drill-down links both. Rows with no wallet address (non-alpha

@@ -1,7 +1,7 @@
 // The analytics page (#104): the activity report, served.
 //
 //   GET  /admin                no session → login form; session → the dashboard (#106)
-//                              ?since=YYYY-MM-DD&until=YYYY-MM-DD&platform=extension|android|demo
+//                              ?since=YYYY-MM-DD&until=YYYY-MM-DD&platform=extension|android|web|demo
 //   GET  /admin/wallets        one row per identity, ?sort=lastSeen|firstSeen|events|sessions|txSigned|highRiskGated
 //   GET  /admin/wallets/:key   drill-down: key = G… address, or the install id of an anonymous install
 //   GET  /admin/report         the full emailed-style report for the window
@@ -125,6 +125,9 @@ const calendarDay = (v: string | undefined): string | null => {
   return Number.isFinite(t) && new Date(t).toISOString().slice(0, 10) === v ? v : null;
 };
 
+// The platforms the toolbar can filter on; anything else means "all".
+const FILTER_PLATFORMS = ['extension', 'android', 'web', 'demo'];
+
 export function parseFilters(q: Record<string, string | undefined>, now: Date): Filters {
   const day = (d: Date) => d.toISOString().slice(0, 10);
   let until = calendarDay(q.until) ?? day(new Date(now.getTime() + DAY_MS));
@@ -137,10 +140,7 @@ export function parseFilters(q: Record<string, string | undefined>, now: Date): 
   }
   const w = q.wallet ?? q.account ?? '';
   const wallet = ACCOUNT_RE.test(w) || UUID_RE.test(w) ? w : '';
-  const platform =
-    q.platform === 'extension' || q.platform === 'android' || q.platform === 'demo'
-      ? q.platform
-      : '';
+  const platform = FILTER_PLATFORMS.includes(q.platform ?? '') ? q.platform! : '';
   return { since, until, wallet, platform };
 }
 
@@ -240,7 +240,7 @@ function toolbar(f: Filters, action: string): string {
   return `<form class="bar" method="get" action="${esc(action)}">
 <label>From (inclusive)<input type="date" name="since" value="${esc(f.since)}"></label>
 <label>To (exclusive)<input type="date" name="until" value="${esc(f.until)}"></label>
-<label>Platform<select name="platform">${opt('', 'all')}${opt('extension', 'Chrome')}${opt('android', 'Android')}${opt('demo', 'Playground')}</select></label>
+<label>Platform<select name="platform">${opt('', 'all')}${opt('extension', 'Chrome')}${opt('android', 'Android')}${opt('web', 'Web')}${opt('demo', 'Playground')}</select></label>
 <button type="submit">Apply</button>
 <button class="ghost" type="submit" formmethod="post" formaction="/admin/logout">Sign out</button>
 </form>`;

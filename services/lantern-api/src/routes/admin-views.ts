@@ -67,6 +67,10 @@ export interface Dashboard {
 }
 
 const truncate = (a: string): string => `${a.slice(0, 4)}…${a.slice(-4)}`;
+// How a platform reads on the pages: the extension is "Chrome", the browser
+// build (#239) is "Web"; the rest keep their stored name.
+export const platformLabel = (p: string): string =>
+  p === 'extension' ? 'Chrome' : p === 'web' ? 'Web' : p;
 const DAY_MS = 86_400_000;
 
 export const identityKey = (r: Pick<Row, 'account' | 'installId'>): string =>
@@ -447,7 +451,7 @@ export function renderDashboard(
     ['transactions signed', d.txSigned],
     ['high-risk gates', d.highRiskGated],
     ...Object.entries(d.byPlatform).map(
-      ([k, v]) => [`wallets on ${k === 'extension' ? 'Chrome' : k}`, v] as [string, number],
+      ([k, v]) => [`wallets on ${platformLabel(k)}`, v] as [string, number],
     ),
   ]);
   const events = d.byEvent.length
@@ -495,7 +499,7 @@ export function renderWallets(
   const rows = ws
     .map(
       (w) =>
-        `<tr><td><a href="/admin/wallets/${esc(w.key)}${opts.qs ? '?' + esc(opts.qs) : ''}">${esc(w.label)}</a></td><td>${w.platforms.map((p) => `<span class="pill">${esc(p === 'extension' ? 'Chrome' : p)}</span>`).join('')}</td><td>v${esc(w.appVersion)}</td><td>${esc(fmtDay(w.firstSeen))}</td><td>${esc(fmtDay(w.lastSeen))}</td><td class="n">${n(w.sessions)}</td><td class="n">${n(w.events)}</td><td class="n">${n(w.txSigned)}</td><td class="n">${n(w.highRiskGated)}</td></tr>`,
+        `<tr><td><a href="/admin/wallets/${esc(w.key)}${opts.qs ? '?' + esc(opts.qs) : ''}">${esc(w.label)}</a></td><td>${w.platforms.map((p) => `<span class="pill">${esc(platformLabel(p))}</span>`).join('')}</td><td>v${esc(w.appVersion)}</td><td>${esc(fmtDay(w.firstSeen))}</td><td>${esc(fmtDay(w.lastSeen))}</td><td class="n">${n(w.sessions)}</td><td class="n">${n(w.events)}</td><td class="n">${n(w.txSigned)}</td><td class="n">${n(w.highRiskGated)}</td></tr>`,
     )
     .join('');
   const table = ws.length
@@ -523,7 +527,7 @@ export function renderWallet(
 ${tabs('wallets', opts.qs)}
 <div class="card"><h2>${esc(s.label)}</h2>
 <p class="meta"><code class="addr">${esc(s.account)}</code></p>
-<p class="meta">${s.platforms.map((p) => `<span class="pill">${esc(p === 'extension' ? 'Chrome' : p)}</span>`).join('')} v${esc(s.appVersion)} · ${esc(s.network)} · ${n(s.installs)} install${s.installs === 1 ? '' : 's'} · first seen ${esc(fmtTs(s.firstSeen))} · last seen ${esc(fmtTs(s.lastSeen))}</p>
+<p class="meta">${s.platforms.map((p) => `<span class="pill">${esc(platformLabel(p))}</span>`).join('')} v${esc(s.appVersion)} · ${esc(s.network)} · ${n(s.installs)} install${s.installs === 1 ? '' : 's'} · first seen ${esc(fmtTs(s.firstSeen))} · last seen ${esc(fmtTs(s.lastSeen))}</p>
 ${tiles([
   ['sessions', s.sessions],
   ['events', s.events],
