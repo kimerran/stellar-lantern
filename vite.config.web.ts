@@ -6,6 +6,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
 import { flagDefines } from './vite.flags';
+import { WEB_CSP } from './src/web/csp';
 
 // The installable web app (#237): the wallet in a plain browser, for iPhone
 // users and anyone without the extension or the APK. Same stack and aliases as
@@ -36,6 +37,17 @@ function webShell(): Plugin {
   return {
     name: 'lantern-web-shell',
     apply: 'build',
+    // The CSP (#238), straight after <meta charset>, so it governs every
+    // script, style and preload Vite adds after it.
+    transformIndexHtml: (html) => {
+      const charset = '<meta charset="UTF-8" />';
+      if (!html.includes(charset)) throw new Error('src/web/index.html lost its <meta charset>');
+      const quoted = WEB_CSP.replace(/'/g, '&#39;');
+      return html.replace(
+        charset,
+        `${charset}\n    <meta http-equiv="Content-Security-Policy" content="${quoted}" />`,
+      );
+    },
     // After Vite's own plugins, so the emitted index.html is in the bundle
     // and gets precached: it's the offline shell.
     enforce: 'post',

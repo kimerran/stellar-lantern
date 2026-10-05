@@ -12,10 +12,15 @@
 //   - the bundle carries the @lantern/scanner pipeline;
 //   - no chrome.* extension call and no Android-only plugin made it in (the
 //     `__WEB_BUILD__` / `__NATIVE_BUILD__` guards dead-code-eliminate them);
-//   - no retired domain and no third-party font or CDN host.
+//   - no retired domain and no third-party font or CDN host;
+//   - a strict Content-Security-Policy in index.html, with nothing inline.
+//
+// Then it writes webapp/SHA256SUMS, the hash of every file it serves, so anyone
+// can compare app.golantern.xyz with this repository (#238).
 
 import { execSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -74,9 +79,24 @@ for (const icon of manifest.icons ?? []) {
   if (!existsSync(join(OUT, icon.src)))
     fail(`the manifest names ${icon.src}, which wasn't emitted`);
 }
-if (!readFileSync(join(OUT, 'index.html'), 'utf8').includes('rel="manifest"')) {
-  fail('index.html does not link the web-app manifest');
-}
+const html = readFileSync(join(OUT, 'index.html'), 'utf8');
+if (!html.includes('rel="manifest"')) fail('index.html does not link the web-app manifest');
+// The CSP (#238): present straight after <meta charset>, strict, and nothing
+// inline for it to have to allow.
+const cspTag = html.match(
+  /<head>\s*<meta charset="UTF-8"\s*\/?>\s*<meta http-equiv="Content-Security-Policy" content="([^"]+)"/,
+);
+if (!cspTag) fail('index.html has no Content-Security-Policy straight after <meta charset>');
+const csp = cspTag[1]
+  .replace(/&#39;/g, "'")
+  .replace(/&quot;/g, '"')
+  .replace(/&amp;/g, '&');
+if (!/(^|; )script-src 'self'(;|$)/.test(csp))
+  fail(`the CSP's script-src isn't exactly 'self': ${csp}`);
+if (/unsafe-|\*/.test(csp)) fail(`the CSP allows unsafe sources or wildcards: ${csp}`);
+if (/<script(?![^>]*\bsrc=)[^>]*>/.test(html))
+  fail('index.html has an inline <script>, which the CSP blocks');
+if (/\son[a-z]+=/i.test(html)) fail('index.html has an inline event handler, which the CSP blocks');
 
 // Only the app's own JS: public/miniapps/ are separate sample pages.
 const appJs = built.filter((f) => f.endsWith('.js') && !relative(OUT, f).startsWith('miniapps'));
@@ -89,6 +109,15 @@ for (const f of built.filter((f) => /\.(html|js|css|webmanifest)$/.test(f))) {
     if (body.includes(s)) fail(`${relative(ROOT, f)} contains ${s}`);
   }
 }
+
+// The served files' hashes, in `sha256sum --check` format (#238).
+const sums = built
+  .map(
+    (f) =>
+      `${createHash('sha256').update(readFileSync(f)).digest('hex')}  ${relative(OUT, f).split('\\').join('/')}`,
+  )
+  .join('\n');
+writeFileSync(join(OUT, 'SHA256SUMS'), sums + '\n');
 
 if (check) {
   const rel = (dir) => files(dir).map((f) => relative(dir, f));

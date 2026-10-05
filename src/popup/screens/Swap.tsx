@@ -42,7 +42,8 @@ const SLIPPAGE = 0.005; // 0.5%
 // and quoting a strictly better rate. Revenue share (feeBps) is sent only when a
 // referral wallet is also configured, as the API requires.
 function soroswapConfig(network: NetworkConfig): SoroswapConfig | null {
-  if (!FLAGS.swapAggregator) return null;
+  // Never in the web app (#238): its CSP allows no aggregator origin.
+  if (__WEB_BUILD__ || !FLAGS.swapAggregator) return null;
   const env = import.meta.env as unknown as Record<string, string | undefined>;
   const apiKey = env.VITE_SOROSWAP_API_KEY;
   if (!apiKey) return null;

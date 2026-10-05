@@ -26,12 +26,13 @@
         <p class="crumbs"><a href="/docs/">Lantern — Instawards Phase 1</a> <span class="sep">/</span> <span>Reference</span> <span class="sep">/</span> <span>Verify it yourself</span></p>
         <article class="prose">
 <h1>Verify it yourself</h1>
-<p>A reviewer packet: how someone outside the team can check two things without trusting us.</p>
+<p>A reviewer packet: how someone outside the team can check three things without trusting us.</p>
 <ol>
 <li><strong>The registry contract running on testnet is built from the public source.</strong></li>
 <li><strong>A wallet build you downloaded is the one we published.</strong></li>
+<li><strong>The web app your browser loads is built from the public source.</strong></li>
 </ol>
-<p>Both come down to comparing SHA-256 hashes. Each takes about ten minutes. When you're done, please send us what you got (the section at the end says what).</p>
+<p>All three come down to comparing SHA-256 hashes. Each takes about ten minutes. When you're done, please send us what you got (the section at the end says what).</p>
 <h2>1. The registry contract's bytecode</h2>
 <p>The claim: the contract at <a href="https://stellar.expert/explorer/testnet/contract/CBJWD6SAQ3OGLDKMQROSWVJGW6U27AESLJIURTMFPLNC4UQH5H2G623F" target="_blank" rel="noopener"><code>CBJWD6SA…G623F</code></a> runs WASM whose SHA-256 is</p>
 <pre><code>40fd37718c3fbc7f849c4d414364cdd86c01b4db9ab86be9099007ba5be23783
@@ -68,12 +69,34 @@ curl -sL https://lantern-api-production-3fad.up.railway.app/download/checksums -
 sha256sum --check --ignore-missing SHA256SUMS.txt
 </code></pre>
 <p><strong>Expected:</strong> your file's name followed by <code>OK</code>, for example <code>lantern-extension-0.5.0.zip: OK</code>. Anything else, <code>FAILED</code> or no line at all, means don't install it, and tell us.</p>
+<h2>3. The web app</h2>
+<p>The wallet also runs in a browser, as a web app at <code>https://app.golantern.xyz</code> (testnet only). An extension or an APK is a fixed file you can check once; a website sends its files every time you open it. So the web app publishes the hash of every file it serves, and the same list is committed to the repository beside the files, in <code>webapp/SHA256SUMS</code>.</p>
+<h3>Rebuild it from the source</h3>
+<pre><code class="language-bash">git clone https://github.com/kimerran/stellar-lantern.git
+cd stellar-lantern
+npm ci
+npm run build:web -- --check
+</code></pre>
+<p><strong>Expected:</strong> <code>build:web: webapp/ is up to date</code>. This builds the web app from the source and compares the result, byte for byte, with the committed <code>webapp/</code>, including <code>SHA256SUMS</code>.</p>
+<h3>Compare the site with the repository</h3>
+<pre><code class="language-bash">cd webapp
+# The site's list should be the committed one:
+curl -sf https://app.golantern.xyz/SHA256SUMS | diff - SHA256SUMS &amp;&amp; echo &quot;lists match&quot;
+# Download every file the site serves, then check each one against the list:
+mkdir -p ../served &amp;&amp; cd ../served
+while read -r _ file; do curl -sf --create-dirs -o &quot;$file&quot; &quot;https://app.golantern.xyz/$file&quot;; done &lt; ../webapp/SHA256SUMS
+sha256sum --check ../webapp/SHA256SUMS
+</code></pre>
+<p><strong>Expected:</strong> <code>lists match</code>, then <code>OK</code> on every line. A <code>FAILED</code> line means the site is serving something that isn't in the repository, and that's worth telling us about.</p>
+<h3>What a match proves</h3>
+<p>The files the site served you, the files the public source builds, and the committed list all agree. The page also carries a strict Content-Security-Policy (look for it at the top of <code>webapp/index.html</code>), so it runs no inline script and no script from any other site.</p>
 <h2>Send us your result</h2>
 <p>For the evidence record, send the Lantern team (hello@artisam.xyz):</p>
 <ul>
 <li>the three hashes from section 1: your build, <code>deployed.wasm</code>, and what stellar.expert shows;</li>
 <li>your <code>stellar --version</code> and <code>rustc --version</code>, and your operating system;</li>
-<li>for section 2, the <code>sha256sum --check</code> line.</li>
+<li>for section 2, the <code>sha256sum --check</code> line;</li>
+<li>for section 3, the <code>build:web</code> line and the <code>sha256sum --check</code> summary.</li>
 </ul>
 <p>If anything doesn't match, that's exactly what this page is for. Please send it too.</p>
 
