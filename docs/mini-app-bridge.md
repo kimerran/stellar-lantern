@@ -25,13 +25,16 @@ ignores any message it doesn't recognise, and anything without a `type`.
 ## Frames, origins and trust
 
 - **Who Lantern listens to.** Only messages whose `event.source` is the frame
-  of the app currently open. Messages from any other window are dropped. There
-  is no origin allow-list on Lantern's side: the frame *is* the identity.
-- **How Lantern replies.** `frame.contentWindow.postMessage(reply, "*")`. The
-  target is `"*"` because remote dApps run in an opaque-origin sandbox, which has
-  no origin to name. Since anyone could post to your window, **check the sender
-  yourself**: accept only messages where `event.source === window.parent` and
-  `event.origin` is a Lantern origin you trust.
+  of the app currently open, and whose `event.origin` is one Lantern expects:
+  `"null"` for an opaque frame, or one of a session app's origins (below).
+  Messages from any other window or origin are dropped.
+- **How Lantern replies.** `frame.contentWindow.postMessage(reply, target)`.
+  For an opaque frame `target` is `"*"`: its origin is `"null"`, which can't be
+  named. For a session app it is never `"*"`: it's the `event.origin` of the
+  latest message Lantern accepted from the frame when that origin is one of the
+  app's, otherwise the origin of the URL Lantern opened. Either way, **check the
+  sender yourself**: accept only messages where `event.source === window.parent`
+  and `event.origin` is a Lantern origin you trust.
 - **Lantern's origin**, i.e. the `event.origin` of its replies:
   - Chrome extension: `chrome-extension://<extension id>`
   - Android: `https://android.golantern.xyz` (its own origin in builds after 0.5.1;
@@ -42,14 +45,26 @@ ignores any message it doesn't recognise, and anything without a `type`.
   no `allow-same-origin`, so your page has an opaque origin (`event.origin` of
   your own messages is `"null"`), and no cookies or storage that survive.
   Bundled first-party mini-apps load unsandboxed from Lantern's own origin.
+- **Session apps** (directory entries marked `session`, e.g. Centient) also get
+  `allow-same-origin`, so they run at their real origin and can keep a login.
+  Lantern never grants it to one of its own origins.
+- **An app's origins.** A directory entry's origins are its `url`'s origin plus
+  any extra https origins it lists in `origins`: hosts that serve the same app.
+  Centient opens at `https://beta.centient.work/` and also lists
+  `https://centient.work`. Every per-origin rule uses the whole set:
+  - a session frame may message Lantern from any of them, so the bridge keeps
+    working if your page redirects from one to another, and replies follow it
+    there; any other origin (`https://evil.centient.work`) is refused;
+  - an "Open in Lantern" link (`lantern://open?url=…`) opens only a URL whose
+    origin is exactly one of them, and opens that URL;
+  - the Android app's `asset_statements` list all of them, so
+    `navigator.getInstalledRelatedApps()` can see Lantern on each (your web
+    manifest must still name `com.lantern.wallet` in `related_applications`).
+  Origins only: no paths, wildcards or other subdomains. Adding one is a
+  directory change plus `npm run android:assets`, so it ships with a release.
 - **Many sites refuse to be framed** (`X-Frame-Options`, CSP
   `frame-ancestors`). Lantern can't read those headers; it shows *This site
   can't be embedded* with an *Open in a new tab* button instead.
-
-> **Changing soon (epic #258).** #260 adds
-> `allow-same-origin` for directory dApps only, so they can keep a login, and
-> sends replies to the app's origin instead of `"*"`. Keep your origin check
-> configurable.
 
 ## Requests have no id
 
