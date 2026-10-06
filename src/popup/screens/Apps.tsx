@@ -32,6 +32,7 @@ import {
   type PaymentIntent,
   type SignXdrReview,
 } from '@core/miniapps/bridge';
+import { remoteFrameSandbox, replyTargetOrigin, isFromFramedApp } from '@core/miniapps/frame';
 import { signXdrWith } from '@core/dapp/sign-xdr';
 import { scanTx, type WalletScanInput } from '@core/scan/wallet';
 import { useRecheck } from '../hooks/useRecheck';
@@ -60,13 +61,20 @@ const DIRECTORY = __WEB_BUILD__ ? MINI_APPS.filter((a) => !a.url) : MINI_APPS;
 
 export type Open =
   | { kind: 'app'; app: MiniApp; src: string; title: string; origin: string }
-  | { kind: 'url'; src: string; title: string; origin: string };
+  // `session`: a directory app marked `session: true` (#260). Never set for the URL bar.
+  | { kind: 'url'; src: string; title: string; origin: string; session?: boolean };
 
 // The one place the Open for a remote directory app is built, so tapping the app
 // and an "Open in Lantern" link to it (#263) load it the same way; `src` is the
 // only difference. Per-app frame properties belong here, not at a call site.
 export function remoteAppOpen(app: MiniApp, src: string): Open {
-  return { kind: 'url', src, title: app.name, origin: displayOrigin(app.url!) };
+  return {
+    kind: 'url',
+    src,
+    title: app.name,
+    origin: displayOrigin(app.url!),
+    session: app.session === true,
+  };
 }
 
 // `config` is the resolved NetworkConfig (Settings Horizon / RPC overrides
@@ -124,8 +132,9 @@ export function Apps({
 
   function launchApp(app: MiniApp) {
     if (__FEATURE_TELEMETRY__) track.miniAppOpened(app.id, isRemoteMiniApp(app));
-    // Remote apps load in the opaque-origin sandbox (like the URL bar), reaching
-    // the wallet only through the scan-gated postMessage bridge. Bundled apps are
+    // Remote apps load in the opaque-origin sandbox (like the URL bar), or at
+    // their real origin if marked `session` (#260), reaching the wallet only
+    // through the scan-gated postMessage bridge either way. Bundled apps are
     // first-party pages. Either way, "favoriting" changes nothing about this.
     if (isRemoteMiniApp(app)) {
       setOpen(remoteAppOpen(app, miniAppSrc(app)));
@@ -358,13 +367,21 @@ function Browser({
   const timer = useRef<ReturnType<typeof setTimeout>>();
 
   const isRemote = open.kind === 'url';
+  // Remote frames are opaque unless this is a session directory app (#260);
+  // see src/core/miniapps/frame.ts for the rules, incl. never on Lantern's origin.
+  const sandbox = isRemote ? remoteFrameSandbox(open.src, open.session === true) : undefined;
+  // Where replies go: a session app's own origin; '*' for an opaque frame (its
+  // origin is 'null', so '*' to its own contentWindow is the only way to reach
+  // it) and for bundled first-party pages (unchanged).
+  const replyTarget = sandbox ? replyTargetOrigin(open.src, sandbox) : '*';
 
   // ── Wallet bridge (read-only connect) ──
   // A mini-app posts { type: 'lantern:getPublicKey' }; we reply (after the user
   // approves) with { type: 'lantern:publicKey', publicKey, network }. Only the
   // public key + network are ever shared — never secrets, never signing. We only
-  // trust messages from THIS app's frame (event.source check), and post back to
-  // that same frame (targetOrigin '*' is required for the opaque-origin sandbox).
+  // trust messages from THIS app's frame (event.source, and for remote frames
+  // event.origin too), and post back to that same frame: to the app's origin
+  // for a session app, '*' for an opaque-origin frame (see replyTargetOrigin).
   const [connectReq, setConnectReq] = useState(false);
   const granted = useRef(false);
 
@@ -415,7 +432,7 @@ function Browser({
   const submittingRef = useRef(false);
 
   function postToApp(message: unknown) {
-    frameRef.current?.contentWindow?.postMessage(message, '*');
+    frameRef.current?.contentWindow?.postMessage(message, replyTarget);
   }
   function sendPublicKey() {
     postToApp({ type: 'lantern:publicKey', publicKey: address, network });
@@ -544,7 +561,9 @@ function Browser({
     granted.current = false; // re-prompt per opened app
     function onMessage(e: MessageEvent) {
       const win = frameRef.current?.contentWindow;
-      if (!win || e.source !== win) return; // only our embedded app
+      // Only our embedded app: its window, and (remote) the origin we reply to.
+      if (!win || e.source !== win) return;
+      if (sandbox && !isFromFramedApp(e, win, replyTarget)) return;
       const data = e.data as { type?: string; intent?: unknown; message?: unknown } | null;
       if (data?.type === 'lantern:getPublicKey') {
         postToApp({ type: 'lantern:connecting' }); // ack → dApp waits for approval
@@ -570,7 +589,7 @@ function Browser({
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open.src, address, network, config]);
+  }, [open.src, sandbox, replyTarget, address, network, config]);
 
   function approveConnect() {
     granted.current = true;
@@ -814,9 +833,10 @@ function Browser({
           src={open.src}
           title={open.title}
           // Bundled apps are first-party extension pages (loaded same-origin so
-          // their relative app.js passes script-src 'self'); only remote URLs get
-          // the opaque-origin sandbox.
-          sandbox={isRemote ? 'allow-scripts allow-forms allow-popups' : undefined}
+          // their relative app.js passes script-src 'self'); remote URLs get the
+          // opaque-origin sandbox, or the session sandbox for a directory app
+          // marked `session` (#260).
+          sandbox={sandbox}
           className="h-full w-full border-0"
           onLoad={onFrameLoad}
         />
