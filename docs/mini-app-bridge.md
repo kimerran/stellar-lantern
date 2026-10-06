@@ -34,7 +34,7 @@ ignores any message it doesn't recognise, and anything without a `type`.
   `event.origin` is a Lantern origin you trust.
 - **Lantern's origin**, i.e. the `event.origin` of its replies:
   - Chrome extension: `chrome-extension://<extension id>`
-  - Android: `https://android.golantern.xyz` (its own origin since 0.5.x;
+  - Android: `https://android.golantern.xyz` (its own origin in builds after 0.5.1;
     earlier builds used Capacitor's shared `https://localhost`, so don't trust that)
   - Web app: `https://app.golantern.xyz` (bundled mini-apps only)
 - **Sandbox.** Remote dApps (directory entries with a `url`, and anything opened
