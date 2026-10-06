@@ -60,6 +60,7 @@ exports[`verdict: corpus snapshots > classic-multi-op 1`] = `
     "auth:flat@auth.calls",
     "effects:coverage_full@effects.coverage",
     "screen:clean@screen",
+    "verdict:signing@signing",
   ],
 }
 `;

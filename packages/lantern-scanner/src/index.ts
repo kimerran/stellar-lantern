@@ -14,11 +14,21 @@ export type {
   ScanContext,
   ScanVerdict,
   MessageVerdict,
+  OpSigner,
+  SigningRequirements,
 } from './types';
 export { ACTION_FOR, UNVERIFIED_LABEL, NOT_JUDGED } from './types';
 
 export { decodeTransaction } from './decode';
 export { explainTransaction } from './explainer';
+// Sponsorship + who-signs-what (#261).
+export {
+  signingRequirements,
+  sponsoredSetup,
+  beyondSetup,
+  SPONSORSHIP_OP_TYPES,
+  type SponsoredSetup,
+} from './sponsorship';
 export { describeDefiFunction } from './defi';
 export { analyzeMessage } from './paste';
 export {

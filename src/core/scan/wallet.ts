@@ -157,6 +157,7 @@ export function toScanVerdict(
     net: result.effects.net.map((n) => ({ ...n, asset: { ...n.asset } })),
     approvals: result.effects.approvals.map((a) => ({ ...a, asset: { ...a.asset } })),
     screenTiming: { ms: result.screen.latencyMs, sincePreviousMs },
+    ...(result.signing ? { signing: structuredClone(result.signing) as ScanVerdict['signing'] } : {}),
   };
 }
 
