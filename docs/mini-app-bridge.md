@@ -84,6 +84,11 @@ parent.postMessage({ type: "lantern:getPublicKey" }, "*");
 
 Only the address and network are shared. Check `network` against the network
 you expect and tell the user to switch in Lantern if it differs.
+A directory entry can also name the networks its app runs on (`networks` in
+`src/core/miniapps/directory.ts`). When Lantern is on another network, the
+Apps tab still lists the app but marks it with a chip, e.g. "Testnet" for a
+testnet-only dApp while Lantern is on mainnet. The chip is only a label: the
+bridge still reports Lantern's real network, so your own check still applies.
 
 ## `lantern:signMessage`
 

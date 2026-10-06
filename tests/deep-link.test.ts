@@ -155,6 +155,17 @@ describe('deepLinkOrigins / asset_statements', () => {
     ]);
   });
 
+  it('the real directory lets a link open Centient (#264)', () => {
+    // Default apps = MINI_APPS, not the test fixture above.
+    expect(deepLinkOrigins()).toContain('https://centient.work');
+    expect(parseDeepLink(link('https://centient.work/contributors'))).toMatchObject({
+      kind: 'open',
+      url: 'https://centient.work/contributors',
+      app: { id: 'centient', session: true },
+    });
+    expect(assetXml).toContain('\\"site\\":\\"https://centient.work\\"');
+  });
+
   it('the committed Android resource names every directory origin', () => {
     for (const o of deepLinkOrigins(MINI_APPS)) expect(assetXml).toContain(`\\"site\\":\\"${o}\\"`);
   });
