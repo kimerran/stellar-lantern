@@ -155,6 +155,10 @@ export function intentAssetCode(intent: PaymentIntent): string {
 //             { type: 'lantern:signRejected', error? }  — the user said no
 //             { type: 'lantern:txError', error }        — refused / failed
 //
+// One request at a time: while a review is open or a signature is in flight,
+// a new signXdr (or signAndSubmit) request is refused with txError
+// BUSY_ERROR, and the open review is left as it is. See refuseWhileBusy.
+//
 // Every reply echoes the request's `id` when it had one (a string or a finite
 // number), so a dApp can tell replies to concurrent requests apart later. The
 // validate / scan / sign core is shared with web connect (#252):
@@ -184,6 +188,25 @@ export interface SignXdrReview {
   value: ValidSignXdr;
   scanInput: WalletScanInput;
   verdict: ScanVerdict;
+}
+
+export const BUSY_ERROR = 'Another request is waiting for review.';
+
+/**
+ * One request at a time. While a review is open or a sign is in flight
+ * (`busy`), answer the new request with txError, echoing ITS id, and report
+ * true so the caller drops it. The open review is never replaced: that would
+ * swap what's under the user's finger, and could leave the old request with
+ * two contradictory replies and the new one with none.
+ */
+export function refuseWhileBusy(
+  busy: boolean,
+  id: BridgeRequestId | undefined,
+  post: (message: { type: string; [k: string]: unknown }) => void,
+): boolean {
+  if (!busy) return false;
+  post(withRequestId({ type: 'lantern:txError', error: BUSY_ERROR }, id));
+  return true;
 }
 
 export interface SignXdrBridge {

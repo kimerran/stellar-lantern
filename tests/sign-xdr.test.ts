@@ -14,7 +14,15 @@ import type { ScanVerdict, ScreenAnswer } from '@lantern/scanner';
 import { __setKV, type KV } from '@shared/kv';
 import { handle, lock } from '@core/session/handler';
 import { checkSigned, signXdrScanInput, signXdrWith, validateSignXdr } from '@core/dapp/sign-xdr';
-import { beginSignXdr, bridgeRequestId, withRequestId, type SignXdrBridge } from '@core/miniapps/bridge';
+import {
+  beginSignXdr,
+  BUSY_ERROR,
+  bridgeRequestId,
+  refuseWhileBusy,
+  withRequestId,
+  type SignXdrBridge,
+  type SignXdrReview,
+} from '@core/miniapps/bridge';
 import { scanTx } from '@core/scan/wallet';
 import { decideRecheck, recheckTx } from '@core/scan/recheck';
 import appsSrc from '../src/popup/screens/Apps.tsx?raw';
@@ -320,7 +328,153 @@ describe('signXdrWith via SIGN_ONLY (#262)', () => {
   });
 });
 
+// ── One request at a time (review F1) ────────────────────────────────────────
+//
+// Apps.tsx can't be rendered under the node test env, so this mirrors its
+// flow with the same pieces: beginSignXdr → refuseWhileBusy → open review;
+// approve → SIGN_ONLY → xdrSigned → close only the reviewed xdr. The wiring
+// test below pins Apps.tsx to that shape.
+
+describe('a second request while one is under review (review F1)', () => {
+  beforeEach(() => {
+    __setKV(memoryKV());
+    lock();
+  });
+
+  function appsLike(
+    me: string,
+    send: (req: { type: 'SIGN_ONLY'; xdr: string; networkPassphrase: string }) => Promise<unknown>,
+  ) {
+    const { b, posts } = bridge({ address: me });
+    let open: SignXdrReview | null = null;
+    let submitting = false;
+    const busy = () => open !== null || submitting;
+    return {
+      posts,
+      get open() {
+        return open;
+      },
+      async request(data: unknown) {
+        const review = await beginSignXdr(data, b);
+        if (!review) return;
+        if (refuseWhileBusy(busy(), review.id, b.post)) return;
+        open = review;
+      },
+      async approve() {
+        const req = open!;
+        submitting = true;
+        const res = await signXdrWith(
+          send as never,
+          { xdr: req.value.xdr, networkPassphrase: pp },
+          me,
+        );
+        submitting = false;
+        if (res.ok) {
+          b.post(
+            withRequestId({ type: 'lantern:xdrSigned', signedXdr: res.data.signedXdr }, req.id),
+          );
+          if (open?.value.xdr === req.value.xdr) open = null;
+        }
+      },
+    };
+  }
+
+  it('refuses the second with txError and its own id; the first completes with one xdrSigned', async () => {
+    const me = await unlockedWallet();
+    const first = centient(me);
+    const second = build(me, [
+      Operation.payment({ destination: OTHER, asset: Asset.native(), amount: '1' }),
+    ]);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const send = vi.fn(
+      async (req: { type: 'SIGN_ONLY'; xdr: string; networkPassphrase: string }) => {
+        await gate;
+        return handle(req);
+      },
+    );
+    const app = appsLike(me, send);
+
+    await app.request({ type: 'lantern:signXdr', xdr: first, networkPassphrase: pp, id: 'a' });
+    expect(app.open?.id).toBe('a');
+
+    // While the review is open: refused, review unchanged.
+    await app.request({ type: 'lantern:signXdr', xdr: second, networkPassphrase: pp, id: 'b' });
+    expect(app.open?.id).toBe('a');
+    expect(app.open?.value.xdr).toBe(first);
+
+    // While the first is being signed: refused too.
+    const approving = app.approve();
+    await app.request({ type: 'lantern:signXdr', xdr: second, networkPassphrase: pp, id: 'c' });
+    release();
+    await approving;
+
+    const types = app.posts.map((m) => `${m.type}:${String(m.id)}`);
+    expect(types).toEqual([
+      'lantern:signing:a',
+      'lantern:signing:b',
+      'lantern:txError:b',
+      'lantern:signing:c',
+      'lantern:txError:c',
+      'lantern:xdrSigned:a',
+    ]);
+    expect(
+      app.posts.filter((m) => m.type === 'lantern:txError').every((m) => m.error === BUSY_ERROR),
+    ).toBe(true);
+    // Only the first was ever signed.
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]![0].xdr).toBe(first);
+    const signed = app.posts.filter((m) => m.type === 'lantern:xdrSigned');
+    expect(signed).toHaveLength(1);
+    expect(TransactionBuilder.fromXDR(signed[0]!.signedXdr as string, pp).hash()).toEqual(
+      TransactionBuilder.fromXDR(first, pp).hash(),
+    );
+    expect(app.open).toBeNull();
+  });
+
+  it('refuseWhileBusy replies nothing when idle and echoes only a valid id', () => {
+    const posts: unknown[] = [];
+    expect(refuseWhileBusy(false, 'x', (m) => posts.push(m))).toBe(false);
+    expect(posts).toEqual([]);
+    expect(refuseWhileBusy(true, undefined, (m) => posts.push(m))).toBe(true);
+    expect(posts).toEqual([
+      { type: 'lantern:txError', error: 'Another request is waiting for review.' },
+    ]);
+  });
+});
+
 describe('Apps.tsx wiring (#262)', () => {
+  it('refuses a new request while a review is open or signing, never replaces it (review F1)', () => {
+    expect(appsSrc).not.toMatch(/replacePending/);
+    expect(appsSrc).toMatch(/signReqRef\.current !== null \|\| submittingRef\.current/);
+    // signXdr: checked after beginSignXdr resolves, before any review state changes.
+    const xdrFn = appsSrc.slice(appsSrc.indexOf('async function prepareSignXdr('));
+    const begin = xdrFn.indexOf('await beginSignXdr(');
+    const gate = xdrFn.indexOf('refuseWhileBusy(reviewBusy(), review.id, postToApp)');
+    expect(begin).toBeGreaterThan(-1);
+    expect(gate).toBeGreaterThan(begin);
+    expect(gate).toBeLessThan(xdrFn.indexOf("setConfirmText('')"));
+    expect(gate).toBeLessThan(xdrFn.indexOf('setSignReq('));
+    // Intents: the same rule, with the request's own id.
+    const intentFn = appsSrc.slice(
+      appsSrc.indexOf('async function prepareSign('),
+      appsSrc.indexOf('function reviewBusy('),
+    );
+    const igate = intentFn.indexOf('refuseWhileBusy(reviewBusy(), id, postToApp)');
+    expect(igate).toBeGreaterThan(intentFn.indexOf('await scanTx('));
+    expect(igate).toBeLessThan(intentFn.indexOf("setConfirmText('')"));
+    expect(appsSrc).toMatch(/prepareSign\(data\.intent, bridgeRequestId\(data\)\)/);
+    // approveSign closes only the review it signed.
+    const approve = appsSrc.slice(
+      appsSrc.indexOf('async function approveSign('),
+      appsSrc.indexOf('function rejectSign('),
+    );
+    expect(approve).not.toMatch(/setSignReq\(null\)/);
+    expect(
+      approve.match(/setSignReq\(\(cur\) => \(cur\?\.xdr === signReq\.xdr \? null : cur\)\)/g),
+    ).toHaveLength(2);
+  });
+
   it('handles lantern:signXdr through beginSignXdr and signs with SIGN_ONLY, never SIGN_AND_SUBMIT', () => {
     expect(appsSrc).toMatch(/data\?\.type === 'lantern:signXdr'/);
     expect(appsSrc).toMatch(/beginSignXdr\(data,/);

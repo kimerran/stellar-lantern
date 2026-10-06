@@ -26,6 +26,8 @@ import {
   toAssetRef,
   intentAssetCode,
   beginSignXdr,
+  bridgeRequestId,
+  refuseWhileBusy,
   withRequestId,
   type PaymentIntent,
   type SignXdrReview,
@@ -336,7 +338,9 @@ function Browser({
     | null
   >(null);
   // The pending request, readable from the message listener (a closure over
-  // the first render): a new request replaces it, so the old one is answered.
+  // the first render). One request at a time: while it's open (or being
+  // signed), a new one is refused, never swapped in. Set synchronously when a
+  // review opens, so two scans finishing before a re-render can't both open.
   const signReqRef = useRef<typeof signReq>(null);
   signReqRef.current = signReq;
   // Re-simulate immediately before submit (#121, SOW §3.9). A dApp-initiated
@@ -360,7 +364,7 @@ function Browser({
   }
 
   // Build + scan a dApp payment intent, then surface it for review.
-  async function prepareSign(rawIntent: unknown) {
+  async function prepareSign(rawIntent: unknown, id?: ReturnType<typeof bridgeRequestId>) {
     const validated = validatePaymentIntent(rawIntent);
     if (!validated.ok) {
       postToApp({ type: 'lantern:txError', error: validated.error });
@@ -406,24 +410,30 @@ function Browser({
         context: { network, fromAddress: address, destinationFunded: destFunded, origin: open.title },
       };
       const verdict = await scanTx(scanInput);
+      // Before touching any review state: the open review stays as it is.
+      if (refuseWhileBusy(reviewBusy(), id, postToApp)) return;
       setConfirmText('');
       setSignErr(null);
       recheck.reset();
       if (__FEATURE_TELEMETRY__) track.txScanned(verdict);
-      replacePending();
-      setSignReq({ kind: 'intent', intent, xdr, verdict, fee: formatAmount(String(Number(baseFee) / 1e7)), scanInput });
+      const next = {
+        kind: 'intent' as const,
+        intent,
+        xdr,
+        verdict,
+        fee: formatAmount(String(Number(baseFee) / 1e7)),
+        scanInput,
+      };
+      signReqRef.current = next;
+      setSignReq(next);
     } catch {
       postToApp({ type: 'lantern:txError', error: 'Could not prepare the transaction.' });
     }
   }
 
-  // A newer request takes over the sheet wholesale. The one it replaces is
-  // answered only when it carried an `id`: without one, the dApp would read
-  // that rejection as the answer to its NEW request.
-  function replacePending() {
-    const cur = signReqRef.current;
-    if (cur?.kind !== 'xdr' || cur.request.id === undefined) return;
-    postToApp(withRequestId({ type: 'lantern:signRejected', error: 'Replaced by a newer request.' }, cur.request.id));
+  // A review is open, or a signature for one is in flight (review F1).
+  function reviewBusy(): boolean {
+    return signReqRef.current !== null || submittingRef.current;
   }
 
   // A dApp-built transaction (#262): ack, validate, scan — then review.
@@ -439,19 +449,23 @@ function Browser({
       scan: scanTx,
     });
     if (!review) return;
+    // Checked after the scan (the ack above stays synchronous); the open
+    // review is left untouched.
+    if (refuseWhileBusy(reviewBusy(), review.id, postToApp)) return;
     setConfirmText('');
     setSignErr(null);
     recheck.reset();
     if (__FEATURE_TELEMETRY__) track.txScanned(review.verdict);
-    replacePending();
-    setSignReq({
-      kind: 'xdr',
+    const next = {
+      kind: 'xdr' as const,
       request: review,
       xdr: review.value.xdr,
       verdict: review.verdict,
       fee: formatAmount(String(Number(review.value.fee) / 1e7)),
       scanInput: review.scanInput,
-    });
+    };
+    signReqRef.current = next;
+    setSignReq(next);
   }
 
   // A pending sign-message request (read-only proof of ownership; no funds).
@@ -483,7 +497,7 @@ function Browser({
           postToApp({ type: 'lantern:txError', error: 'Connect the wallet first.' });
           return;
         }
-        void prepareSign(data.intent);
+        void prepareSign(data.intent, bridgeRequestId(data));
       } else if (data?.type === 'lantern:signMessage') {
         if (!granted.current) {
           postToApp({ type: 'lantern:signRejected', error: 'Connect the wallet first.' });
@@ -541,7 +555,8 @@ function Browser({
       setSubmitting(false);
       if (res.ok) {
         postToApp(withRequestId({ type: 'lantern:xdrSigned', signedXdr: res.data.signedXdr }, signReq.request.id));
-        setSignReq(null);
+        // Keyed to the xdr, like the re-check update: only this review closes.
+        setSignReq((cur) => (cur?.xdr === signReq.xdr ? null : cur));
       } else {
         setSignErr(res.code === 'LOCKED' ? 'Wallet locked — reopen to unlock and retry.' : res.error);
       }
@@ -557,7 +572,7 @@ function Browser({
     setSubmitting(false);
     if (res.ok) {
       postToApp({ type: 'lantern:txResult', hash: res.data.hash });
-      setSignReq(null);
+      setSignReq((cur) => (cur?.xdr === signReq.xdr ? null : cur));
     } else {
       setSignErr(res.code === 'LOCKED' ? 'Wallet locked — reopen to unlock and retry.' : res.error);
     }
