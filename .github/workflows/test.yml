@@ -64,6 +64,13 @@ jobs:
       - name: Web app is up to date
         run: npm run build:web -- --check
 
+      # The Android app's asset_statements resource (#263) is generated from the
+      # mini-app directory by scripts/gen-asset-statements.mjs and committed.
+      # Fail if a directory change left it stale, so the sites Chrome is told
+      # about always match the ones "Open in Lantern" will open.
+      - name: Android asset statements are up to date
+        run: npm run android:assets -- --check
+
       # Flag dead-code-elimination proof (#81 / #88): builds with the demo
       # and telemetry flags on and off and asserts the telemetry module and
       # the ingest origin are ABSENT from a flag-off bundle.

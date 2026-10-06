@@ -120,6 +120,9 @@ build(false);
 // dead-code-eliminate. Checked on the default extension build just made.
 const QR_PLUGIN_MARKER = 'isGoogleBarcodeScannerModuleAvailable';
 const qrInExtension = bundleHas(QR_PLUGIN_MARKER) || bundleHas('capacitor-mlkit');
+// Likewise the "Open in Lantern" deep-link listener (#263): only the Android
+// build registers @capacitor/app's appUrlOpen.
+const deepLinkInExtension = bundleHas('appUrlOpen');
 
 // The web app (#237) is the reverse: `__WEB_BUILD__` is false in the extension
 // build, so its IndexedDB vault, one-tab lock and "open in another tab" screen
@@ -149,6 +152,12 @@ if (qrInExtension) {
   failed = true;
 } else {
   console.log('✓ QR scanner plugin ABSENT from the extension bundle (Android-only).');
+}
+if (deepLinkInExtension) {
+  console.error('✗ FAIL: the Android deep-link listener (appUrlOpen) is in the extension bundle (__NATIVE_BUILD__ guard broken).');
+  failed = true;
+} else {
+  console.log('✓ deep-link listener ABSENT from the extension bundle (Android-only).');
 }
 if (telemetryOffHas) {
   console.error('✗ FAIL: telemetry code or the ingest URL is in the bundle with TELEMETRY=false.');

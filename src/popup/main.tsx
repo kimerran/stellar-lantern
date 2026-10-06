@@ -29,6 +29,14 @@ if (isNativePlatform()) {
   })();
 }
 
+// "Open in Lantern" links (#263). Started before the first render so a link
+// that launched the app is waiting by the time the wallet mounts. Behind
+// __NATIVE_BUILD__ so the extension and web bundles don't carry @capacitor/app's
+// deep-link wiring.
+if (__NATIVE_BUILD__ && isNativePlatform()) {
+  void import('./deep-link/native').then((m) => m.listenForDeepLinks());
+}
+
 // Expanded ("open in full tab") mode — same wallet rendered as a centered card.
 if (new URLSearchParams(window.location.search).has('expanded')) {
   document.documentElement.classList.add('expanded');

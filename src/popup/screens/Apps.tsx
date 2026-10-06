@@ -38,6 +38,7 @@ import { ReportCounterparties, counterpartiesOf } from '../components/ReportAddr
 import { ScanBadge } from '../components/ScanBadge';
 import { HoldToConfirm } from '../components/HoldToConfirm';
 import { isNativePlatform } from '@shared/kv';
+import type { PendingDeepLink } from '../deep-link/inbox';
 
 // The web app (#238) lists only the bundled mini-apps: its CSP allows frames
 // from its own origin alone, so a remote dApp couldn't load there.
@@ -62,14 +63,40 @@ export function Apps({
   address,
   network,
   config,
+  deepLink = null,
+  onDeepLinkHandled,
 }: {
   address: string;
   network: NetworkId;
   config: NetworkConfig;
+  /** An "Open in Lantern" link to act on (#263), already origin-checked. */
+  deepLink?: PendingDeepLink | null;
+  onDeepLinkHandled?: () => void;
 }) {
   const [open, setOpen] = useState<Open | null>(null);
   const [urlText, setUrlText] = useState('');
   const [urlError, setUrlError] = useState(false);
+  // Set when a link asked to open a site outside the directory: we opened
+  // nothing and say so. '' when the link carried no usable site at all.
+  const [refusedLink, setRefusedLink] = useState<string | null>(null);
+
+  // "Open in Lantern" (#263). parseDeepLink only returns `open` for a URL whose
+  // origin is a directory app's; it loads in the same opaque-origin sandbox as
+  // tapping that app. Anything else opens nothing.
+  useEffect(() => {
+    if (!deepLink) return;
+    const { link } = deepLink;
+    if (link.kind === 'open') {
+      setRefusedLink(null);
+      if (__FEATURE_TELEMETRY__) track.miniAppOpened(link.app.id, true);
+      setOpen({ kind: 'url', src: link.url, title: link.app.name, origin: displayOrigin(link.url) });
+    } else {
+      setOpen(null);
+      setRefusedLink(link.origin ?? '');
+    }
+    onDeepLinkHandled?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- act once per link id
+  }, [deepLink?.id]);
 
   // Favorited / "installed" app ids (#93). Loaded once, then kept live across
   // surfaces via the settings pub-sub — favoriting an app in one window updates
@@ -113,7 +140,7 @@ export function Apps({
 
   if (open) {
     return (
-      <Browser open={open} address={address} network={network} config={config} onClose={() => setOpen(null)} />
+      <Browser key={open.src} open={open} address={address} network={network} config={config} onClose={() => setOpen(null)} />
     );
   }
 
@@ -121,6 +148,31 @@ export function Apps({
 
   return (
     <div className="space-y-5 pt-1">
+      {refusedLink !== null && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-xl border border-error/30 bg-error-container/15 p-3"
+        >
+          <Icon name="block" size={18} className="mt-0.5 shrink-0 text-error" />
+          <div className="min-w-0 flex-1">
+            <p className="text-label-lg text-on-surface">
+              This site isn’t in Lantern’s directory
+            </p>
+            <p className="break-all text-label-md text-on-surface-variant">
+              {refusedLink
+                ? `A link asked Lantern to open ${refusedLink}. Lantern only opens directory apps from links, so nothing was opened.`
+                : 'A link asked Lantern to open a page it couldn’t check, so nothing was opened.'}
+            </p>
+          </div>
+          <button
+            onClick={() => setRefusedLink(null)}
+            className="shrink-0 text-on-surface-variant hover:text-on-surface"
+            aria-label="Dismiss"
+          >
+            <Icon name="close" size={18} />
+          </button>
+        </div>
+      )}
       {/* URL bar. Not in the web app: its CSP frames only its own origin (#238). */}
       {!__WEB_BUILD__ && (
         <section className="space-y-2">

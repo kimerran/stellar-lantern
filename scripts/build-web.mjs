@@ -40,6 +40,8 @@ const FORBIDDEN = [
   'capacitor-mlkit',
   'isGoogleBarcodeScannerModuleAvailable',
   '@capacitor/preferences',
+  // The "Open in Lantern" deep-link listener (#263), behind __NATIVE_BUILD__.
+  'appUrlOpen',
   // As for the playground.
   'lantern.artisam.xyz',
   'fonts.googleapis.com',

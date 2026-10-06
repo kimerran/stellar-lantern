@@ -10,6 +10,7 @@ import { BottomNav, type Tab } from './components/BottomNav';
 import { Icon } from './components/Icon';
 import { useToast } from './components/Toast';
 import { usePasskeyAccount } from './hooks/usePasskeyAccount';
+import { onDeepLink, peekDeepLink, takeDeepLink, type PendingDeepLink } from './deep-link/inbox';
 // First-paint path stays eager: splash → unlock/onboarding → home (assets),
 // plus Settings which shares the home shell. (#127)
 import { Onboarding } from './screens/Onboarding';
@@ -74,6 +75,23 @@ export function App() {
   const [swapOpen, setSwapOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const showToast = useToast();
+  // "Open in Lantern" (#263): a link waits in memory until the wallet is
+  // unlocked (Unlock shows first when locked), then opens in the Apps tab.
+  const [inbox, setInbox] = useState<PendingDeepLink | null>(peekDeepLink);
+  const [deepLink, setDeepLink] = useState<PendingDeepLink | null>(null);
+  useEffect(() => onDeepLink(() => setInbox(peekDeepLink())), []);
+  const unlocked = !!status?.initialized && !status.locked && !!status.address;
+  useEffect(() => {
+    if (!unlocked || !inbox || peekDeepLink()?.id !== inbox.id) return;
+    takeDeepLink(inbox.id);
+    setScanOpen(false);
+    setGuardiansOpen(false);
+    setCashOpen(false);
+    setSwapOpen(false);
+    setReceiveOpen(false);
+    setTab('apps');
+    setDeepLink(inbox);
+  }, [unlocked, inbox]);
   // Memoized so the NetworkConfig only rebuilds when settings change, instead of
   // on every render. Computed at the top (before any early return) to respect the
   // Rules of Hooks; `settings` may be null on first paint, so guard for it. (#127)
@@ -211,7 +229,15 @@ export function App() {
             {tab === 'send' && (
               <Send address={address} network={network} onDone={() => setTab('activity')} />
             )}
-            {tab === 'apps' && <Apps address={address} network={settings.network} config={network} />}
+            {tab === 'apps' && (
+              <Apps
+                address={address}
+                network={settings.network}
+                config={network}
+                deepLink={deepLink}
+                onDeepLinkHandled={() => setDeepLink(null)}
+              />
+            )}
             {tab === 'activity' && <Activity address={address} network={network} embedded />}
             {tab === 'settings' && (
               <Settings

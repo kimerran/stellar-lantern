@@ -9,6 +9,11 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <!-- Lets Chrome answer a directory site's navigator.getInstalledRelatedApps()
+             (#263). The string is generated from the mini-app directory: see
+             res/values/asset_statements.xml and `npm run android:assets`. -->
+        <meta-data android:name="asset_statements" android:resource="@string/asset_statements" />
+
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
@@ -20,6 +25,18 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- "Open in Lantern" (#263): a site's
+                 intent://open?url=…#Intent;scheme=lantern;package=com.lantern.wallet;…;end
+                 link arrives as lantern://open?url=<https URL>. The app opens it in the
+                 Apps tab only if its origin is a directory app's
+                 (src/core/miniapps/deep-link.ts); anything else opens nothing. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="lantern" android:host="open" />
             </intent-filter>
 
         </activity>
