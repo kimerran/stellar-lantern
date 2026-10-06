@@ -554,6 +554,9 @@ footer { border-top: 1px solid rgba(79, 70, 50, 0.5); padding: 56px 0 40px; back
    app.js hides the options that can't apply (data-cta + hidden). The rule wins
    over .btn's display: inline-flex. */
 [data-cta][hidden] { display: none !important; }
+/* The web app's links and copy (data-web-app) start hidden until app.js's
+   WEB_APP_LIVE is set; the install card is a .step, which sets display. */
+[data-web-app][hidden], [data-web-app-off][hidden] { display: none !important; }
 .cta-hint { margin-top: 14px; font-size: 13px; line-height: 1.5; color: var(--on-surface-variant); display: flex; align-items: flex-start; gap: 7px; max-width: 46ch; }
 .cta-hint .material-symbols-outlined { font-size: 16px; color: var(--amber-dim); margin-top: 1px; }
 .cta-alt { font-size: 13px; color: var(--outline); }
