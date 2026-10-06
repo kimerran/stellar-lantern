@@ -55,6 +55,67 @@ export interface DecodedOp {
   destAssetCode?: string;
   destAssetIssuer?: string;
   destMin?: string;
+  // Sponsorship + trustlines (#261).
+  // beginSponsoringFutureReserves: the account whose new reserves the op's
+  // source pays for, until that account's `endSponsoringFutureReserves`.
+  sponsoredId?: string;
+  // changeTrust: the trustline's asset is `assetCode` / `assetIssuer`
+  // (`assetCode: 'liquidity pool share'` for a pool-share line); this is its
+  // limit as a 7-decimal string. A limit of 0 removes the trustline.
+  trustLimit?: string;
+  // revokeSponsorship (the SDK's seven `revoke…Sponsorship` types, folded into
+  // `type: 'revokeSponsorship'`): which ledger entry's sponsorship ends, and
+  // the account that entry belongs to (absent for claimable balances and
+  // liquidity pools). Once revoked, that account carries the reserve itself.
+  revokeEntry?:
+    | 'account'
+    | 'trustline'
+    | 'offer'
+    | 'data'
+    | 'claimableBalance'
+    | 'liquidityPool'
+    | 'signer';
+  revokeAccount?: string;
+}
+
+// Who has to sign what (#261). A transaction a dApp builds can have someone
+// else as its source (a sponsor paying the fee) and set per-operation sources
+// on the operations that act for the user. Every operation acts for one
+// account — its own `source`, else the transaction's — and that account's
+// signature is what authorizes it. `scan()` and `runPipeline()` both report
+// this, computed for `ScanContext.fromAddress` (the user):
+//   - `userOps`: what the user's signature authorizes. A signer (e.g.
+//     `lantern:signXdr`) adds the user's signature for exactly these.
+//   - `otherOps` / `otherSigners`: what someone else must sign; the user's
+//     signature is not enough on its own to submit the transaction.
+// Muxed (M…) sources are compared by their base G… account. A fee-bump's fee
+// source is not modelled: only the inner transaction is decoded.
+export interface OpSigner {
+  opIndex: number;
+  type: string;
+  // The account the op acts for (base G…), explicit or inherited.
+  source: string;
+  // True when the op carried its own source; false when it inherits the
+  // transaction's.
+  explicitSource: boolean;
+  byUser: boolean;
+}
+
+export interface SigningRequirements {
+  // The account the requirements were computed for (`fromAddress`).
+  user: string;
+  // The (inner) transaction source: it pays the fee and its sequence number is
+  // used, so it always signs the envelope.
+  txSource: string;
+  userIsTxSource: boolean;
+  // Op indexes whose source, explicit or inherited, is the user.
+  userOps: number[];
+  // Op indexes some other account authorizes.
+  otherOps: number[];
+  // Every account other than the user whose signature the transaction needs
+  // (the tx source and every op source), in first-seen order.
+  otherSigners: string[];
+  ops: OpSigner[];
 }
 
 export interface DecodedTx {
@@ -103,6 +164,10 @@ export interface ScanVerdict {
   // screening line (D3 QA plan §10.1). Absent from the legacy scan() itself;
   // the wallet adapter sets it.
   registry?: 'checked' | 'unavailable';
+  // Which operations need the user's signature and which are someone else's
+  // (#261). Absent when the transaction could not be decoded (and from
+  // verdicts built before #261).
+  signing?: SigningRequirements;
   // Registry screening timing, when the pipeline ran (#180): how long stage 4
   // took, and how long since the previous screening in this session (`null`
   // for the first). Diagnostics for "couldn't check the recipient" — the
@@ -300,6 +365,8 @@ export type EffectKind =
   | 'contract_call' // invokeHostFunction not otherwise decoded (3c)
   | 'account_control' // setOptions signer / threshold change
   | 'account_merge'
+  | 'trustline' // changeTrust: counterparty = the asset issuer (screened) (#261)
+  | 'sponsorship' // begin/end/revoke sponsorship (#261)
   | 'unknown';
 export interface Effect {
   kind: EffectKind;
@@ -417,6 +484,10 @@ export interface EffectSet {
   // 'full' when every op and every authorised call was decoded by 3a/3b;
   // 'partial' whenever anything is `unverified`.
   coverage: 'none' | 'partial' | 'full';
+  // Who has to sign which operation, for the scanning user (#261). Optional
+  // only so hand-built EffectSets stay valid; `effects()` sets it whenever the
+  // transaction decoded.
+  signing?: SigningRequirements;
 }
 
 // Stage 4 — Screen. Three outcomes, never two: a registry that could not be
@@ -499,4 +570,9 @@ export interface ScanResult {
   auth: AuthTree;
   effects: DeepReadonly<EffectSet>;
   screen: ScreenResult;
+  // Which ops need the user's signature vs someone else's (#261); null when
+  // the transaction could not be decoded. Same object as `effects.signing`.
+  // `runPipeline` always sets it; optional only so hand-built results (tests,
+  // pre-#261 callers) stay valid.
+  signing?: DeepReadonly<SigningRequirements> | null;
 }

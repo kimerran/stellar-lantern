@@ -92,9 +92,74 @@ function mapOp(op: Record<string, unknown>): DecodedOp {
       return { ...base, ...decodeSetOptions(op) };
     case 'invokeHostFunction':
       return { ...base, ...decodeInvoke(op) };
+    // Sponsorship + trustlines (#261). The sandwich a dApp hands over to set
+    // up a user's account: someone else's `beginSponsoringFutureReserves`, the
+    // user's `changeTrust`, the user's `endSponsoringFutureReserves`.
+    case 'beginSponsoringFutureReserves':
+      return { ...base, ...(str(op.sponsoredId) ? { sponsoredId: str(op.sponsoredId) } : {}) };
+    case 'endSponsoringFutureReserves':
+      return base;
+    case 'changeTrust':
+      return { ...base, ...decodeChangeTrust(op) };
     default:
+      // The SDK splits revokeSponsorship into one type per ledger-entry kind
+      // (`revokeTrustlineSponsorship`, …); fold them into one op type.
+      if (REVOKE_ENTRY[type]) {
+        const revoke = decodeRevoke(op, REVOKE_ENTRY[type]);
+        return source ? { ...revoke, sourceAccount: source } : revoke;
+      }
       return base;
   }
+}
+
+// changeTrust: the asset the trustline is for, and its limit. A limit of 0
+// removes the trustline. A liquidity-pool share line has no code/issuer of its
+// own; it is labelled as such rather than mistaken for XLM.
+function decodeChangeTrust(op: Record<string, unknown>): Partial<DecodedOp> {
+  const line = op.line as { code?: unknown; getAssetType?: () => string } | undefined;
+  const limit = str(op.limit);
+  const isPool =
+    !!line &&
+    typeof line.getAssetType === 'function' &&
+    line.getAssetType() === 'liquidity_pool_shares';
+  return {
+    ...(isPool
+      ? { assetCode: 'liquidity pool share' }
+      : {
+          ...(assetCode(line) ? { assetCode: assetCode(line) } : {}),
+          ...(assetIssuer(line) ? { assetIssuer: assetIssuer(line) } : {}),
+        }),
+    ...(limit !== undefined ? { trustLimit: limit } : {}),
+  };
+}
+
+const REVOKE_ENTRY: Record<string, NonNullable<DecodedOp['revokeEntry']>> = {
+  revokeAccountSponsorship: 'account',
+  revokeTrustlineSponsorship: 'trustline',
+  revokeOfferSponsorship: 'offer',
+  revokeDataSponsorship: 'data',
+  revokeClaimableBalanceSponsorship: 'claimableBalance',
+  revokeLiquidityPoolSponsorship: 'liquidityPool',
+  revokeSignerSponsorship: 'signer',
+};
+
+// revokeSponsorship, whatever the entry: which entry, and whose account it
+// belongs to (offers name it `seller`). Claimable balances and liquidity
+// pools belong to no account.
+function decodeRevoke(
+  op: Record<string, unknown>,
+  entry: NonNullable<DecodedOp['revokeEntry']>,
+): DecodedOp {
+  const account = str(op.account) ?? str(op.seller);
+  // A trustline's asset; a pool-share trustline names a pool id instead.
+  const asset = (op.asset as { code?: unknown } | undefined)?.code ? op.asset : undefined;
+  return {
+    type: 'revokeSponsorship',
+    revokeEntry: entry,
+    ...(account ? { revokeAccount: account } : {}),
+    ...(entry === 'trustline' && assetCode(asset) ? { assetCode: assetCode(asset) } : {}),
+    ...(entry === 'trustline' && assetIssuer(asset) ? { assetIssuer: assetIssuer(asset) } : {}),
+  };
 }
 
 // Pull the contract address + function name out of a Soroban invokeHostFunction

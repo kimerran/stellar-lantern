@@ -1,0 +1,153 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`single-op explanations are pinned (#261) > accountMerge 1`] = `
+{
+  "explanation": "This performs a account merge operation.",
+  "reasons": [
+    "account_merge:high",
+  ],
+  "risk": "high",
+}
+`;
+
+exports[`single-op explanations are pinned (#261) > createAccount 1`] = `
+{
+  "explanation": "This creates and funds a new account GDVE...ZA57 with 2 XLM.",
+  "reasons": [],
+  "risk": "low",
+}
+`;
+
+exports[`single-op explanations are pinned (#261) > invoke supply 1`] = `
+{
+  "explanation": "Deposits funds into a lending pool — calls “supply” on a smart contract (CA3D...GAXE). Only continue if you trust it.",
+  "reasons": [
+    "contract_call:medium",
+  ],
+  "risk": "medium",
+}
+`;
+
+exports[`single-op explanations are pinned (#261) > invoke unknown fn 1`] = `
+{
+  "explanation": "This calls “frobnicate” on a smart contract (CA3D...GAXE) that may move funds or change permissions. Only continue if you trust it.",
+  "reasons": [
+    "contract_call:medium",
+  ],
+  "risk": "medium",
+}
+`;
+
+exports[`single-op explanations are pinned (#261) > manageData 1`] = `
+{
+  "explanation": "This performs a manage data operation.",
+  "reasons": [
+    "unrecognized_op:medium",
+  ],
+  "risk": "medium",
+}
+`;
+
+exports[`single-op explanations are pinned (#261) > payment USDC 1`] = `
+{
+  "explanation": "This sends 1,000 USDC to GDVE...ZA57.",
+  "reasons": [
+    "drains_balance:high",
+  ],
+  "risk": "high",
+}
+`;
+
+exports[`single-op explanations are pinned (#261) > payment XLM 1`] = `
+{
+  "explanation": "This sends 12.5 XLM to GDVE...ZA57.",
+  "reasons": [],
+  "risk": "low",
+}
+`;
+
+exports[`single-op explanations are pinned (#261) > payment to deny-listed 1`] = `
+{
+  "explanation": "This sends 5 XLM to GA7Q...VSGZ.",
+  "reasons": [
+    "reported_address:high",
+  ],
+  "risk": "high",
+}
+`;
+
+exports[`single-op explanations are pinned (#261) > payment with memo 1`] = `
+{
+  "explanation": "This sends 3 XLM to GDVE...ZA57. Memo: “invoice 42”.",
+  "reasons": [],
+  "risk": "low",
+}
+`;
+
+exports[`single-op explanations are pinned (#261) > payment with scam memo 1`] = `
+{
+  "explanation": "This sends 3 XLM to GDVE...ZA57. Memo: “claim your airdrop”.",
+  "reasons": [
+    "memo_language:high",
+  ],
+  "risk": "high",
+}
+`;
+
+exports[`single-op explanations are pinned (#261) > setOptions add signer 1`] = `
+{
+  "explanation": "This adds signer GDVE...ZA57 with weight 1. Only continue if you set this up yourself.",
+  "reasons": [
+    "account_control_change:high",
+  ],
+  "risk": "high",
+}
+`;
+
+exports[`single-op explanations are pinned (#261) > setOptions home domain 1`] = `
+{
+  "explanation": "This changes account options. Only continue if you set this up yourself.",
+  "reasons": [],
+  "risk": "low",
+}
+`;
+
+exports[`single-op explanations are pinned (#261) > setOptions master 0 + thresholds 1`] = `
+{
+  "explanation": "This removes your own key’s signing power, and sets the signing thresholds (low 1, medium 2, high 3). Only continue if you set this up yourself.",
+  "reasons": [
+    "account_control_change:high",
+  ],
+  "risk": "high",
+}
+`;
+
+exports[`single-op explanations are pinned (#261) > setOptions remove signer 1`] = `
+{
+  "explanation": "This removes signer GDVE...ZA57. Only continue if you set this up yourself.",
+  "reasons": [
+    "account_control_change:high",
+  ],
+  "risk": "high",
+}
+`;
+
+exports[`single-op explanations are pinned (#261) > strict-receive swap to other 1`] = `
+{
+  "explanation": "This swaps up to 110 XLM for 25 USDC.",
+  "reasons": [
+    "swap_to_other:medium",
+  ],
+  "risk": "medium",
+}
+`;
+
+exports[`single-op explanations are pinned (#261) > strict-send swap 1`] = `
+{
+  "explanation": "This swaps 100 XLM for at least 24.3 USDC.",
+  "reasons": [],
+  "risk": "low",
+}
+`;
+
+exports[`single-op explanations are pinned (#261) > undecodable 1`] = `"This transaction could not be read. Only continue if you trust the source."`;
