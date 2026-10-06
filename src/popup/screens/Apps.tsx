@@ -25,8 +25,12 @@ import {
   validatePaymentIntent,
   toAssetRef,
   intentAssetCode,
+  beginSignXdr,
+  withRequestId,
   type PaymentIntent,
+  type SignXdrReview,
 } from '@core/miniapps/bridge';
+import { signXdrWith } from '@core/dapp/sign-xdr';
 import { scanTx, type WalletScanInput } from '@core/scan/wallet';
 import { useRecheck } from '../hooks/useRecheck';
 import { RecheckNotice } from '../components/RecheckNotice';
@@ -308,13 +312,33 @@ function Browser({
   // user's review. The dApp sends an *intent* (destination/amount/memo) — Lantern
   // builds, scans, signs and submits, so the secret never leaves and every send
   // goes through the same security review as the wallet's own Send flow.
-  const [signReq, setSignReq] = useState<{
-    intent: PaymentIntent;
-    xdr: string;
-    verdict: ScanVerdict;
-    fee: string;
-    scanInput: WalletScanInput;
-  } | null>(null);
+  //
+  // Or (#262, `lantern:signXdr`) a transaction the dApp built itself — maybe
+  // already signed by a sponsor — that Lantern scans, signs through SIGN_ONLY
+  // and hands back without submitting. Same sheet, same gates.
+  const [signReq, setSignReq] = useState<
+    | {
+        kind: 'intent';
+        intent: PaymentIntent;
+        xdr: string;
+        verdict: ScanVerdict;
+        fee: string;
+        scanInput: WalletScanInput;
+      }
+    | {
+        kind: 'xdr';
+        request: SignXdrReview;
+        xdr: string;
+        verdict: ScanVerdict;
+        fee: string;
+        scanInput: WalletScanInput;
+      }
+    | null
+  >(null);
+  // The pending request, readable from the message listener (a closure over
+  // the first render): a new request replaces it, so the old one is answered.
+  const signReqRef = useRef<typeof signReq>(null);
+  signReqRef.current = signReq;
   // Re-simulate immediately before submit (#121, SOW §3.9). A dApp-initiated
   // payment is the case where the wait between review and confirm is longest.
   const recheck = useRecheck();
@@ -386,10 +410,48 @@ function Browser({
       setSignErr(null);
       recheck.reset();
       if (__FEATURE_TELEMETRY__) track.txScanned(verdict);
-      setSignReq({ intent, xdr, verdict, fee: formatAmount(String(Number(baseFee) / 1e7)), scanInput });
+      replacePending();
+      setSignReq({ kind: 'intent', intent, xdr, verdict, fee: formatAmount(String(Number(baseFee) / 1e7)), scanInput });
     } catch {
       postToApp({ type: 'lantern:txError', error: 'Could not prepare the transaction.' });
     }
+  }
+
+  // A newer request takes over the sheet wholesale. The one it replaces is
+  // answered only when it carried an `id`: without one, the dApp would read
+  // that rejection as the answer to its NEW request.
+  function replacePending() {
+    const cur = signReqRef.current;
+    if (cur?.kind !== 'xdr' || cur.request.id === undefined) return;
+    postToApp(withRequestId({ type: 'lantern:signRejected', error: 'Replaced by a newer request.' }, cur.request.id));
+  }
+
+  // A dApp-built transaction (#262): ack, validate, scan — then review.
+  async function prepareSignXdr(data: unknown) {
+    const review = await beginSignXdr(data, {
+      post: postToApp,
+      connected: granted.current,
+      address,
+      network,
+      networkPassphrase: config.passphrase,
+      rpcUrl: config.sorobanRpcUrl,
+      origin: open.title,
+      scan: scanTx,
+    });
+    if (!review) return;
+    setConfirmText('');
+    setSignErr(null);
+    recheck.reset();
+    if (__FEATURE_TELEMETRY__) track.txScanned(review.verdict);
+    replacePending();
+    setSignReq({
+      kind: 'xdr',
+      request: review,
+      xdr: review.value.xdr,
+      verdict: review.verdict,
+      fee: formatAmount(String(Number(review.value.fee) / 1e7)),
+      scanInput: review.scanInput,
+    });
   }
 
   // A pending sign-message request (read-only proof of ownership; no funds).
@@ -428,6 +490,9 @@ function Browser({
           return;
         }
         if (typeof data.message === 'string') setMsgReq(data.message);
+      } else if (data?.type === 'lantern:signXdr') {
+        // beginSignXdr acks synchronously, before its first await (#262).
+        void prepareSignXdr(data);
       }
     }
     window.addEventListener('message', onMessage);
@@ -465,6 +530,23 @@ function Browser({
       return;
     }
     const cfg = config;
+    if (signReq.kind === 'xdr') {
+      // Sign only — the dApp submits. Existing signatures (a sponsor's) stay.
+      const res = await signXdrWith(
+        sendMessage,
+        { xdr: signReq.xdr, networkPassphrase: signReq.request.value.networkPassphrase },
+        address,
+      );
+      submittingRef.current = false;
+      setSubmitting(false);
+      if (res.ok) {
+        postToApp(withRequestId({ type: 'lantern:xdrSigned', signedXdr: res.data.signedXdr }, signReq.request.id));
+        setSignReq(null);
+      } else {
+        setSignErr(res.code === 'LOCKED' ? 'Wallet locked — reopen to unlock and retry.' : res.error);
+      }
+      return;
+    }
     const res = await sendMessage({
       type: 'SIGN_AND_SUBMIT',
       xdr: signReq.xdr,
@@ -481,7 +563,8 @@ function Browser({
     }
   }
   function rejectSign() {
-    postToApp({ type: 'lantern:txRejected' });
+    if (signReq?.kind === 'xdr') postToApp(withRequestId({ type: 'lantern:signRejected' }, signReq.request.id));
+    else postToApp({ type: 'lantern:txRejected' });
     setSignReq(null);
     setSignErr(null);
     recheck.reset();
@@ -749,17 +832,22 @@ function Browser({
             <div className="flex items-center gap-2">
               <Icon name="draw" size={18} className="text-primary-container" />
               <span id="sign-sheet-title" className="text-title-sm text-on-surface">
-                <span className="font-semibold">{open.title}</span> wants to send
+                <span className="font-semibold">{open.title}</span>{' '}
+                {signReq.kind === 'xdr' ? 'wants you to sign a transaction' : 'wants to send'}
               </span>
             </div>
-            <div className="rounded-xl bg-surface-container-high p-3 text-center">
-              <p className={`text-headline-lg-mobile ${isHigh ? 'text-on-surface-variant' : 'text-primary glow-amber-text'}`}>
-                {formatAmount(signReq.intent.amount)} {intentAssetCode(signReq.intent)}
-              </p>
-              <p className="mt-1 font-mono text-label-sm text-on-surface-variant">
-                to {truncateAddress(signReq.intent.destination, 5, 5)}
-              </p>
-            </div>
+            {signReq.kind === 'intent' ? (
+              <div className="rounded-xl bg-surface-container-high p-3 text-center">
+                <p className={`text-headline-lg-mobile ${isHigh ? 'text-on-surface-variant' : 'text-primary glow-amber-text'}`}>
+                  {formatAmount(signReq.intent.amount)} {intentAssetCode(signReq.intent)}
+                </p>
+                <p className="mt-1 font-mono text-label-sm text-on-surface-variant">
+                  to {truncateAddress(signReq.intent.destination, 5, 5)}
+                </p>
+              </div>
+            ) : (
+              <SignXdrSummary request={signReq.request} />
+            )}
 
             {signReq.verdict.action === 'allow' ? (
               <div className="flex items-center justify-between rounded-xl border border-tertiary-container/20 bg-surface-container-high p-3">
@@ -785,13 +873,21 @@ function Browser({
               subjects={
                 counterpartiesOf(signReq.verdict, address).length > 0
                   ? counterpartiesOf(signReq.verdict, address)
-                  : [{ address: signReq.intent.destination }]
+                  : signReq.kind === 'intent'
+                    ? [{ address: signReq.intent.destination }]
+                    : signReq.request.value.signing.otherSigners.map((a) => ({ address: a }))
               }
             />
 
             <div className="flex items-center justify-between text-label-sm text-on-surface-variant">
               <span>Network fee</span>
-              <span>~{signReq.fee} XLM · {network === 'PUBLIC' ? 'Mainnet' : 'Testnet'}</span>
+              <span>
+                ~{signReq.fee} XLM
+                {signReq.kind === 'xdr' && !signReq.request.value.signing.userIsTxSource
+                  ? ` · paid by ${truncateAddress(signReq.request.value.signing.txSource, 4, 4)}`
+                  : ''}{' '}
+                · {network === 'PUBLIC' ? 'Mainnet' : 'Testnet'}
+              </span>
             </div>
 
             {isHigh && !native && (
@@ -815,7 +911,7 @@ function Browser({
               {isHigh && native ? (
                 <HoldToConfirm
                   className="flex-1"
-                  label={submitting ? 'Sending…' : 'Hold to Sign anyway'}
+                  label={submitting ? (signReq.kind === 'xdr' ? 'Signing…' : 'Sending…') : 'Hold to Sign anyway'}
                   danger
                   onConfirm={approveSign}
                   disabled={submitting}
@@ -830,7 +926,17 @@ function Browser({
                       : 'bg-primary-container text-on-primary-container shadow-primary'
                   }`}
                 >
-                  {submitting ? 'Sending…' : isHigh ? 'Sign anyway' : 'Approve & send'}
+                  {signReq.kind === 'xdr'
+                    ? submitting
+                      ? 'Signing…'
+                      : isHigh
+                        ? 'Sign anyway'
+                        : 'Approve & sign'
+                    : submitting
+                      ? 'Sending…'
+                      : isHigh
+                        ? 'Sign anyway'
+                        : 'Approve & send'}
                 </button>
               )}
             </div>
@@ -870,6 +976,48 @@ function Browser({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// What a dApp-built transaction asks of the user (#262): which operations
+// their signature authorizes, who else signs, and that Lantern hands the
+// signed envelope back rather than submitting it. The scan's explanation —
+// above the buttons, as for any review — says what the operations do.
+function SignXdrSummary({ request }: { request: SignXdrReview }) {
+  const { signing, operationCount, existingSignatures } = request.value;
+  const yours = signing.userOps.length;
+  return (
+    <div className="space-y-2 rounded-xl bg-surface-container-high p-3 text-label-md text-on-surface">
+      <p>
+        {signing.userIsTxSource
+          ? `Your account is the transaction source (it pays the fee) and acts in ${yours} of ${operationCount} operation${operationCount === 1 ? '' : 's'}.`
+          : `Your signature authorizes ${yours} of ${operationCount} operation${operationCount === 1 ? '' : 's'}.`}
+        {signing.otherSigners.length > 0 && (
+          <>
+            {' '}Also signed by{' '}
+            <span className="font-mono">
+              {signing.otherSigners.map((a) => truncateAddress(a, 4, 4)).join(', ')}
+            </span>
+            {existingSignatures > 0 ? ` (${existingSignatures} signature${existingSignatures === 1 ? '' : 's'} already on it).` : '.'}
+          </>
+        )}
+      </p>
+      <ol className="space-y-0.5 text-label-sm text-on-surface-variant">
+        {signing.ops.map((op) => (
+          <li key={op.opIndex} className="flex justify-between gap-2">
+            <span className="truncate">
+              {op.opIndex + 1}. {op.type}
+            </span>
+            <span className={`shrink-0 font-mono ${op.byUser ? 'text-primary' : ''}`}>
+              {op.byUser ? 'you' : truncateAddress(op.source, 4, 4)}
+            </span>
+          </li>
+        ))}
+      </ol>
+      <p className="text-label-sm text-on-surface-variant">
+        Lantern adds your signature and returns it to the app. It doesn’t submit the transaction.
+      </p>
     </div>
   );
 }
