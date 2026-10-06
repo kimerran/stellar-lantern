@@ -227,7 +227,9 @@ The upgrade path once there are real users is per-install client identity
 | `ALPHA_JOIN_URL` | no | `https://chat.whatsapp.com/L3bNrVe8f0ZJoE7E6AsNT9` — the alpha group invite `/join` redirects to (#162); must be `https://chat.whatsapp.com/<code>` or boot fails |
 
 The extension's origin is `chrome-extension://<extension id>`; add the demo
-site's origin alongside it.
+site's origin alongside it. The Android app's origin is `https://android.golantern.xyz` from the first
+build with #259; earlier builds (0.5.x) send Capacitor's shared `https://localhost`. The web
+app's is `https://app.golantern.xyz`.
 
 ## Run locally
 

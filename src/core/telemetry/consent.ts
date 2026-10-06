@@ -20,7 +20,15 @@ export const CONSENT_COPY = {
     ...(IDENTIFIED ? ['your public wallet address (alpha builds only)'] : []),
     'which features you use, and how often',
     'whether a scan warned you, and how risky it said the transaction was',
-    'which platform you are on (Android or Chrome) and the app version',
+    __WEB_BUILD__
+      ? 'which platform you are on (the web app) and the app version'
+      : 'which platform you are on (Android or Chrome) and the app version',
+    // The web app only (#239): the first open's `?src=`, as a fixed label.
+    ...(__WEB_BUILD__
+      ? [
+          'which of our links first opened the web app (for example, the homepage), as a fixed label',
+        ]
+      : []),
   ],
   neverCollected: [
     IDENTIFIED ? 'your secret keys' : 'your addresses, public keys or secret keys',
