@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 // The node-polyfills plugin shims `node:fs` (and `node:vm`) in test files, so
 // read through the real Node modules, as tests/self-hosted-fonts.test.ts does.
-const builtin = (globalThis as unknown as { process: { getBuiltinModule(m: string): unknown } }).process
-  .getBuiltinModule;
+const builtin = (globalThis as unknown as { process: { getBuiltinModule(m: string): unknown } })
+  .process.getBuiltinModule;
 const fs = builtin('fs') as typeof import('fs');
 const vm = builtin('vm') as typeof import('vm');
 const read = (p: string) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
@@ -11,7 +11,9 @@ const read = (p: string) => fs.readFileSync(new URL(`../${p}`, import.meta.url),
 // The homepage's download buttons per device (homepage/app.js). app.js is a
 // plain script, so it runs here in a VM with a stub DOM: its lanternPlatform()
 // global decides which buttons stay, and the markup is checked for what a
-// visitor without JS sees.
+// visitor without JS sees. Until app.golantern.xyz is hosted, app.js ships with
+// WEB_APP_LIVE = false and every web-app mention stays hidden; the per-device
+// tests run app.js with the switch flipped on, as it will be once it's live.
 
 const appJs = read('homepage/app.js');
 const html = read('homepage/index.html');
@@ -40,17 +42,29 @@ interface FakeEl {
   href: string;
 }
 
-/** Runs app.js against a stub DOM holding one element per data-cta name. */
-function run(userAgent: string, maxTouchPoints = 0) {
+const LIVE_OFF = 'var WEB_APP_LIVE = false;';
+
+/** Runs app.js against a stub DOM holding one element per data-cta name, each
+ *  starting as the markup ships it. `live` runs it with WEB_APP_LIVE on. */
+function run(userAgent: string, maxTouchPoints = 0, live = true) {
   const names = ['android', 'extension', 'web', 'web-hint', 'web-hint-browser', 'web-alt'] as const;
   const els = new Map<string, FakeEl>(
-    names.map((n) => [n, { hidden: false, href: 'https://app.golantern.xyz/?src=homepage' }]),
+    names.map((n) => [
+      n,
+      {
+        hidden: n !== 'android' && n !== 'extension',
+        href: 'https://app.golantern.xyz/?src=homepage',
+      },
+    ]),
   );
-  // Web-app links without a data-cta (the install card, the footer).
+  // Web-app links without a data-cta (the install card, the footer), hidden in the markup.
   const plainLinks: FakeEl[] = [0, 1].map(() => ({
-    hidden: false,
+    hidden: true,
     href: 'https://app.golantern.xyz/?src=homepage',
   }));
+  // The pre-web-app wording (data-web-app-off), shown in the markup.
+  const offText: FakeEl = { hidden: false, href: '' };
+  const webApp = () => [...names.slice(2).map((n) => els.get(n) as FakeEl), ...plainLinks];
   const document = {
     documentElement: { classList: { add() {} } },
     getElementById: () => null,
@@ -60,6 +74,8 @@ function run(userAgent: string, maxTouchPoints = 0) {
           a.href.startsWith('https://app.golantern.xyz/'),
         );
       }
+      if (sel === '[data-web-app]') return webApp();
+      if (sel === '[data-web-app-off]') return [offText];
       const el = els.get(/^\[data-cta="([\w-]+)"\]$/.exec(sel)?.[1] ?? '');
       return el ? [el] : [];
     },
@@ -72,13 +88,16 @@ function run(userAgent: string, maxTouchPoints = 0) {
   };
   ctx.window = ctx;
   vm.createContext(ctx);
-  vm.runInContext(appJs, ctx);
+  if (!appJs.includes(LIVE_OFF)) throw new Error('app.js no longer declares WEB_APP_LIVE');
+  vm.runInContext(live ? appJs.replace(LIVE_OFF, 'var WEB_APP_LIVE = true;') : appJs, ctx);
   const visible = names.filter((n) => !els.get(n)?.hidden);
   const webLinks = [els.get('web')?.href, ...plainLinks.map((a) => a.href)];
   return {
     visible,
     webHref: els.get('web')?.href,
     webLinks,
+    plainLinksHidden: plainLinks.every((a) => a.hidden),
+    offTextHidden: offText.hidden,
     platform: ctx.lanternPlatform as (ua: string, t: number) => string,
   };
 }
@@ -150,30 +169,70 @@ describe('homepage: the buttons app.js leaves visible', () => {
   });
 });
 
-describe('homepage: without JS every option shows', () => {
+describe('homepage: while the web app is not hosted (WEB_APP_LIVE = false)', () => {
+  it('app.js ships with the switch off', () => {
+    expect(appJs).toContain(LIVE_OFF);
+  });
+
+  it('every visitor gets the APK and the extension, and nothing points at the web app', () => {
+    for (const [ua, touch] of [
+      [UA.iphone, 5],
+      [UA.mac, 5],
+      [UA.android, 5],
+      [UA.chromeWin, 0],
+      [UA.firefoxLinux, 0],
+    ] as const) {
+      const r = run(ua, touch, false);
+      expect(r.visible, ua).toEqual(['android', 'extension']);
+      expect(r.plainLinksHidden, ua).toBe(true);
+      expect(r.offTextHidden, ua).toBe(false);
+    }
+  });
+
+  it('switched on, the web-app links and copy appear and the old wording goes', () => {
+    const r = run(UA.iphone, 5);
+    expect(r.plainLinksHidden).toBe(false);
+    expect(r.offTextHidden).toBe(true);
+  });
+});
+
+describe('homepage: the markup (what a visitor without JS sees)', () => {
   const ctas = [...html.matchAll(/<(\w+)([^>]*\bdata-cta="([\w-]+)"[^>]*)>/g)].map((m) => ({
     name: m[3],
     attrs: m[2],
   }));
 
-  it('the APK, the extension and the web app are all in the markup, visible', () => {
-    for (const name of ['android', 'extension', 'web', 'web-hint']) {
+  it('the APK and the extension are in the markup, visible', () => {
+    for (const name of ['android', 'extension']) {
       const els = ctas.filter((c) => c.name === name);
       expect(els.length, name).toBeGreaterThan(0);
       for (const el of els) expect(el.attrs, name).not.toMatch(/\shidden\b/);
     }
   });
 
-  it('the device-specific extras start hidden', () => {
-    for (const name of ['web-hint-browser', 'web-alt']) {
+  it('every web-app element and link is marked data-web-app and starts hidden', () => {
+    for (const name of ['web', 'web-hint', 'web-hint-browser', 'web-alt']) {
       const els = ctas.filter((c) => c.name === name);
       expect(els.length, name).toBeGreaterThan(0);
-      for (const el of els) expect(el.attrs, name).toMatch(/\shidden\b/);
+      for (const el of els)
+        expect(el.attrs, name).toMatch(/\sdata-web-app(?![\w-])[^>]*\shidden\b/);
     }
+    const links = [...html.matchAll(/<a\b[^>]*app\.golantern\.xyz[^>]*>/g)].map((m) => m[0]);
+    expect(links.length).toBe(6);
+    for (const a of links) expect(a).toMatch(/\sdata-web-app\s+hidden\b/);
+    const gated = [...html.matchAll(/<\w+\b[^>]*\sdata-web-app(?![\w-])[^>]*>/g)].map((m) => m[0]);
+    expect(gated.length).toBeGreaterThan(links.length);
+    for (const el of gated) expect(el).toMatch(/\shidden\b/);
+  });
+
+  it('the pre-web-app wording shows in its place', () => {
+    expect(html).toContain('<span data-web-app-off>Chrome extension &amp; Android APK</span>');
   });
 
   it('every web-app link carries ?src=homepage', () => {
-    const links = [...html.matchAll(/href="(https:\/\/app\.golantern\.xyz[^"]*)"/g)].map((m) => m[1]);
+    const links = [...html.matchAll(/href="(https:\/\/app\.golantern\.xyz[^"]*)"/g)].map(
+      (m) => m[1],
+    );
     expect(links.length).toBeGreaterThan(0);
     for (const l of links) expect(l).toBe('https://app.golantern.xyz/?src=homepage');
   });

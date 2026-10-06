@@ -15,32 +15,44 @@ function lanternPlatform(userAgent, maxTouchPoints) {
   return 'other';
 }
 
+// Whether app.golantern.xyz is hosted. Until it is, everything that mentions
+// the web app (data-web-app) stays hidden as the markup ships it, and every
+// visitor sees the APK and the extension. To go live: set this to true, and
+// remove `hidden` from the data-web-app elements in index.html (and the
+// data-web-app-off text) so visitors without JS see the web app too.
+var WEB_APP_LIVE = false;
+
 (function () {
   // ── Download buttons, per device ──
-  // The markup lists every option (APK, extension, web app), which is what a
-  // visitor without JS sees. Here the buttons that can't apply are hidden:
+  // With the web app live, the markup lists every option (APK, extension, web
+  // app). Here the buttons that can't apply are hidden:
   // - iPhone/iPad, and any device where neither the APK nor the extension
   //   applies: "Open the web app" with a two-line hint, in place of the APK.
   // - Android and desktop Chrome: their usual buttons, plus a small
   //   "or use the web app" link.
-  var platform = lanternPlatform(navigator.userAgent, navigator.maxTouchPoints);
-  var webFirst = platform === 'ios' || platform === 'other';
-  function each(name, fn) {
-    document.querySelectorAll('[data-cta="' + name + '"]').forEach(fn);
-  }
-  function show(name, on) { each(name, function (el) { el.hidden = !on; }); }
-  show('android', !webFirst);
-  show('extension', !webFirst);
-  show('web', webFirst);
-  show('web-hint', platform === 'ios');
-  show('web-hint-browser', platform === 'other');
-  show('web-alt', !webFirst);
-  if (platform === 'ios') {
-    // Every web-app link, not just the buttons: the install card and the
-    // footer count toward homepage-ios too.
-    document.querySelectorAll('a[href^="https://app.golantern.xyz/"]').forEach(function (a) {
-      a.href = 'https://app.golantern.xyz/?src=homepage-ios';
-    });
+  if (WEB_APP_LIVE) showDownloads();
+  function showDownloads() {
+    document.querySelectorAll('[data-web-app]').forEach(function (el) { el.hidden = false; });
+    document.querySelectorAll('[data-web-app-off]').forEach(function (el) { el.hidden = true; });
+    var platform = lanternPlatform(navigator.userAgent, navigator.maxTouchPoints);
+    var webFirst = platform === 'ios' || platform === 'other';
+    function each(name, fn) {
+      document.querySelectorAll('[data-cta="' + name + '"]').forEach(fn);
+    }
+    function show(name, on) { each(name, function (el) { el.hidden = !on; }); }
+    show('android', !webFirst);
+    show('extension', !webFirst);
+    show('web', webFirst);
+    show('web-hint', platform === 'ios');
+    show('web-hint-browser', platform === 'other');
+    show('web-alt', !webFirst);
+    if (platform === 'ios') {
+      // Every web-app link, not just the buttons: the install card and the
+      // footer count toward homepage-ios too.
+      document.querySelectorAll('a[href^="https://app.golantern.xyz/"]').forEach(function (a) {
+        a.href = 'https://app.golantern.xyz/?src=homepage-ios';
+      });
+    }
   }
 
   // ── Cookie consent ──
