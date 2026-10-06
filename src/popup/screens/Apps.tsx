@@ -6,6 +6,7 @@ import {
   normalizeUrl,
   displayOrigin,
   isRemoteMiniApp,
+  networkChip,
   type MiniApp,
 } from '@core/miniapps/directory';
 import {
@@ -240,6 +241,7 @@ export function Apps({
               <AppRow
                 key={app.id}
                 app={app}
+                network={network}
                 favorited
                 onLaunch={() => launchApp(app)}
                 onToggleFavorite={() => toggleFavorite(app.id)}
@@ -264,6 +266,7 @@ export function Apps({
             <AppRow
               key={app.id}
               app={app}
+              network={network}
               favorited={isFavorite(favorites, app.id)}
               onLaunch={() => launchApp(app)}
               onToggleFavorite={() => toggleFavorite(app.id)}
@@ -284,15 +287,18 @@ export function Apps({
 // be its own button — a button can't nest inside a button.
 function AppRow({
   app,
+  network,
   favorited,
   onLaunch,
   onToggleFavorite,
 }: {
   app: MiniApp;
+  network: NetworkId;
   favorited: boolean;
   onLaunch: () => void;
   onToggleFavorite: () => void;
 }) {
+  const chip = networkChip(app, network);
   return (
     <Card as="div" className="flex items-center gap-1">
       <button
@@ -312,6 +318,16 @@ function AppRow({
             {app.demo && (
               <span className="shrink-0 rounded-full bg-surface-container-high px-1.5 py-px text-label-sm text-on-surface-variant">
                 Demo
+              </span>
+            )}
+            {/* Runs on another network than the wallet's (e.g. a testnet-only
+                dApp while Lantern is on mainnet): listed, but labelled. */}
+            {chip && (
+              <span
+                className="shrink-0 rounded-full bg-primary-container/15 px-1.5 py-px text-label-sm text-primary-container"
+                title={`Runs on ${chip} only`}
+              >
+                {chip}
               </span>
             )}
           </span>

@@ -6,7 +6,9 @@
 // Swapping in the real connection broker (spec — README "Mini-app browser")
 // doesn't touch this module's shape.
 
-export type MiniAppCategory = 'DeFi' | 'Payments' | 'NFTs' | 'Tools';
+import type { NetworkId } from '@shared/constants';
+
+export type MiniAppCategory = 'DeFi' | 'Payments' | 'NFTs' | 'Tools' | 'Earn';
 
 export interface MiniApp {
   id: string;
@@ -39,6 +41,13 @@ export interface MiniApp {
    * `url` must be the app's final origin: replies are posted to it.
    */
   session?: boolean;
+  /**
+   * The Stellar networks the app runs on. Omitted = any network (it follows
+   * whatever network the wallet shares). When set and Lantern's active network
+   * isn't in it, the row stays listed but shows a chip naming where the app
+   * does run (see networkChip) — e.g. a testnet-only dApp on mainnet.
+   */
+  networks?: readonly NetworkId[];
 }
 
 export const MINI_APPS: MiniApp[] = [
@@ -76,7 +85,35 @@ export const MINI_APPS: MiniApp[] = [
     verified: false,
     demo: true,
   },
+  // Centient (epic #258): earn USDC by ranking AI answers. Remote, with a
+  // session so its login survives (#260). Testnet-only for now, so on mainnet
+  // it shows a "Testnet" chip rather than disappearing. `verified` flips to
+  // true once the device QA in slice 8 (#266) passes.
+  {
+    id: 'centient',
+    name: 'Centient',
+    tagline: 'Earn USDC by ranking AI answers.',
+    category: 'Earn',
+    icon: 'payments',
+    url: 'https://centient.work/',
+    verified: false,
+    session: true,
+    networks: ['TESTNET'],
+  },
 ];
+
+const NETWORK_LABEL: Record<NetworkId, string> = { TESTNET: 'Testnet', PUBLIC: 'Mainnet' };
+
+/**
+ * The network chip a directory row shows, or null for none. An app that runs
+ * on the active network (or didn't say — `networks` omitted) gets no chip; one
+ * that doesn't shows where it does run, e.g. "Testnet" for a testnet-only app
+ * while Lantern is on mainnet. Listing it with a chip beats hiding it.
+ */
+export function networkChip(app: MiniApp, active: NetworkId): string | null {
+  if (!app.networks || app.networks.length === 0 || app.networks.includes(active)) return null;
+  return app.networks.map((n) => NETWORK_LABEL[n]).join(' / ');
+}
 
 export function findMiniApp(id: string): MiniApp | undefined {
   return MINI_APPS.find((a) => a.id === id);
