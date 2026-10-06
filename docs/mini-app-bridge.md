@@ -17,7 +17,7 @@ mini-apps only, so a remote dApp never runs there.
 | `{ type: "lantern:getPublicKey" }` | `lantern:connecting` at once, then `lantern:publicKey { publicKey, network }` or `lantern:connectRejected` | No (this is the connection) |
 | `{ type: "lantern:signMessage", message }` | `lantern:messageSigned { signature, publicKey }` or `lantern:signRejected { error? }` | Yes |
 | `{ type: "lantern:signAndSubmit", intent }` | `lantern:signing` once the intent is valid, then `lantern:txResult { hash }` or `lantern:txRejected`; `lantern:txError { error }` at any point before review | Yes |
-| `{ type: "lantern:signXdr", xdr, networkPassphrase }` | **Planned, not shipped** (see below) | Yes |
+| `{ type: "lantern:signXdr", xdr, networkPassphrase, id? }` | `lantern:signing` at once, then `lantern:xdrSigned { signedXdr }`, `lantern:signRejected { error? }` or `lantern:txError { error }` (see below) | Yes |
 
 Every message is a plain object whose `type` starts with `lantern:`. Lantern
 ignores any message it doesn't recognise, and anything without a `type`.
@@ -53,10 +53,12 @@ ignores any message it doesn't recognise, and anything without a `type`.
 
 ## Requests have no id
 
-Replies carry no request id, so run **one request at a time** and match a reply
-by its `type`. A second request of the same kind while one is pending replaces
-it on Lantern's side, and the first one never gets an answer. Time out on your
-side: the user can leave a prompt open indefinitely.
+Replies carry no request id (except `lantern:signXdr`'s, below), so run **one
+request at a time** and match a reply by its `type`. While a transaction review
+is open or a signature is in flight, a new `lantern:signXdr` or
+`lantern:signAndSubmit` is refused with `lantern:txError`
+`"Another request is waiting for review."` and the open review is left as it
+is. Time out on your side: the user can leave a prompt open indefinitely.
 
 ## Connection
 
@@ -171,25 +173,31 @@ one of those happens.
 
 Contract calls (Soroban) aren't exposed on the bridge.
 
-## `lantern:signXdr` (planned, not shipped)
-
-> **Not in any release yet.** Planned in Centient slice 4 (#262). Until it
-> ships Lantern ignores this message, so a dApp should treat no `lantern:signing`
-> within 5 s as "this Lantern can't sign transactions".
+## `lantern:signXdr`
 
 Sign a transaction the dApp built (and may already have signed, e.g. as a fee
 sponsor) and return it **without submitting**. Lantern keeps the signatures
-already on the envelope and adds the user's.
+already on the envelope and adds the user's. Builds before this one ignore the
+message, so treat no `lantern:signing` within 5 s as "this Lantern can't sign
+transactions".
 
 | dApp sends | Lantern replies |
 |---|---|
-| `{ type: "lantern:signXdr", xdr, networkPassphrase }` | `{ type: "lantern:signing" }` **at once**, then `{ type: "lantern:xdrSigned", signedXdr }`, or `{ type: "lantern:signRejected", error? }`, or `{ type: "lantern:txError", error }` |
+| `{ type: "lantern:signXdr", xdr, networkPassphrase, id? }` | `{ type: "lantern:signing" }` **at once**, then `{ type: "lantern:xdrSigned", signedXdr }`, or `{ type: "lantern:signRejected", error? }` (the user said no), or `{ type: "lantern:txError", error }` (refused or failed) |
 
-Planned behaviour: the app must be connected first; a `networkPassphrase` other
-than the active network, XDR that doesn't decode, or a fee-bump envelope is
-refused before review; the transaction goes through the same review as
-`signAndSubmit`; an `id` field on the request may be echoed on the reply. Check
-#262 for the final shape before relying on it.
+- The app must be connected first (`lantern:getPublicKey`).
+- Refused before review, with `lantern:txError`: a `networkPassphrase` other
+  than Lantern's active network; XDR that doesn't decode as a transaction
+  envelope; a **fee-bump** envelope (send the inner transaction and wrap it
+  after Lantern returns it); and a transaction that needs no signature from
+  the user.
+- Otherwise it goes through the same review as `signAndSubmit`: every
+  operation is explained, including which ones need the user's signature and
+  which are someone else's (e.g. a sponsor's), and a high-risk verdict needs
+  the typed CONFIRM or press-and-hold.
+- Every reply echoes the request's `id` when it has one (a non-empty string of
+  up to 128 characters, or a finite number).
+- One request at a time (see *Requests have no id*).
 
 ## Bundled mini-apps
 
