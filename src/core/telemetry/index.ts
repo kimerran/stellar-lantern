@@ -10,6 +10,7 @@ import { getSettings, getVault, onSettingsChanged, setSettings } from '@shared/s
 import { getKV, isNativePlatform } from '@shared/kv';
 import { createSink, type Sink } from './sink';
 import { clearInstallId, getInstallId, INSTALL_ID_KEY } from './install-id';
+import { attributeOnce } from '@shared/web/attribution';
 import type { TelemetryEvent } from './events';
 
 export type { TelemetryEvent, Envelope, StampedEvent, EventName } from './events';
@@ -44,7 +45,9 @@ export async function startTelemetry(opts: StartOptions): Promise<void> {
   });
   sink = createSink({
     ingestUrl: opts.ingestUrl,
-    platform: isNativePlatform() ? 'android' : 'extension',
+    // The web build (#239) is its own platform; without this, a plain
+    // browser would report itself as the extension.
+    platform: __WEB_BUILD__ ? 'web' : isNativePlatform() ? 'android' : 'extension',
     appVersion: opts.appVersion,
     network: () => (network === 'PUBLIC' ? 'public' : 'testnet'),
     installId: getInstallId,
@@ -102,6 +105,13 @@ export async function bootTelemetry(opts: {
     emit({ name: 'app_first_open', props: {} });
     await kv.set(FIRST_OPEN_KEY, '1');
   }
+  // The web app's source (#239), recorded on the first open and sent once,
+  // like app_first_open, on a consented open.
+  if (__WEB_BUILD__)
+    await attributeOnce(
+      (src) => emit({ name: 'web_attributed', props: { src } }),
+      () => consent,
+    );
   if (consent) emit({ name: 'session_start', props: {} });
 }
 
