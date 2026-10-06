@@ -54,7 +54,7 @@ Every example card also has **Copy XDR**, so you can get the same text from the 
 | §9 Wallet unaffected | **N/A**: `ALLOWED_ORIGINS` stays unset |
 | §10.3 Telemetry | Live (the footer notice and the privacy policy) |
 
-Check the build first: the page should load `index-BHRTWAwu.js` (DevTools → Network).
+Check the build first: the page should load `index-tGYw1YDB.js` (DevTools → Network).
 
 ## 1. Cold open
 

@@ -10,9 +10,11 @@ import { BottomNav, type Tab } from './components/BottomNav';
 import { Icon } from './components/Icon';
 import { useToast } from './components/Toast';
 import { usePasskeyAccount } from './hooks/usePasskeyAccount';
+import { onDeepLink, peekDeepLink, takeDeepLink, type PendingDeepLink } from './deep-link/inbox';
 // First-paint path stays eager: splash → unlock/onboarding → home (assets),
 // plus Settings which shares the home shell. (#127)
 import { Onboarding } from './screens/Onboarding';
+import { WebOnboarding } from './web/WebOnboarding';
 import { AnalyticsPrompt } from './screens/AnalyticsPrompt';
 import { shouldShowConsentPrompt } from '@core/telemetry';
 import { Unlock } from './screens/Unlock';
@@ -73,6 +75,23 @@ export function App() {
   const [swapOpen, setSwapOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const showToast = useToast();
+  // "Open in Lantern" (#263): a link waits in memory until the wallet is
+  // unlocked (Unlock shows first when locked), then opens in the Apps tab.
+  const [inbox, setInbox] = useState<PendingDeepLink | null>(peekDeepLink);
+  const [deepLink, setDeepLink] = useState<PendingDeepLink | null>(null);
+  useEffect(() => onDeepLink(() => setInbox(peekDeepLink())), []);
+  const unlocked = !!status?.initialized && !status.locked && !!status.address;
+  useEffect(() => {
+    if (!unlocked || !inbox || peekDeepLink()?.id !== inbox.id) return;
+    takeDeepLink(inbox.id);
+    setScanOpen(false);
+    setGuardiansOpen(false);
+    setCashOpen(false);
+    setSwapOpen(false);
+    setReceiveOpen(false);
+    setTab('apps');
+    setDeepLink(inbox);
+  }, [unlocked, inbox]);
   // Memoized so the NetworkConfig only rebuilds when settings change, instead of
   // on every render. Computed at the top (before any early return) to respect the
   // Rules of Hooks; `settings` may be null on first paint, so guard for it. (#127)
@@ -96,6 +115,8 @@ export function App() {
 
   // Onboarding — no wallet yet.
   if (!status.initialized) {
+    // The web app adds the Home Screen step and an install prompt (#238).
+    if (__WEB_BUILD__) return <WebOnboarding onDone={refresh} />;
     return <Onboarding onDone={refresh} onPasskeyDone={refreshPasskey} />;
   }
 
@@ -123,6 +144,9 @@ export function App() {
   // Already in a full tab? Then don't offer "expand" again.
   const isExpanded = new URLSearchParams(window.location.search).has('expanded');
   const openExpanded = () => {
+    // Extension only: the web app (#237) is already a full tab, and its bundle
+    // must carry no chrome.* calls.
+    if (__WEB_BUILD__) return;
     const url = chrome.runtime.getURL('index.html?expanded=1');
     if (chrome.tabs?.create) {
       void chrome.tabs.create({ url });
@@ -183,7 +207,7 @@ export function App() {
         address={address}
         network={settings.network}
         onCopyAddress={copyAddress}
-        onExpand={isExpanded || isNativePlatform() ? undefined : openExpanded}
+        onExpand={isExpanded || __WEB_BUILD__ || isNativePlatform() ? undefined : openExpanded}
       />
 
       <main className="no-scrollbar relative flex-1 overflow-y-auto">
@@ -205,7 +229,15 @@ export function App() {
             {tab === 'send' && (
               <Send address={address} network={network} onDone={() => setTab('activity')} />
             )}
-            {tab === 'apps' && <Apps address={address} network={settings.network} config={network} />}
+            {tab === 'apps' && (
+              <Apps
+                address={address}
+                network={settings.network}
+                config={network}
+                deepLink={deepLink}
+                onDeepLinkHandled={() => setDeepLink(null)}
+              />
+            )}
             {tab === 'activity' && <Activity address={address} network={network} embedded />}
             {tab === 'settings' && (
               <Settings

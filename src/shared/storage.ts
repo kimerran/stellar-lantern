@@ -54,19 +54,23 @@ const DEFAULT_SETTINGS: Settings = {
 
 export async function getSettings(): Promise<Settings> {
   const kv = await getKV();
-  return { ...DEFAULT_SETTINGS, ...(parse<Partial<Settings>>(await kv.get(SETTINGS_KEY)) ?? {}) };
+  const saved = { ...DEFAULT_SETTINGS, ...(parse<Partial<Settings>>(await kv.get(SETTINGS_KEY)) ?? {}) };
+  // The web app is testnet only (#236): no switch, and its CSP allows only
+  // testnet Horizon and RPC (#238).
+  return __WEB_BUILD__ ? { ...saved, network: 'TESTNET' } : saved;
 }
 
-// In-process settings subscribers, used on native only. The extension gets
-// cross-surface change events for free via chrome.storage.onChanged; native is
-// a single JS context with no storage events, so we fan writes out ourselves.
+// In-process settings subscribers, used on native and the web app (#237). The
+// extension gets cross-surface change events for free via
+// chrome.storage.onChanged; the in-page builds are a single JS context with no
+// storage events, so we fan writes out ourselves.
 const nativeSettingsListeners = new Set<(settings: Settings) => void>();
 
 export async function setSettings(patch: Partial<Settings>): Promise<Settings> {
   const kv = await getKV();
   const next = { ...(await getSettings()), ...patch };
   await kv.set(SETTINGS_KEY, JSON.stringify(next));
-  if (isNativePlatform()) {
+  if (__WEB_BUILD__ || isNativePlatform()) {
     for (const cb of nativeSettingsListeners) cb(next);
   }
   return next;
@@ -74,9 +78,10 @@ export async function setSettings(patch: Partial<Settings>): Promise<Settings> {
 
 // Subscribe to settings changes so every mounted surface stays in sync. On the
 // extension this bridges chrome.storage.onChanged; on native it registers with
-// the in-process fan-out above (matching the extension's live-update behavior).
+// the in-process fan-out above, as does the web app (matching the extension's
+// live-update behavior).
 export function onSettingsChanged(cb: (settings: Settings) => void): () => void {
-  if (isNativePlatform()) {
+  if (__WEB_BUILD__ || isNativePlatform()) {
     nativeSettingsListeners.add(cb);
     return () => {
       nativeSettingsListeners.delete(cb);

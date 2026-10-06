@@ -30,6 +30,15 @@ export interface MiniApp {
   verified: boolean;
   /** Marks a showcase/demo entry (shows a "Demo" chip). */
   demo?: boolean;
+  /**
+   * Remote apps only (#260): frame it with `allow-same-origin`, so it runs at
+   * its real origin and can keep a login (a partitioned cookie) and call its
+   * own API. It still reaches the wallet only through the bridge. Set it only
+   * for a curated app that needs a session; the URL bar never gets it, and
+   * Lantern's own origin never does (see remoteFrameSandbox in frame.ts).
+   * `url` must be the app's final origin: replies are posted to it.
+   */
+  session?: boolean;
 }
 
 export const MINI_APPS: MiniApp[] = [

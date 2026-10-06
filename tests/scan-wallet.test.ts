@@ -116,6 +116,32 @@ describe('toScanVerdict — ScanResult → the shape the screens render', () => 
     });
   });
 
+  it('carries who-signs-what through for a signer (#261)', () => {
+    const signing = {
+      user: 'GUSER',
+      txSource: 'GSPONSOR',
+      userIsTxSource: false,
+      userOps: [2, 3],
+      otherOps: [0, 1],
+      otherSigners: ['GSPONSOR'],
+      ops: [],
+    };
+    const v = toScanVerdict(
+      {
+        ...base,
+        risk: 'low',
+        action: 'allow',
+        reasons: [],
+        explanation: 'x',
+        explanationSource: 'fallback',
+        signing,
+      },
+      1,
+    );
+    expect(v.signing).toEqual(signing);
+    expect(v.signing).not.toBe(signing);
+  });
+
   it('carries the screening timing and the idle gap for the registry_unknown diagnostic (#180)', () => {
     const r = {
       ...base,

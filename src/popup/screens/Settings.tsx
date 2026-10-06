@@ -8,6 +8,7 @@ import { Button } from '../components/Button';
 import { Icon } from '../components/Icon';
 import { Input } from '../components/Input';
 import { NetworkBadge } from '../components/NetworkBadge';
+import { StorageStatus } from '../web/StorageStatus';
 import { useToast } from '../components/Toast';
 import { CONSENT_COPY } from '@core/telemetry';
 
@@ -98,14 +99,24 @@ export function Settings({
         <AutoLockRow value={settings.autoLockMinutes} onChange={setAutoLock} />
       </Section>
 
-      <Section title="Cash">
-        <NavRow
-          icon="currency_exchange"
-          label="Cash in / Cash out"
-          hint="Deposit & withdraw via anchors"
-          onClick={onOpenCashInOut}
-        />
-      </Section>
+      {/* Not in the web app: anchors live on their own domains, which its CSP
+        doesn't allow (#238). */}
+      {!__WEB_BUILD__ && (
+        <Section title="Cash">
+          <NavRow
+            icon="currency_exchange"
+            label="Cash in / Cash out"
+            hint="Deposit & withdraw via anchors"
+            onClick={onOpenCashInOut}
+          />
+        </Section>
+      )}
+
+      {__WEB_BUILD__ && (
+        <Section title="Storage">
+          <StorageStatus />
+        </Section>
+      )}
 
       {__FEATURE_TELEMETRY__ && setAnalyticsConsent && deleteAnalytics && (
         <Section title="Privacy">
@@ -120,13 +131,24 @@ export function Settings({
       )}
 
       <Section title="Network">
-        <NetworkRow current={settings.network} onSelect={setNetwork} />
-        <Divider />
-        <AdvancedEndpoints
-          settings={settings}
-          setHorizonOverrides={setHorizonOverrides}
-          setRpcOverrides={setRpcOverrides}
-        />
+        {__WEB_BUILD__ ? (
+          // The web app is testnet only, on the default servers (#236, #238).
+          <div className="flex min-h-[52px] items-center gap-3 px-4 py-3">
+            <Icon name="lan" size={22} className="shrink-0 text-on-surface-variant" />
+            <span className="flex-1 text-body-md text-on-surface">Network</span>
+            <span className="text-label-md text-on-surface-variant">Testnet only</span>
+          </div>
+        ) : (
+          <>
+            <NetworkRow current={settings.network} onSelect={setNetwork} />
+            <Divider />
+            <AdvancedEndpoints
+              settings={settings}
+              setHorizonOverrides={setHorizonOverrides}
+              setRpcOverrides={setRpcOverrides}
+            />
+          </>
+        )}
       </Section>
 
       <Section title="About">

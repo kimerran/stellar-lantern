@@ -100,6 +100,7 @@ data" discards it as before.
 | `registry_unknown` | `reason: timeout \| rpc_error \| malformed \| archived \| no_registry \| other`, `latency: lt_1s \| 1s_2s \| 2s_3s \| gte_3s` (the screening stage), `idle: first \| lt_30s \| 30s_2m \| gte_2m` (since the previous screening) — sent with `tx_scanned` when the review reads "Couldn't check the recipient" (#180); no address, no raw duration | diagnostics |
 | `tx_rechecked` | `drifted: boolean`, `direction: none \| escalated \| de_escalated \| lateral \| failed` (the re-simulate before submit, #121; `failed` = could not re-check) | Q4 / §3.9 |
 | `registry_report_submitted` | `reason: Scam \| Phishing \| Drainer \| Poisoning \| Mixer \| Other`, `ok: boolean` (the one-click registry report, #120 — no subject, fee or note) | Q4 / §6.3 registry targets |
+| `web_attributed` | `src: homepage-ios \| homepage \| launch \| other` — the web app only (#239), once after opt-in: the first `?src=` it was opened with, folded into this enum on the device (anything unrecognised is `other`; never the raw value). The server rejects it from any other platform | acquisition |
 | `consent_granted` / `consent_revoked` | — | audit |
 
 Each flush sends one envelope:
@@ -107,13 +108,37 @@ Each flush sends one envelope:
 ```json
 {
   "installId": "<uuid>",
-  "platform": "extension" | "android",
+  "platform": "extension" | "android" | "web",
   "appVersion": "0.1.0",
   "network": "testnet" | "public",
   "account": "G…",   // alpha builds only (#100); absent otherwise
   "events": [{ "name": "…", "props": { … }, "ts": 1700000000000 }]
 }
 ```
+
+## The web app (`platform: "web"`, #239)
+
+The browser build at `app.golantern.xyz` reports as its own platform, `web`,
+with the same consent model as the extension and Android (opt-in, off by
+default, delete on request) and the same events. It adds one:
+
+- **Attribution.** On the very first open, the web app reads the first
+  `?src=` value and keeps it in its own storage as one of `homepage-ios`,
+  `homepage`, `launch` or `other` (anything unrecognised). The raw value is
+  never stored or sent. An open without `src` records `launch` when the app
+  runs installed (from the Home Screen), and nothing in a browser tab; later
+  opens never change it (`src/shared/web/attribution.ts`). On iOS the Home
+  Screen app has its own storage, so `homepage-ios` is only seen there when
+  the Home Screen icon keeps the `?src=` URL. After opt-in it
+  is sent once, as `web_attributed`. The server accepts that event only from
+  `web`, and rejects `demo_scanned` from `web`.
+- **Off until the server is ready.** `vite.config.web.ts` pins the web
+  build's `telemetry` flag to `WEB_TELEMETRY_ENABLED` (`src/web/telemetry.ts`,
+  `false`) and fixes its ingest URL in the source, like the playground. While
+  it is `false`, the web bundle carries no telemetry code and sends nothing
+  (asserted against the committed `webapp/`). Flip it only once the
+  lantern-api release that accepts `web` is live and, if `ALLOWED_ORIGINS` is
+  set, it includes `https://app.golantern.xyz`.
 
 ## Consent model
 

@@ -120,13 +120,46 @@ build(false);
 // dead-code-eliminate. Checked on the default extension build just made.
 const QR_PLUGIN_MARKER = 'isGoogleBarcodeScannerModuleAvailable';
 const qrInExtension = bundleHas(QR_PLUGIN_MARKER) || bundleHas('capacitor-mlkit');
+// Likewise the "Open in Lantern" deep-link listener (#263): only the Android
+// build registers @capacitor/app's appUrlOpen.
+const deepLinkInExtension = bundleHas('appUrlOpen');
+
+// The web app (#237) is the reverse: `__WEB_BUILD__` is false in the extension
+// build, so its IndexedDB vault, one-tab lock and "open in another tab" screen
+// must all dead-code-eliminate. (The web bundle's own absence of chrome.* and
+// the Android plugins is asserted by `build:web`.)
+const WEB_MARKERS = [
+  'IndexedDB transaction aborted',
+  'lantern.wallet',
+  'Lantern is open in another tab',
+  // Slice 2 (#238): the banner, persistence record, Home Screen step, frame refusal.
+  'Testnet web app — not for real funds',
+  'lantern.web.persist',
+  'Add Lantern to your Home Screen',
+  'can’t run inside another page',
+  // Slice 3 (#239): the first open's source, kept on the device.
+  'lantern.web.source',
+];
+const webInExtension = WEB_MARKERS.filter((m) => bundleHas(m));
 
 let failed = false;
+if (webInExtension.length) {
+  console.error(`✗ FAIL: web-app-only code is in the extension bundle (__WEB_BUILD__ guard broken): ${webInExtension.join(', ')}`);
+  failed = true;
+} else {
+  console.log('✓ web-app-only code ABSENT from the extension bundle (IndexedDB vault, tab lock, banner, Home Screen step, attribution).');
+}
 if (qrInExtension) {
   console.error('✗ FAIL: the Android QR scanner plugin is in the extension bundle (__NATIVE_BUILD__ guard broken).');
   failed = true;
 } else {
   console.log('✓ QR scanner plugin ABSENT from the extension bundle (Android-only).');
+}
+if (deepLinkInExtension) {
+  console.error('✗ FAIL: the Android deep-link listener (appUrlOpen) is in the extension bundle (__NATIVE_BUILD__ guard broken).');
+  failed = true;
+} else {
+  console.log('✓ deep-link listener ABSENT from the extension bundle (Android-only).');
 }
 if (telemetryOffHas) {
   console.error('✗ FAIL: telemetry code or the ingest URL is in the bundle with TELEMETRY=false.');

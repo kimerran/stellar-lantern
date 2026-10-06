@@ -1,0 +1,17 @@
+{
+  "id": "/",
+  "name": "Lantern Wallet (testnet)",
+  "short_name": "Lantern",
+  "description": "A Stellar wallet that reads every transaction back to you before you sign. Testnet only.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1326",
+  "theme_color": "#0b1326",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

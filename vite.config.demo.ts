@@ -19,7 +19,7 @@ export default defineConfig({
   // machine that built it (a local VITE_FEATURE_SCANNER_AI=true would otherwise
   // change the bundle). DEMO_AFFORDANCES is off by default and stays off: the
   // playground's seeded examples (#185) are its own.
-  define: flagDefines({}),
+  define: { ...flagDefines({}), __NATIVE_BUILD__: 'false', __WEB_BUILD__: 'false' },
   plugins: [
     react(),
     // No `crypto` polyfill: nothing in the playground uses it, and tweetnacl

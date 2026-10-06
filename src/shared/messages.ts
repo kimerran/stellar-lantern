@@ -67,7 +67,8 @@ export type ResponseFor<R extends Request> = Result<ResponseMap[R['type']]>;
 // worker — load the in-process handler lazily so its wallet logic is split into
 // a chunk the extension popup bundle never loads.
 export async function sendMessage<R extends Request>(req: R): Promise<ResponseFor<R>> {
-  if (isNativePlatform()) {
+  // Native and the web app (#237) run the wallet in the page, in-process.
+  if (__WEB_BUILD__ || isNativePlatform()) {
     const { handle } = await import('@core/session/handler');
     return (await handle(req)) as ResponseFor<R>;
   }

@@ -16,6 +16,8 @@ export default defineConfig(({ mode }) => ({
     // Not the Android build: native-only imports (the QR scanner, #226)
     // dead-code-eliminate. vite.config.mobile.ts sets it true.
     __NATIVE_BUILD__: 'false',
+    // Not the web-app build (#237).
+    __WEB_BUILD__: 'false',
   },
   plugins: [
     react(),

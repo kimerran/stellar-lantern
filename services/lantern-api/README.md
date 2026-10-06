@@ -166,7 +166,7 @@ daily chart and full trail, and
 `/admin/report` is the emailed-style report — the same code as `npm run
 report:activity` (both import `src/core/telemetry/report.ts`, aliased here as
 `@lantern/telemetry-report`). Every page takes
-`?since=YYYY-MM-DD&until=YYYY-MM-DD&platform=extension|android` (default
+`?since=YYYY-MM-DD&until=YYYY-MM-DD&platform=extension|android|web|demo` (default
 window: the last 30 days). Raw data: `/admin/export.csv` and
 `/admin/export.json` for the same filters, plus `&wallet=<key>` for one
 identity — the drill-down links both. Rows with no wallet address (non-alpha
@@ -227,7 +227,9 @@ The upgrade path once there are real users is per-install client identity
 | `ALPHA_JOIN_URL` | no | `https://chat.whatsapp.com/L3bNrVe8f0ZJoE7E6AsNT9` — the alpha group invite `/join` redirects to (#162); must be `https://chat.whatsapp.com/<code>` or boot fails |
 
 The extension's origin is `chrome-extension://<extension id>`; add the demo
-site's origin alongside it.
+site's origin alongside it. The Android app's origin is `https://android.golantern.xyz` from the first
+build with #259; earlier builds (0.5.x) send Capacitor's shared `https://localhost`. The web
+app's is `https://app.golantern.xyz`.
 
 ## Run locally
 

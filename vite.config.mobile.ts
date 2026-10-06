@@ -14,6 +14,8 @@ export default defineConfig(({ mode }) => ({
     ...flagDefines(loadEnv(mode, process.cwd(), 'VITE_FEATURE_')),
     // The Android build: native-only imports (the QR scanner, #226) are kept.
     __NATIVE_BUILD__: 'true',
+    // Not the web-app build (#237).
+    __WEB_BUILD__: 'false',
   },
   plugins: [
     react(),

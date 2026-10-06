@@ -242,6 +242,49 @@ describe('/admin pages', () => {
     expect(none).toContain('<svg class="chart"'); // an empty chart still renders
   });
 
+  it('web (#239) is a wallet platform: its own tile, pill and filter, counted like the others', async () => {
+    const h = harness();
+    await h.seed();
+    const WEB_ADDRESS = 'GBWEBWEBWEBWEBWEBWEBWEBWEBWEBWEBWEBWEBWEBWEBWEBWEBWEBWEB';
+    const UUID_W = '3c1e5a2b-7d4f-4e6a-9b8c-0d1e2f3a4b5c';
+    const web = (event: string, props: Record<string, string | boolean>, ts: string) => ({
+      installId: UUID_W,
+      platform: 'web',
+      appVersion: '0.5.1',
+      network: 'testnet',
+      event,
+      props,
+      ts: new Date(ts),
+      account: WEB_ADDRESS,
+    });
+    await h.store.insert(
+      [
+        web('web_attributed', { src: 'homepage-ios' }, '2026-09-12T10:00:00Z'),
+        web('session_start', {}, '2026-09-12T10:00:01Z'),
+        web('tx_signed', { kind: 'sign_and_submit', ok: true }, '2026-09-12T10:05:00Z'),
+      ],
+      new Date('2026-09-12T12:00:00Z'),
+    );
+    const cookie = h.cookieFrom(await h.login(TOKEN));
+    const page = await (await h.get('/admin', cookie)).text();
+    expect(page).toContain('<b>2</b><span>wallets</span>');
+    expect(page).toContain('<b>2</b><span>transactions signed</span>');
+    expect(page).toContain('<b>1</b><span>wallets on Web</span>');
+    expect(page).toContain('<b>1</b><span>wallets on Chrome</span>');
+    expect(page).toContain('<option value="web">Web</option>');
+    expect(page).not.toContain(UUID_W);
+
+    const only = await (await h.get('/admin?platform=web', cookie)).text();
+    expect(only).toContain('<option value="web" selected>Web</option>');
+    expect(only).toContain('<b>1</b><span>wallets</span>');
+    expect(only).toContain('<b>1</b><span>transactions signed</span>');
+    expect(only).not.toContain('wallets on Chrome');
+
+    const wallets = await (await h.get('/admin/wallets?platform=web', cookie)).text();
+    expect(wallets).toContain('<span class="pill">Web</span>');
+    expect(wallets).not.toContain('<span class="pill">Chrome</span>');
+  });
+
   it('wallets: one row per address, anonymous installs absent, links to the drill-down, sortable', async () => {
     const h = harness();
     const B2 = 'GDVEU3DD4KOFECV66VIHWEZOYX4ZKR3WV27L464SIIPOU2IUI3JCZA57';
@@ -489,6 +532,8 @@ describe('helpers', () => {
       until: '2024-03-01',
     });
     expect(parseFilters({ wallet: ADDRESS, platform: 'android' }, now).wallet).toBe(ADDRESS);
+    for (const p of ['extension', 'android', 'web', 'demo'])
+      expect(parseFilters({ platform: p }, now).platform).toBe(p);
     expect(parseFilters({ wallet: UUID_B }, now).wallet).toBe(UUID_B);
     expect(parseFilters({ account: ADDRESS }, now).wallet).toBe(ADDRESS); // legacy name
   });

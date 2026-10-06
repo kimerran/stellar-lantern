@@ -25,8 +25,15 @@ import {
   validatePaymentIntent,
   toAssetRef,
   intentAssetCode,
+  beginSignXdr,
+  bridgeRequestId,
+  refuseWhileBusy,
+  withRequestId,
   type PaymentIntent,
+  type SignXdrReview,
 } from '@core/miniapps/bridge';
+import { remoteFrameSandbox, replyTargetOrigin, isFromFramedApp } from '@core/miniapps/frame';
+import { signXdrWith } from '@core/dapp/sign-xdr';
 import { scanTx, type WalletScanInput } from '@core/scan/wallet';
 import { useRecheck } from '../hooks/useRecheck';
 import { RecheckNotice } from '../components/RecheckNotice';
@@ -38,6 +45,11 @@ import { ReportCounterparties, counterpartiesOf } from '../components/ReportAddr
 import { ScanBadge } from '../components/ScanBadge';
 import { HoldToConfirm } from '../components/HoldToConfirm';
 import { isNativePlatform } from '@shared/kv';
+import type { PendingDeepLink } from '../deep-link/inbox';
+
+// The web app (#238) lists only the bundled mini-apps: its CSP allows frames
+// from its own origin alone, so a remote dApp couldn't load there.
+const DIRECTORY = __WEB_BUILD__ ? MINI_APPS.filter((a) => !a.url) : MINI_APPS;
 
 // In-app mini-app browser (README "Mini-app browser for Stellar dApps").
 //
@@ -47,10 +59,23 @@ import { isNativePlatform } from '@shared/kv';
 // approval) — see Browser below. The header trust chip reflects real state:
 // "Checked" only for bundled first-party pages, "Unverified" for remote sites.
 
-type Open =
+export type Open =
   | { kind: 'app'; app: MiniApp; src: string; title: string; origin: string }
-  | { kind: 'url'; src: string; title: string; origin: string };
+  // `session`: a directory app marked `session: true` (#260). Never set for the URL bar.
+  | { kind: 'url'; src: string; title: string; origin: string; session?: boolean };
 
+// The one place the Open for a remote directory app is built, so tapping the app
+// and an "Open in Lantern" link to it (#263) load it the same way; `src` is the
+// only difference. Per-app frame properties belong here, not at a call site.
+export function remoteAppOpen(app: MiniApp, src: string): Open {
+  return {
+    kind: 'url',
+    src,
+    title: app.name,
+    origin: displayOrigin(app.url!),
+    session: app.session === true,
+  };
+}
 
 // `config` is the resolved NetworkConfig (Settings Horizon / RPC overrides
 // applied — #84); `network` stays the id the bridge protocol shares with apps.
@@ -58,14 +83,40 @@ export function Apps({
   address,
   network,
   config,
+  deepLink = null,
+  onDeepLinkHandled,
 }: {
   address: string;
   network: NetworkId;
   config: NetworkConfig;
+  /** An "Open in Lantern" link to act on (#263), already origin-checked. */
+  deepLink?: PendingDeepLink | null;
+  onDeepLinkHandled?: () => void;
 }) {
   const [open, setOpen] = useState<Open | null>(null);
   const [urlText, setUrlText] = useState('');
   const [urlError, setUrlError] = useState(false);
+  // Set when a link asked to open a site outside the directory: we opened
+  // nothing and say so. '' when the link carried no usable site at all.
+  const [refusedLink, setRefusedLink] = useState<string | null>(null);
+
+  // "Open in Lantern" (#263). parseDeepLink only returns `open` for a URL whose
+  // origin is a directory app's; it loads in the same opaque-origin sandbox as
+  // tapping that app. Anything else opens nothing.
+  useEffect(() => {
+    if (!deepLink) return;
+    const { link } = deepLink;
+    if (link.kind === 'open') {
+      setRefusedLink(null);
+      if (__FEATURE_TELEMETRY__) track.miniAppOpened(link.app.id, true);
+      setOpen(remoteAppOpen(link.app, link.url));
+    } else {
+      setOpen(null);
+      setRefusedLink(link.origin ?? '');
+    }
+    onDeepLinkHandled?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- act once per link id
+  }, [deepLink?.id]);
 
   // Favorited / "installed" app ids (#93). Loaded once, then kept live across
   // surfaces via the settings pub-sub — favoriting an app in one window updates
@@ -81,11 +132,12 @@ export function Apps({
 
   function launchApp(app: MiniApp) {
     if (__FEATURE_TELEMETRY__) track.miniAppOpened(app.id, isRemoteMiniApp(app));
-    // Remote apps load in the opaque-origin sandbox (like the URL bar), reaching
-    // the wallet only through the scan-gated postMessage bridge. Bundled apps are
+    // Remote apps load in the opaque-origin sandbox (like the URL bar), or at
+    // their real origin if marked `session` (#260), reaching the wallet only
+    // through the scan-gated postMessage bridge either way. Bundled apps are
     // first-party pages. Either way, "favoriting" changes nothing about this.
     if (isRemoteMiniApp(app)) {
-      setOpen({ kind: 'url', src: miniAppSrc(app), title: app.name, origin: displayOrigin(app.url!) });
+      setOpen(remoteAppOpen(app, miniAppSrc(app)));
       return;
     }
     setOpen({
@@ -109,42 +161,69 @@ export function Apps({
 
   if (open) {
     return (
-      <Browser open={open} address={address} network={network} config={config} onClose={() => setOpen(null)} />
+      <Browser key={open.src} open={open} address={address} network={network} config={config} onClose={() => setOpen(null)} />
     );
   }
 
-  const favoriteApps = orderedFavoriteApps(favorites);
+  const favoriteApps = orderedFavoriteApps(favorites, DIRECTORY);
 
   return (
     <div className="space-y-5 pt-1">
-      {/* URL bar */}
-      <section className="space-y-2">
-        <div className="flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-high px-3 py-2 focus-within:border-primary-container focus-within:shadow-focus-amber">
-          <Icon name="public" size={18} className="text-on-surface-variant" />
-          <input
-            value={urlText}
-            onChange={(e) => {
-              setUrlText(e.target.value);
-              if (urlError) setUrlError(false);
-            }}
-            onKeyDown={(e) => e.key === 'Enter' && go()}
-            inputMode="url"
-            placeholder="Enter a dApp URL…"
-            className="min-w-0 flex-1 bg-transparent text-body-md text-on-surface placeholder:text-outline focus:outline-none"
-          />
+      {refusedLink !== null && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-xl border border-error/30 bg-error-container/15 p-3"
+        >
+          <Icon name="block" size={18} className="mt-0.5 shrink-0 text-error" />
+          <div className="min-w-0 flex-1">
+            <p className="text-label-lg text-on-surface">
+              This site isn’t in Lantern’s directory
+            </p>
+            <p className="break-all text-label-md text-on-surface-variant">
+              {refusedLink
+                ? `A link asked Lantern to open ${refusedLink}. Lantern only opens directory apps from links, so nothing was opened.`
+                : 'A link asked Lantern to open a page it couldn’t check, so nothing was opened.'}
+            </p>
+          </div>
           <button
-            onClick={go}
-            disabled={!urlText.trim()}
-            className="shrink-0 text-on-surface-variant hover:text-on-surface disabled:opacity-30"
-            aria-label="Open URL"
+            onClick={() => setRefusedLink(null)}
+            className="shrink-0 text-on-surface-variant hover:text-on-surface"
+            aria-label="Dismiss"
           >
-            <Icon name="arrow_forward" size={18} />
+            <Icon name="close" size={18} />
           </button>
         </div>
-        {urlError && (
-          <p className="px-1 text-label-sm text-error">That doesn’t look like a web address.</p>
-        )}
-      </section>
+      )}
+      {/* URL bar. Not in the web app: its CSP frames only its own origin (#238). */}
+      {!__WEB_BUILD__ && (
+        <section className="space-y-2">
+          <div className="flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-high px-3 py-2 focus-within:border-primary-container focus-within:shadow-focus-amber">
+            <Icon name="public" size={18} className="text-on-surface-variant" />
+            <input
+              value={urlText}
+              onChange={(e) => {
+                setUrlText(e.target.value);
+                if (urlError) setUrlError(false);
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && go()}
+              inputMode="url"
+              placeholder="Enter a dApp URL…"
+              className="min-w-0 flex-1 bg-transparent text-body-md text-on-surface placeholder:text-outline focus:outline-none"
+            />
+            <button
+              onClick={go}
+              disabled={!urlText.trim()}
+              className="shrink-0 text-on-surface-variant hover:text-on-surface disabled:opacity-30"
+              aria-label="Open URL"
+            >
+              <Icon name="arrow_forward" size={18} />
+            </button>
+          </div>
+          {urlError && (
+            <p className="px-1 text-label-sm text-error">That doesn’t look like a web address.</p>
+          )}
+        </section>
+      )}
 
       {/* My apps — favorited/"installed" apps, pinned above the directory. Same
           sandboxed launch as Discover; installing is a bookmark, not access. */}
@@ -181,7 +260,7 @@ export function Apps({
         </div>
 
         <div className="space-y-2">
-          {MINI_APPS.map((app) => (
+          {DIRECTORY.map((app) => (
             <AppRow
               key={app.id}
               app={app}
@@ -288,13 +367,21 @@ function Browser({
   const timer = useRef<ReturnType<typeof setTimeout>>();
 
   const isRemote = open.kind === 'url';
+  // Remote frames are opaque unless this is a session directory app (#260);
+  // see src/core/miniapps/frame.ts for the rules, incl. never on Lantern's origin.
+  const sandbox = isRemote ? remoteFrameSandbox(open.src, open.session === true) : undefined;
+  // Where replies go: a session app's own origin; '*' for an opaque frame (its
+  // origin is 'null', so '*' to its own contentWindow is the only way to reach
+  // it) and for bundled first-party pages (unchanged).
+  const replyTarget = sandbox ? replyTargetOrigin(open.src, sandbox) : '*';
 
   // ── Wallet bridge (read-only connect) ──
   // A mini-app posts { type: 'lantern:getPublicKey' }; we reply (after the user
   // approves) with { type: 'lantern:publicKey', publicKey, network }. Only the
   // public key + network are ever shared — never secrets, never signing. We only
-  // trust messages from THIS app's frame (event.source check), and post back to
-  // that same frame (targetOrigin '*' is required for the opaque-origin sandbox).
+  // trust messages from THIS app's frame (event.source, and for remote frames
+  // event.origin too), and post back to that same frame: to the app's origin
+  // for a session app, '*' for an opaque-origin frame (see replyTargetOrigin).
   const [connectReq, setConnectReq] = useState(false);
   const granted = useRef(false);
 
@@ -302,13 +389,35 @@ function Browser({
   // user's review. The dApp sends an *intent* (destination/amount/memo) — Lantern
   // builds, scans, signs and submits, so the secret never leaves and every send
   // goes through the same security review as the wallet's own Send flow.
-  const [signReq, setSignReq] = useState<{
-    intent: PaymentIntent;
-    xdr: string;
-    verdict: ScanVerdict;
-    fee: string;
-    scanInput: WalletScanInput;
-  } | null>(null);
+  //
+  // Or (#262, `lantern:signXdr`) a transaction the dApp built itself — maybe
+  // already signed by a sponsor — that Lantern scans, signs through SIGN_ONLY
+  // and hands back without submitting. Same sheet, same gates.
+  const [signReq, setSignReq] = useState<
+    | {
+        kind: 'intent';
+        intent: PaymentIntent;
+        xdr: string;
+        verdict: ScanVerdict;
+        fee: string;
+        scanInput: WalletScanInput;
+      }
+    | {
+        kind: 'xdr';
+        request: SignXdrReview;
+        xdr: string;
+        verdict: ScanVerdict;
+        fee: string;
+        scanInput: WalletScanInput;
+      }
+    | null
+  >(null);
+  // The pending request, readable from the message listener (a closure over
+  // the first render). One request at a time: while it's open (or being
+  // signed), a new one is refused, never swapped in. Set synchronously when a
+  // review opens, so two scans finishing before a re-render can't both open.
+  const signReqRef = useRef<typeof signReq>(null);
+  signReqRef.current = signReq;
   // Re-simulate immediately before submit (#121, SOW §3.9). A dApp-initiated
   // payment is the case where the wait between review and confirm is longest.
   const recheck = useRecheck();
@@ -323,14 +432,14 @@ function Browser({
   const submittingRef = useRef(false);
 
   function postToApp(message: unknown) {
-    frameRef.current?.contentWindow?.postMessage(message, '*');
+    frameRef.current?.contentWindow?.postMessage(message, replyTarget);
   }
   function sendPublicKey() {
     postToApp({ type: 'lantern:publicKey', publicKey: address, network });
   }
 
   // Build + scan a dApp payment intent, then surface it for review.
-  async function prepareSign(rawIntent: unknown) {
+  async function prepareSign(rawIntent: unknown, id?: ReturnType<typeof bridgeRequestId>) {
     const validated = validatePaymentIntent(rawIntent);
     if (!validated.ok) {
       postToApp({ type: 'lantern:txError', error: validated.error });
@@ -376,14 +485,62 @@ function Browser({
         context: { network, fromAddress: address, destinationFunded: destFunded, origin: open.title },
       };
       const verdict = await scanTx(scanInput);
+      // Before touching any review state: the open review stays as it is.
+      if (refuseWhileBusy(reviewBusy(), id, postToApp)) return;
       setConfirmText('');
       setSignErr(null);
       recheck.reset();
       if (__FEATURE_TELEMETRY__) track.txScanned(verdict);
-      setSignReq({ intent, xdr, verdict, fee: formatAmount(String(Number(baseFee) / 1e7)), scanInput });
+      const next = {
+        kind: 'intent' as const,
+        intent,
+        xdr,
+        verdict,
+        fee: formatAmount(String(Number(baseFee) / 1e7)),
+        scanInput,
+      };
+      signReqRef.current = next;
+      setSignReq(next);
     } catch {
       postToApp({ type: 'lantern:txError', error: 'Could not prepare the transaction.' });
     }
+  }
+
+  // A review is open, or a signature for one is in flight (review F1).
+  function reviewBusy(): boolean {
+    return signReqRef.current !== null || submittingRef.current;
+  }
+
+  // A dApp-built transaction (#262): ack, validate, scan — then review.
+  async function prepareSignXdr(data: unknown) {
+    const review = await beginSignXdr(data, {
+      post: postToApp,
+      connected: granted.current,
+      address,
+      network,
+      networkPassphrase: config.passphrase,
+      rpcUrl: config.sorobanRpcUrl,
+      origin: open.title,
+      scan: scanTx,
+    });
+    if (!review) return;
+    // Checked after the scan (the ack above stays synchronous); the open
+    // review is left untouched.
+    if (refuseWhileBusy(reviewBusy(), review.id, postToApp)) return;
+    setConfirmText('');
+    setSignErr(null);
+    recheck.reset();
+    if (__FEATURE_TELEMETRY__) track.txScanned(review.verdict);
+    const next = {
+      kind: 'xdr' as const,
+      request: review,
+      xdr: review.value.xdr,
+      verdict: review.verdict,
+      fee: formatAmount(String(Number(review.value.fee) / 1e7)),
+      scanInput: review.scanInput,
+    };
+    signReqRef.current = next;
+    setSignReq(next);
   }
 
   // A pending sign-message request (read-only proof of ownership; no funds).
@@ -404,7 +561,9 @@ function Browser({
     granted.current = false; // re-prompt per opened app
     function onMessage(e: MessageEvent) {
       const win = frameRef.current?.contentWindow;
-      if (!win || e.source !== win) return; // only our embedded app
+      // Only our embedded app: its window, and (remote) the origin we reply to.
+      if (!win || e.source !== win) return;
+      if (sandbox && !isFromFramedApp(e, win, replyTarget)) return;
       const data = e.data as { type?: string; intent?: unknown; message?: unknown } | null;
       if (data?.type === 'lantern:getPublicKey') {
         postToApp({ type: 'lantern:connecting' }); // ack → dApp waits for approval
@@ -415,19 +574,22 @@ function Browser({
           postToApp({ type: 'lantern:txError', error: 'Connect the wallet first.' });
           return;
         }
-        void prepareSign(data.intent);
+        void prepareSign(data.intent, bridgeRequestId(data));
       } else if (data?.type === 'lantern:signMessage') {
         if (!granted.current) {
           postToApp({ type: 'lantern:signRejected', error: 'Connect the wallet first.' });
           return;
         }
         if (typeof data.message === 'string') setMsgReq(data.message);
+      } else if (data?.type === 'lantern:signXdr') {
+        // beginSignXdr acks synchronously, before its first await (#262).
+        void prepareSignXdr(data);
       }
     }
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open.src, address, network, config]);
+  }, [open.src, sandbox, replyTarget, address, network, config]);
 
   function approveConnect() {
     granted.current = true;
@@ -459,6 +621,24 @@ function Browser({
       return;
     }
     const cfg = config;
+    if (signReq.kind === 'xdr') {
+      // Sign only — the dApp submits. Existing signatures (a sponsor's) stay.
+      const res = await signXdrWith(
+        sendMessage,
+        { xdr: signReq.xdr, networkPassphrase: signReq.request.value.networkPassphrase },
+        address,
+      );
+      submittingRef.current = false;
+      setSubmitting(false);
+      if (res.ok) {
+        postToApp(withRequestId({ type: 'lantern:xdrSigned', signedXdr: res.data.signedXdr }, signReq.request.id));
+        // Keyed to the xdr, like the re-check update: only this review closes.
+        setSignReq((cur) => (cur?.xdr === signReq.xdr ? null : cur));
+      } else {
+        setSignErr(res.code === 'LOCKED' ? 'Wallet locked — reopen to unlock and retry.' : res.error);
+      }
+      return;
+    }
     const res = await sendMessage({
       type: 'SIGN_AND_SUBMIT',
       xdr: signReq.xdr,
@@ -469,13 +649,14 @@ function Browser({
     setSubmitting(false);
     if (res.ok) {
       postToApp({ type: 'lantern:txResult', hash: res.data.hash });
-      setSignReq(null);
+      setSignReq((cur) => (cur?.xdr === signReq.xdr ? null : cur));
     } else {
       setSignErr(res.code === 'LOCKED' ? 'Wallet locked — reopen to unlock and retry.' : res.error);
     }
   }
   function rejectSign() {
-    postToApp({ type: 'lantern:txRejected' });
+    if (signReq?.kind === 'xdr') postToApp(withRequestId({ type: 'lantern:signRejected' }, signReq.request.id));
+    else postToApp({ type: 'lantern:txRejected' });
     setSignReq(null);
     setSignErr(null);
     recheck.reset();
@@ -652,9 +833,10 @@ function Browser({
           src={open.src}
           title={open.title}
           // Bundled apps are first-party extension pages (loaded same-origin so
-          // their relative app.js passes script-src 'self'); only remote URLs get
-          // the opaque-origin sandbox.
-          sandbox={isRemote ? 'allow-scripts allow-forms allow-popups' : undefined}
+          // their relative app.js passes script-src 'self'); remote URLs get the
+          // opaque-origin sandbox, or the session sandbox for a directory app
+          // marked `session` (#260).
+          sandbox={sandbox}
           className="h-full w-full border-0"
           onLoad={onFrameLoad}
         />
@@ -743,17 +925,22 @@ function Browser({
             <div className="flex items-center gap-2">
               <Icon name="draw" size={18} className="text-primary-container" />
               <span id="sign-sheet-title" className="text-title-sm text-on-surface">
-                <span className="font-semibold">{open.title}</span> wants to send
+                <span className="font-semibold">{open.title}</span>{' '}
+                {signReq.kind === 'xdr' ? 'wants you to sign a transaction' : 'wants to send'}
               </span>
             </div>
-            <div className="rounded-xl bg-surface-container-high p-3 text-center">
-              <p className={`text-headline-lg-mobile ${isHigh ? 'text-on-surface-variant' : 'text-primary glow-amber-text'}`}>
-                {formatAmount(signReq.intent.amount)} {intentAssetCode(signReq.intent)}
-              </p>
-              <p className="mt-1 font-mono text-label-sm text-on-surface-variant">
-                to {truncateAddress(signReq.intent.destination, 5, 5)}
-              </p>
-            </div>
+            {signReq.kind === 'intent' ? (
+              <div className="rounded-xl bg-surface-container-high p-3 text-center">
+                <p className={`text-headline-lg-mobile ${isHigh ? 'text-on-surface-variant' : 'text-primary glow-amber-text'}`}>
+                  {formatAmount(signReq.intent.amount)} {intentAssetCode(signReq.intent)}
+                </p>
+                <p className="mt-1 font-mono text-label-sm text-on-surface-variant">
+                  to {truncateAddress(signReq.intent.destination, 5, 5)}
+                </p>
+              </div>
+            ) : (
+              <SignXdrSummary request={signReq.request} />
+            )}
 
             {signReq.verdict.action === 'allow' ? (
               <div className="flex items-center justify-between rounded-xl border border-tertiary-container/20 bg-surface-container-high p-3">
@@ -779,13 +966,21 @@ function Browser({
               subjects={
                 counterpartiesOf(signReq.verdict, address).length > 0
                   ? counterpartiesOf(signReq.verdict, address)
-                  : [{ address: signReq.intent.destination }]
+                  : signReq.kind === 'intent'
+                    ? [{ address: signReq.intent.destination }]
+                    : signReq.request.value.signing.otherSigners.map((a) => ({ address: a }))
               }
             />
 
             <div className="flex items-center justify-between text-label-sm text-on-surface-variant">
               <span>Network fee</span>
-              <span>~{signReq.fee} XLM · {network === 'PUBLIC' ? 'Mainnet' : 'Testnet'}</span>
+              <span>
+                ~{signReq.fee} XLM
+                {signReq.kind === 'xdr' && !signReq.request.value.signing.userIsTxSource
+                  ? ` · paid by ${truncateAddress(signReq.request.value.signing.txSource, 4, 4)}`
+                  : ''}{' '}
+                · {network === 'PUBLIC' ? 'Mainnet' : 'Testnet'}
+              </span>
             </div>
 
             {isHigh && !native && (
@@ -809,7 +1004,7 @@ function Browser({
               {isHigh && native ? (
                 <HoldToConfirm
                   className="flex-1"
-                  label={submitting ? 'Sending…' : 'Hold to Sign anyway'}
+                  label={submitting ? (signReq.kind === 'xdr' ? 'Signing…' : 'Sending…') : 'Hold to Sign anyway'}
                   danger
                   onConfirm={approveSign}
                   disabled={submitting}
@@ -824,7 +1019,17 @@ function Browser({
                       : 'bg-primary-container text-on-primary-container shadow-primary'
                   }`}
                 >
-                  {submitting ? 'Sending…' : isHigh ? 'Sign anyway' : 'Approve & send'}
+                  {signReq.kind === 'xdr'
+                    ? submitting
+                      ? 'Signing…'
+                      : isHigh
+                        ? 'Sign anyway'
+                        : 'Approve & sign'
+                    : submitting
+                      ? 'Sending…'
+                      : isHigh
+                        ? 'Sign anyway'
+                        : 'Approve & send'}
                 </button>
               )}
             </div>
@@ -864,6 +1069,48 @@ function Browser({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// What a dApp-built transaction asks of the user (#262): which operations
+// their signature authorizes, who else signs, and that Lantern hands the
+// signed envelope back rather than submitting it. The scan's explanation —
+// above the buttons, as for any review — says what the operations do.
+function SignXdrSummary({ request }: { request: SignXdrReview }) {
+  const { signing, operationCount, existingSignatures } = request.value;
+  const yours = signing.userOps.length;
+  return (
+    <div className="space-y-2 rounded-xl bg-surface-container-high p-3 text-label-md text-on-surface">
+      <p>
+        {signing.userIsTxSource
+          ? `Your account is the transaction source (it pays the fee) and acts in ${yours} of ${operationCount} operation${operationCount === 1 ? '' : 's'}.`
+          : `Your signature authorizes ${yours} of ${operationCount} operation${operationCount === 1 ? '' : 's'}.`}
+        {signing.otherSigners.length > 0 && (
+          <>
+            {' '}Also signed by{' '}
+            <span className="font-mono">
+              {signing.otherSigners.map((a) => truncateAddress(a, 4, 4)).join(', ')}
+            </span>
+            {existingSignatures > 0 ? ` (${existingSignatures} signature${existingSignatures === 1 ? '' : 's'} already on it).` : '.'}
+          </>
+        )}
+      </p>
+      <ol className="space-y-0.5 text-label-sm text-on-surface-variant">
+        {signing.ops.map((op) => (
+          <li key={op.opIndex} className="flex justify-between gap-2">
+            <span className="truncate">
+              {op.opIndex + 1}. {op.type}
+            </span>
+            <span className={`shrink-0 font-mono ${op.byUser ? 'text-primary' : ''}`}>
+              {op.byUser ? 'you' : truncateAddress(op.source, 4, 4)}
+            </span>
+          </li>
+        ))}
+      </ol>
+      <p className="text-label-sm text-on-surface-variant">
+        Lantern adds your signature and returns it to the app. It doesn’t submit the transaction.
+      </p>
     </div>
   );
 }

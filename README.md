@@ -45,7 +45,7 @@ A best-effort snapshot from public sources (official sites/docs, GitHub, and 202
 | **Security scan** | Decodes a transaction's operations, explains them in plain language (payments, trustlines, `setOptions` signer/threshold changes, Soroban/DeFi calls), assigns a risk verdict, and gates high-risk actions behind a **type-CONFIRM / press-&-hold** prompt. Tier 0/1 on-device today (opt-in Tier 2 cloud + reputation registry are roadmapped). |
 | **Guardian recovery** | *Kill the seed phrase.* Add guardians (native multisig `setOptions`), co-sign someone's recovery on your own device (`SIGN_ONLY`, out-of-band), and recover a lost account onto a new device once enough guardians sign. Anti-drain invariant enforced (guardians can recover but not spend). |
 | **Anchors — Cash in / Cash out** | SEP-1 `stellar.toml` discovery → SEP-24 `/info` asset discovery → **validated** SEP-10 web-auth (challenge checked against the anchor's `SIGNING_KEY` *before* signing) → interactive deposit/withdraw in a sandboxed frame → live status polling. Curated anchor directory. |
-| **DeFi / mini-apps** | A sandboxed **mini-app browser** with a read-only connect bridge + a scan-gated payment/sign bridge; a typed **Soroban invoke-contract** builder + RPC **`simulateTransaction`**; plain-language labels for DeFi calls (e.g. Blend `supply`/`withdraw`). |
+| **DeFi / mini-apps** | A sandboxed **mini-app browser** with a read-only connect bridge + a scan-gated payment/sign bridge (protocol for dApp developers: [`docs/mini-app-bridge.md`](docs/mini-app-bridge.md)); a typed **Soroban invoke-contract** builder + RPC **`simulateTransaction`**; plain-language labels for DeFi calls (e.g. Blend `supply`/`withdraw`). |
 | **Platforms** | Chrome MV3 extension **and** Android (Capacitor): safe-area-aware layout, debug-APK CI. |
 
 > Status: the merged codebase is unit-tested (200+ tests) with green extension + Android builds. In-flight and roadmapped items (full anchor screen wiring, reputation backend, biometric/passkey unlock, in-wallet swaps) are tracked as GitHub issues — see **Roadmap**.
@@ -65,12 +65,14 @@ npm run typecheck   # tsc --noEmit
 npm run lint        # eslint
 npm run test        # vitest run
 npm run build:mobile && npm run cap:sync   # build web assets and sync into the Android project
+npm run build:web   # installable web app → webapp/ (committed; `-- --check` fails on drift)
 npm run icons       # regenerate extension icons  (icons:android for Android)
 npm run verify:flags # prove disabled features are stripped from the release bundle
 ```
 
 **Load the extension:** `npm run build` → `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select `dist/` → pin **Lantern**.
 **Android:** `npm run build:mobile && npm run cap:sync`, then open `android/` in Android Studio (or use the `build-debug-apk` CI job).
+**Web app:** `npm run build:web`, then serve `webapp/` as a static site over HTTPS (it will be hosted at `app.golantern.xyz`). One wallet per browser profile, stored in IndexedDB. A new deploy takes effect on the next launch: an open tab keeps running the build it loaded. Testnet only, with a strict CSP; the host must also send the headers in [`docs/web-app-hosting.md`](docs/web-app-hosting.md).
 
 ---
 
