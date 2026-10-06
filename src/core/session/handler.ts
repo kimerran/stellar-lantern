@@ -255,6 +255,10 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
 }
 
 // Prefix that domain-separates wallet-signed messages from transaction envelopes.
+// FROZEN (#265): `lantern:signMessage` signs UTF-8(prefix + message), unhashed,
+// and dApps (Centient) verify exactly that. Don't change it or hash it; SEP-53
+// gets its own method (#253). Pinned by tests/sign-message-format.test.ts and
+// documented in docs/mini-app-bridge.md.
 export const SIGN_MESSAGE_PREFIX = 'Lantern signed message:\n';
 
 // Public entry point. Never throws — converts errors to readable Results so
