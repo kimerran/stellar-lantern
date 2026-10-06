@@ -51,34 +51,82 @@ function grantsSameOrigin(src: string, session: boolean, self?: string): boolean
 }
 
 /**
+ * The origins a framed app may send messages from and be replied to (#279).
+ * An opaque frame: only 'null' (its origin). A session frame: `src`'s origin,
+ * then the directory app's other origins (`appOrigins`, from appOrigins() in
+ * directory.ts), each https and never Lantern's own (isLanternOrigin, with the
+ * same `self` as remoteFrameSandbox), deduplicated. So a session app redirected
+ * between two hosts it lists (beta.centient.work and centient.work) keeps
+ * talking to the wallet, and nothing outside its set does.
+ */
+export function frameOrigins(
+  src: string,
+  sandbox: string,
+  appOrigins: readonly string[] = [],
+  self?: string,
+): string[] {
+  if (!hasSameOrigin(sandbox)) return ['null'];
+  const out: string[] = [];
+  for (const value of [src, ...appOrigins]) {
+    if (typeof value !== 'string') continue;
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      continue;
+    }
+    if (url.protocol !== 'https:' || url.username || url.password) continue;
+    if (self === undefined ? isLanternOrigin(url.origin) : isLanternOrigin(url.origin, self)) continue;
+    if (!out.includes(url.origin)) out.push(url.origin);
+  }
+  return out;
+}
+
+function hasSameOrigin(sandbox: string): boolean {
+  return sandbox.split(/\s+/).includes('allow-same-origin');
+}
+
+/**
  * The postMessage target for replies to a framed app, given its sandbox.
- * A session frame runs at its real origin, so replies go to that origin only:
- * if the frame has navigated elsewhere, the browser drops them.
+ * A session frame runs at its real origin, so replies go to one origin only:
+ * `lastOrigin` (the `event.origin` of the latest message accepted from the
+ * frame) when it's in `allowed` (frameOrigins), else `src`'s origin. Never
+ * '*'. If the frame has navigated anywhere else, the browser drops them.
  * An opaque frame's origin is the string 'null', which isn't a valid
  * targetOrigin, so the only way to reach it is '*'. That's safe because the
  * message is posted to that frame's own contentWindow, and the frame can't
  * leave the opaque sandbox: whatever it navigates to is still opaque, and still
  * only reached through the same scan-gated bridge.
  */
-export function replyTargetOrigin(src: string, sandbox: string): string {
-  if (!sandbox.split(/\s+/).includes('allow-same-origin')) return '*';
+export function replyTargetOrigin(
+  src: string,
+  sandbox: string,
+  allowed: readonly string[] = [],
+  lastOrigin?: string | null,
+): string {
+  if (!hasSameOrigin(sandbox)) return '*';
+  if (lastOrigin && lastOrigin !== 'null' && allowed.includes(lastOrigin)) return lastOrigin;
   try {
     return new URL(src).origin;
   } catch {
-    return '*'; // unreachable: SESSION_SANDBOX is only granted to a parseable https URL
+    // Unreachable: SESSION_SANDBOX is only granted to a parseable https URL.
+    // Never '*' for a session frame; postMessage refuses 'null', so it fails closed.
+    return 'null';
   }
 }
 
 /**
  * Whether an incoming message came from the framed app: the sender must be the
- * frame's window (event.source), and its origin must be the one we reply to
- * (the app's origin for a session frame, 'null' for an opaque one).
+ * frame's window (event.source), and its origin must be one we accept: one of
+ * `allowed` (frameOrigins: the session app's origins, or ['null'] for an
+ * opaque frame). A single reply target is accepted too ('*' meaning 'null').
  */
 export function isFromFramedApp(
   event: { source: unknown; origin: string },
   frameWindow: unknown,
-  targetOrigin: string,
+  allowed: string | readonly string[],
 ): boolean {
   if (!frameWindow || event.source !== frameWindow) return false;
-  return event.origin === (targetOrigin === '*' ? 'null' : targetOrigin);
+  const set = typeof allowed === 'string' ? [allowed === '*' ? 'null' : allowed] : allowed;
+  return set.includes(event.origin);
 }

@@ -126,6 +126,46 @@ describe('parseDeepLink', () => {
     expect(parseDeepLink('::::', APPS)).toBeNull();
   });
 
+  it('accepts every origin an app lists, and opens the URL linked (#279)', () => {
+    const multi: MiniApp = { ...CENTIENT, url: 'https://beta.centient.work/', origins: ['https://centient.work'] };
+    const apps = [BUNDLED, multi];
+    expect(parseDeepLink(link('https://beta.centient.work/'), apps)).toEqual({
+      kind: 'open',
+      url: 'https://beta.centient.work/',
+      app: multi,
+    });
+    expect(parseDeepLink(link('https://centient.work/contributors?x=1'), apps)).toEqual({
+      kind: 'open',
+      url: 'https://centient.work/contributors?x=1',
+      app: multi,
+    });
+    expect(parseDeepLink(link('https://BETA.Centient.work/a'), apps)).toMatchObject({ kind: 'open', url: 'https://beta.centient.work/a' });
+    // Other subdomains, ports, schemes and userinfo tricks are refused.
+    for (const t of [
+      'https://evil.centient.work/',
+      'https://www.centient.work/',
+      'https://beta.beta.centient.work/',
+      'https://betacentient.work/',
+      'https://beta.centient.work.evil.com/',
+      'https://beta.centient.work:8443/',
+      'http://beta.centient.work/',
+      'https://beta.centient.work@evil.com/',
+      'https://centient.work@evil.com/',
+      'https://user@beta.centient.work/',
+      'https://evil.com\\@beta.centient.work/',
+    ]) {
+      expect(parseDeepLink(link(t), apps)?.kind, t).toBe('refused');
+    }
+    expect(parseDeepLink(link('https://evil.centient.work/'), apps)).toEqual({ kind: 'refused', origin: 'evil.centient.work' });
+  });
+
+  it('an extra origin never makes Lantern itself openable (#279)', () => {
+    const sneaky: MiniApp = { ...CENTIENT, origins: [ANDROID_ORIGIN, WEB_APP_ORIGIN, 'http://plain.example'] };
+    expect(deepLinkOrigins([sneaky])).toEqual(['https://centient.work']);
+    expect(parseDeepLink(link(`${ANDROID_ORIGIN}/`), [sneaky])?.kind).toBe('refused');
+    expect(parseDeepLink(link(`${WEB_APP_ORIGIN}/`), [sneaky])?.kind).toBe('refused');
+  });
+
   it('never opens a bundled app or Lantern itself', () => {
     const apps: MiniApp[] = [
       BUNDLED,
@@ -146,6 +186,11 @@ describe('deepLinkOrigins / asset_statements', () => {
     ]);
   });
 
+  it('lists an app\'s extra origins after its url origin (#279)', () => {
+    const multi: MiniApp = { ...CENTIENT, url: 'https://beta.centient.work/', origins: ['https://centient.work'] };
+    expect(deepLinkOrigins([BUNDLED, multi, CENTIENT])).toEqual(['https://beta.centient.work', 'https://centient.work']);
+  });
+
   it('builds the Digital Asset Links statement Centient expects', () => {
     expect(JSON.parse(assetStatements(['https://centient.work']))).toEqual([
       {
@@ -155,14 +200,15 @@ describe('deepLinkOrigins / asset_statements', () => {
     ]);
   });
 
-  it('the real directory lets a link open Centient (#264)', () => {
+  it('the real directory lets a link open Centient at beta or the apex (#264, #279)', () => {
     // Default apps = MINI_APPS, not the test fixture above.
+    expect(deepLinkOrigins()).toContain('https://beta.centient.work');
     expect(deepLinkOrigins()).toContain('https://centient.work');
-    expect(parseDeepLink(link('https://centient.work/contributors'))).toMatchObject({
-      kind: 'open',
-      url: 'https://centient.work/contributors',
-      app: { id: 'centient', session: true },
-    });
+    for (const url of ['https://beta.centient.work/', 'https://beta.centient.work/contributors', 'https://centient.work/contributors']) {
+      expect(parseDeepLink(link(url))).toMatchObject({ kind: 'open', url, app: { id: 'centient', session: true } });
+    }
+    expect(parseDeepLink(link('https://evil.centient.work/'))).toEqual({ kind: 'refused', origin: 'evil.centient.work' });
+    expect(assetXml).toContain('\\"site\\":\\"https://beta.centient.work\\"');
     expect(assetXml).toContain('\\"site\\":\\"https://centient.work\\"');
   });
 
@@ -222,6 +268,21 @@ describe('deep link opens like tapping the app', () => {
     if (parsed?.kind !== 'open') throw new Error('expected open');
     expect(remoteAppOpen(parsed.app, parsed.url)).toMatchObject({ kind: 'url', session: true });
     expect(remoteAppOpen(CENTIENT, miniAppSrc(CENTIENT))).toMatchObject({ session: false });
+  });
+
+  it('the Open carries the app\'s origins and names the host actually loaded (#279)', () => {
+    const multi: MiniApp = { ...CENTIENT, url: 'https://beta.centient.work/', origins: ['https://centient.work'], session: true };
+    const parsed = parseDeepLink(link('https://centient.work/contributors'), [multi]);
+    if (parsed?.kind !== 'open') throw new Error('expected open');
+    expect(remoteAppOpen(parsed.app, parsed.url)).toEqual({
+      kind: 'url',
+      src: 'https://centient.work/contributors',
+      title: 'Centient',
+      origin: 'centient.work',
+      session: true,
+      origins: ['https://beta.centient.work', 'https://centient.work'],
+    });
+    expect(remoteAppOpen(multi, miniAppSrc(multi))).toMatchObject({ origin: 'beta.centient.work' });
   });
 
   it('both Apps.tsx paths build the Open through remoteAppOpen', () => {

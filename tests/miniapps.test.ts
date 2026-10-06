@@ -7,8 +7,10 @@ import {
   normalizeUrl,
   displayOrigin,
   networkChip,
+  appOrigins,
   type MiniApp,
 } from '@core/miniapps/directory';
+import { ANDROID_ORIGIN, WEB_APP_ORIGIN, LEGACY_ANDROID_ORIGIN } from '@shared/origin';
 import appsSrc from '../src/popup/screens/Apps.tsx?raw';
 
 describe('mini-app directory', () => {
@@ -58,7 +60,10 @@ describe('mini-app directory', () => {
     expect(app).toBeDefined();
     expect(MINI_APPS.filter((a) => a.id === 'centient')).toHaveLength(1);
     expect(isRemoteMiniApp(app!)).toBe(true);
-    expect(app!.url).toBe('https://centient.work/');
+    // Opens at beta for the testnet launch; the apex is the same app (#279).
+    expect(app!.url).toBe('https://beta.centient.work/');
+    expect(app!.origins).toEqual(['https://centient.work']);
+    expect(appOrigins(app!)).toEqual(['https://beta.centient.work', 'https://centient.work']);
     expect(new URL(app!.url!).protocol).toBe('https:');
     expect(normalizeUrl(app!.url!)).toBe(app!.url);
     expect(app!.session).toBe(true);
@@ -74,6 +79,56 @@ describe('mini-app directory', () => {
 
   it('only remote apps keep a session', () => {
     for (const app of MINI_APPS.filter((a) => a.session)) expect(isRemoteMiniApp(app)).toBe(true);
+  });
+});
+
+describe('appOrigins (#279)', () => {
+  const base: MiniApp = { id: 'x', name: 'X', tagline: 't', category: 'Tools', icon: 'x', url: 'https://beta.x.example/a?b#c', verified: false };
+
+  it('is the url origin, then the extra origins, deduplicated', () => {
+    expect(appOrigins(base)).toEqual(['https://beta.x.example']);
+    expect(appOrigins({ ...base, origins: ['https://x.example', 'https://X.example/', 'https://beta.x.example'] })).toEqual([
+      'https://beta.x.example',
+      'https://x.example',
+    ]);
+    // A path on an extra entry is reduced to its origin; a port is kept.
+    expect(appOrigins({ ...base, origins: ['https://x.example/path', 'https://x.example:8443'] })).toEqual([
+      'https://beta.x.example',
+      'https://x.example',
+      'https://x.example:8443',
+    ]);
+  });
+
+  it('drops anything that is not a plain https origin', () => {
+    const bad = ['http://x.example', 'https://user@x.example', 'https://u:p@x.example', 'javascript:alert(1)', 'not a url', '', 'data:text/html,hi'];
+    expect(appOrigins({ ...base, origins: bad })).toEqual(['https://beta.x.example']);
+    expect(appOrigins({ ...base, origins: [42 as unknown as string] })).toEqual(['https://beta.x.example']);
+  });
+
+  it('never includes a Lantern origin', () => {
+    const own = [ANDROID_ORIGIN, `${WEB_APP_ORIGIN}/x`, 'chrome-extension://abcdefghijklmnop'];
+    expect(appOrigins({ ...base, origins: own })).toEqual(['https://beta.x.example']);
+    expect(appOrigins({ ...base, url: `${ANDROID_ORIGIN}/`, origins: ['https://x.example'] })).toEqual([]);
+    expect(appOrigins({ ...base, url: `${WEB_APP_ORIGIN}/`, origins: ['https://x.example'] })).toEqual([]);
+    // The running page's own origin, when given as `self`.
+    expect(appOrigins({ ...base, origins: ['https://preview.example.dev'] }, 'https://preview.example.dev')).toEqual([
+      'https://beta.x.example',
+    ]);
+    // The legacy https://localhost isn't a Lantern origin to isLanternOrigin, but no entry lists it.
+    for (const app of MINI_APPS) expect(appOrigins(app)).not.toContain(LEGACY_ANDROID_ORIGIN);
+  });
+
+  it('gives nothing to a bundled app or one whose own url does not qualify', () => {
+    expect(appOrigins({ ...base, url: undefined, path: 'miniapps/x/index.html', origins: ['https://x.example'] })).toEqual([]);
+    expect(appOrigins({ ...base, url: 'http://beta.x.example/', origins: ['https://x.example'] })).toEqual([]);
+  });
+
+  it('every directory app with extra origins is a remote app, and they are all https', () => {
+    for (const app of MINI_APPS.filter((a) => a.origins?.length)) {
+      expect(isRemoteMiniApp(app)).toBe(true);
+      // Every listed extra survives the filter: a typo would silently drop it.
+      expect(appOrigins(app)).toHaveLength(1 + new Set(app.origins).size);
+    }
   });
 });
 

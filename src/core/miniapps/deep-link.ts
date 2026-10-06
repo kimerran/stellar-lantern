@@ -14,47 +14,32 @@
 // accepts can't drift. scripts/gen-asset-statements.mjs writes the resource.
 //
 // Qualification rule: every directory entry with a remote `url` (an https dApp)
-// qualifies. Bundled apps have no web origin, and Lantern's own origins never
-// qualify. Adding a remote dApp to MINI_APPS is all it takes; then run
+// qualifies, with every origin appOrigins() gives it: `url`'s origin plus any
+// extra `origins` the entry lists (#279). Bundled apps have no web origin, and
+// Lantern's own origins never qualify. Adding a remote dApp to MINI_APPS is all it takes; then run
 // `npm run android:assets` and commit the regenerated XML.
 
-import { isLanternOrigin } from '@shared/origin';
-import { MINI_APPS, type MiniApp } from './directory';
+import { MINI_APPS, appOrigins, type MiniApp } from './directory';
 
 /** Generous cap on a deep-linked URL; real dApp entry URLs are far shorter. */
 const MAX_URL_LENGTH = 2048;
 
-/** The https origin a directory app qualifies with, or null if it doesn't. */
-function appOrigin(app: MiniApp): string | null {
-  if (!app.url) return null;
-  let url: URL;
-  try {
-    url = new URL(app.url);
-  } catch {
-    return null;
-  }
-  if (url.protocol !== 'https:' || url.username || url.password) return null;
-  // `'null'` as self: compare against Lantern's fixed origins only.
-  if (isLanternOrigin(url.origin, 'null')) return null;
-  return url.origin;
-}
-
 /**
  * The origins "Open in Lantern" may open, and that the Android app declares in
- * `asset_statements`: each qualifying directory app's https origin, deduplicated,
- * in directory order.
+ * `asset_statements`: every origin of every qualifying directory app
+ * (appOrigins: its `url`'s origin, then its extra `origins`), deduplicated, in
+ * directory order.
  */
 export function deepLinkOrigins(apps: readonly MiniApp[] = MINI_APPS): string[] {
   const out: string[] = [];
   for (const app of apps) {
-    const origin = appOrigin(app);
-    if (origin && !out.includes(origin)) out.push(origin);
+    for (const origin of appOrigins(app)) if (!out.includes(origin)) out.push(origin);
   }
   return out;
 }
 
 export type DeepLink =
-  /** Open `url` in the Apps tab; its origin is `app`'s. */
+  /** Open `url` in the Apps tab; its origin is one of `app`'s (appOrigins). */
   | { kind: 'open'; url: string; app: MiniApp }
   /**
    * A `lantern://open` link Lantern won't follow: a site outside the directory,
@@ -98,7 +83,9 @@ export function parseDeepLink(raw: string, apps: readonly MiniApp[] = MINI_APPS)
   // is evil.com) and no dApp entry link needs them.
   if (url.username || url.password) return { kind: 'refused', origin: url.host };
 
-  const app = apps.find((a) => appOrigin(a) === url.origin);
+  // Any of the app's origins (#279): `beta.centient.work` and `centient.work`
+  // are both Centient. Exact origin match, so other subdomains don't count.
+  const app = apps.find((a) => appOrigins(a).includes(url.origin));
   if (!app) return { kind: 'refused', origin: url.host };
   return { kind: 'open', url: url.href, app };
 }
