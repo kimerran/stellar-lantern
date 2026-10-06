@@ -7,6 +7,7 @@ import { join, relative, sep } from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
 import { flagDefines } from './vite.flags';
 import { WEB_CSP } from './src/web/csp';
+import { WEB_INGEST_URL, WEB_TELEMETRY_ENABLED } from './src/web/telemetry';
 
 // The installable web app (#237): the wallet in a plain browser, for iPhone
 // users and anyone without the extension or the APK. Same stack and aliases as
@@ -81,9 +82,14 @@ export default defineConfig({
   base: '/',
   envDir: repo('.'),
   // Flags pinned to their FLAG_DEFS defaults, never read from the local env,
-  // as in the playground: the output is committed and drift-checked.
+  // as in the playground: the output is committed and drift-checked. The one
+  // exception is `telemetry`, pinned to WEB_TELEMETRY_ENABLED (#239), with
+  // its ingest URL fixed in the source rather than read from the env.
   define: {
-    ...flagDefines({}),
+    ...flagDefines({ VITE_FEATURE_TELEMETRY: String(WEB_TELEMETRY_ENABLED) }),
+    ...(WEB_TELEMETRY_ENABLED
+      ? { 'import.meta.env.VITE_TELEMETRY_INGEST_URL': JSON.stringify(WEB_INGEST_URL) }
+      : {}),
     // Not Android: no ML Kit QR plugin, no Capacitor plugins.
     __NATIVE_BUILD__: 'false',
     __WEB_BUILD__: 'true',

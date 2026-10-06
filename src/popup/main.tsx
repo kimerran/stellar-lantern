@@ -7,6 +7,7 @@ import { ToastProvider } from './components/Toast';
 import { OpenInAnotherTab } from './screens/OpenInAnotherTab';
 import { holdWalletTab } from '@shared/tab-lock';
 import { captureInstallPrompt } from '@shared/web/install';
+import { recordFirstOpenSource } from '@shared/web/attribution';
 import { FramedRefusal } from './web/FramedRefusal';
 import '../styles/tailwind.css';
 
@@ -75,6 +76,9 @@ if (__WEB_BUILD__) {
     web(<FramedRefusal />);
   } else {
     captureInstallPrompt();
+    // The first open's `?src=`, kept on the device as an enum (#239). Sent
+    // only once the user opts in to analytics; nothing leaves the device here.
+    void recordFirstOpenSource(window.location.search);
     if (import.meta.env.PROD && 'serviceWorker' in navigator) {
       void navigator.serviceWorker.register('/sw.js').catch(() => {
         /* no offline shell; the app still works online */
