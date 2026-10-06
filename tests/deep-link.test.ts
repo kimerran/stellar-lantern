@@ -205,6 +205,14 @@ describe('deep link opens like tapping the app', () => {
     expect({ ...viaLink, src: '' }).toEqual({ ...viaTap, src: '' });
   });
 
+  it('a session app keeps its session when opened from a link (#260)', () => {
+    const sessionApp: MiniApp = { ...CENTIENT, session: true };
+    const parsed = parseDeepLink(link('https://centient.work/contributors'), [BUNDLED, sessionApp]);
+    if (parsed?.kind !== 'open') throw new Error('expected open');
+    expect(remoteAppOpen(parsed.app, parsed.url)).toMatchObject({ kind: 'url', session: true });
+    expect(remoteAppOpen(CENTIENT, miniAppSrc(CENTIENT))).toMatchObject({ session: false });
+  });
+
   it('both Apps.tsx paths build the Open through remoteAppOpen', () => {
     expect(appsSrc).toContain('setOpen(remoteAppOpen(link.app, link.url));');
     expect(appsSrc).toContain('setOpen(remoteAppOpen(app, miniAppSrc(app)));');
