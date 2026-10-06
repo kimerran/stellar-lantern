@@ -34,7 +34,8 @@ ignores any message it doesn't recognise, and anything without a `type`.
   `event.origin` is a Lantern origin you trust.
 - **Lantern's origin**, i.e. the `event.origin` of its replies:
   - Chrome extension: `chrome-extension://<extension id>`
-  - Android: `https://localhost` today (Capacitor's default)
+  - Android: `https://android.golantern.xyz` (its own origin since 0.5.x;
+    earlier builds used Capacitor's shared `https://localhost`, so don't trust that)
   - Web app: `https://app.golantern.xyz` (bundled mini-apps only)
 - **Sandbox.** Remote dApps (directory entries with a `url`, and anything opened
   from the URL bar) load with `sandbox="allow-scripts allow-forms allow-popups"`:
@@ -45,8 +46,7 @@ ignores any message it doesn't recognise, and anything without a `type`.
   `frame-ancestors`). Lantern can't read those headers; it shows *This site
   can't be embedded* with an *Open in a new tab* button instead.
 
-> **Changing soon (epic #258).** #259 gives the Android app its own origin
-> instead of `https://localhost` (which every Capacitor app shares). #260 adds
+> **Changing soon (epic #258).** #260 adds
 > `allow-same-origin` for directory dApps only, so they can keep a login, and
 > sends replies to the app's origin instead of `"*"`. Keep your origin check
 > configurable.
