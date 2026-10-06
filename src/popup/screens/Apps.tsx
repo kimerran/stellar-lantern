@@ -52,10 +52,16 @@ const DIRECTORY = __WEB_BUILD__ ? MINI_APPS.filter((a) => !a.url) : MINI_APPS;
 // approval) — see Browser below. The header trust chip reflects real state:
 // "Checked" only for bundled first-party pages, "Unverified" for remote sites.
 
-type Open =
+export type Open =
   | { kind: 'app'; app: MiniApp; src: string; title: string; origin: string }
   | { kind: 'url'; src: string; title: string; origin: string };
 
+// The one place the Open for a remote directory app is built, so tapping the app
+// and an "Open in Lantern" link to it (#263) load it the same way; `src` is the
+// only difference. Per-app frame properties belong here, not at a call site.
+export function remoteAppOpen(app: MiniApp, src: string): Open {
+  return { kind: 'url', src, title: app.name, origin: displayOrigin(app.url!) };
+}
 
 // `config` is the resolved NetworkConfig (Settings Horizon / RPC overrides
 // applied — #84); `network` stays the id the bridge protocol shares with apps.
@@ -89,7 +95,7 @@ export function Apps({
     if (link.kind === 'open') {
       setRefusedLink(null);
       if (__FEATURE_TELEMETRY__) track.miniAppOpened(link.app.id, true);
-      setOpen({ kind: 'url', src: link.url, title: link.app.name, origin: displayOrigin(link.url) });
+      setOpen(remoteAppOpen(link.app, link.url));
     } else {
       setOpen(null);
       setRefusedLink(link.origin ?? '');
@@ -116,7 +122,7 @@ export function Apps({
     // the wallet only through the scan-gated postMessage bridge. Bundled apps are
     // first-party pages. Either way, "favoriting" changes nothing about this.
     if (isRemoteMiniApp(app)) {
-      setOpen({ kind: 'url', src: miniAppSrc(app), title: app.name, origin: displayOrigin(app.url!) });
+      setOpen(remoteAppOpen(app, miniAppSrc(app)));
       return;
     }
     setOpen({

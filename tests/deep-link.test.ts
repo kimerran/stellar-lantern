@@ -1,9 +1,11 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { assetStatements, deepLinkOrigins, parseDeepLink } from '@core/miniapps/deep-link';
-import { MINI_APPS, type MiniApp } from '@core/miniapps/directory';
+import { MINI_APPS, miniAppSrc, type MiniApp } from '@core/miniapps/directory';
 import { ANDROID_ORIGIN, WEB_APP_ORIGIN } from '@shared/origin';
 import assetXml from '../android/app/src/main/res/values/asset_statements.xml?raw';
 import manifest from '../android/app/src/main/AndroidManifest.xml?raw';
+import { remoteAppOpen } from '../src/popup/screens/Apps';
+import appsSrc from '../src/popup/screens/Apps.tsx?raw';
 import { onDeepLink, peekDeepLink, receiveDeepLink, takeDeepLink } from '../src/popup/deep-link/inbox';
 
 // #263: "Open in Lantern" opens only directory apps.
@@ -187,5 +189,25 @@ describe('pending deep link (in memory)', () => {
     takeDeepLink(p.id);
     expect(peekDeepLink()).toBeNull();
     off();
+  });
+});
+
+// #270 review F1: a link and a tap open the same directory app the same way, so
+// a per-app frame property set for one can't be missing from the other.
+describe('deep link opens like tapping the app', () => {
+  it('builds the same Open as launchApp, apart from src', () => {
+    const parsed = parseDeepLink(link('https://CENTIENT.work/contributors?x=1'), APPS);
+    if (parsed?.kind !== 'open') throw new Error('expected open');
+    const viaLink = remoteAppOpen(parsed.app, parsed.url);
+    const viaTap = remoteAppOpen(CENTIENT, miniAppSrc(CENTIENT));
+    expect(viaLink.src).toBe('https://centient.work/contributors?x=1');
+    expect(viaTap.src).toBe('https://centient.work/');
+    expect({ ...viaLink, src: '' }).toEqual({ ...viaTap, src: '' });
+  });
+
+  it('both Apps.tsx paths build the Open through remoteAppOpen', () => {
+    expect(appsSrc).toContain('setOpen(remoteAppOpen(link.app, link.url));');
+    expect(appsSrc).toContain('setOpen(remoteAppOpen(app, miniAppSrc(app)));');
+    expect(appsSrc).not.toMatch(/setOpen\(\{ kind: 'url', src: (link\.url|miniAppSrc)/);
   });
 });
