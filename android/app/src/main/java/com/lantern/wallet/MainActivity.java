@@ -13,8 +13,9 @@ public class MainActivity extends BridgeActivity {
         // Directory dApps marked `session` run at their real origin inside an
         // Apps-tab iframe (#260), and keep their login in a cross-site
         // (third-party, partitioned) cookie. Android WebView blocks those by
-        // default. This allows third-party cookies in Lantern's WebView only;
-        // opaque-origin frames (the URL bar) still can't store any.
+        // default. This allows third-party cookies for EVERY frame in Lantern's
+        // WebView, URL-bar pages included: an opaque sandbox only takes away
+        // document.cookie and storage, not cookies set or sent over HTTP.
         // super.onCreate builds the bridge (load()); it's null only when the
         // WebView failed to inflate.
         if (bridge != null) {
