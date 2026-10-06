@@ -1,6 +1,9 @@
 import type { AssetRef } from '@core/stellar/tx';
 import { isValidContractId, isValidPublicKey } from '@core/wallet/wallet';
-import { MAX_MEMO_BYTES } from '@shared/constants';
+import { MAX_MEMO_BYTES, type NetworkId } from '@shared/constants';
+import type { ScanVerdict } from '@lantern/scanner';
+import type { WalletScanInput } from '@core/scan/wallet';
+import { signXdrScanInput, validateSignXdr, type ValidSignXdr } from '@core/dapp/sign-xdr';
 
 // Pure helpers for the mini-app wallet bridge (see src/popup/screens/Apps.tsx).
 // A connected dApp sends a payment *intent*; Lantern validates it here, then
@@ -141,4 +144,116 @@ export function toAssetRef(intent: PaymentIntent): AssetRef {
 /** Display label for the intent's asset. */
 export function intentAssetCode(intent: PaymentIntent): string {
   return intent.asset ? intent.asset.code : 'XLM';
+}
+
+// ── lantern:signXdr — sign a dApp-built transaction, don't submit it (#262) ──
+//
+//   dApp → { type: 'lantern:signXdr', xdr, networkPassphrase, id? }
+//   Lantern → { type: 'lantern:signing' } at once (Centient treats no ack
+//             within 5 s as "this Lantern can't sign transactions"), then one of
+//             { type: 'lantern:xdrSigned', signedXdr }
+//             { type: 'lantern:signRejected', error? }  — the user said no
+//             { type: 'lantern:txError', error }        — refused / failed
+//
+// One request at a time: while a review is open or a signature is in flight,
+// a new signXdr (or signAndSubmit) request is refused with txError
+// BUSY_ERROR, and the open review is left as it is. See refuseWhileBusy.
+//
+// Every reply echoes the request's `id` when it had one (a string or a finite
+// number), so a dApp can tell replies to concurrent requests apart later. The
+// validate / scan / sign core is shared with web connect (#252):
+// src/core/dapp/sign-xdr.ts.
+
+export type BridgeRequestId = string | number;
+
+/** The request's `id`, when it is one we echo. */
+export function bridgeRequestId(data: unknown): BridgeRequestId | undefined {
+  if (!data || typeof data !== 'object') return undefined;
+  const { id } = data as { id?: unknown };
+  if (typeof id === 'string' && id.length > 0 && id.length <= 128) return id;
+  if (typeof id === 'number' && Number.isFinite(id)) return id;
+  return undefined;
+}
+
+/** `message`, with `id` added when the request carried one. */
+export function withRequestId<T extends { type: string }>(
+  message: T,
+  id: BridgeRequestId | undefined,
+): T & { id?: BridgeRequestId } {
+  return id === undefined ? message : { ...message, id };
+}
+
+export interface SignXdrReview {
+  id?: BridgeRequestId;
+  value: ValidSignXdr;
+  scanInput: WalletScanInput;
+  verdict: ScanVerdict;
+}
+
+export const BUSY_ERROR = 'Another request is waiting for review.';
+
+/**
+ * One request at a time. While a review is open or a sign is in flight
+ * (`busy`), answer the new request with txError, echoing ITS id, and report
+ * true so the caller drops it. The open review is never replaced: that would
+ * swap what's under the user's finger, and could leave the old request with
+ * two contradictory replies and the new one with none.
+ */
+export function refuseWhileBusy(
+  busy: boolean,
+  id: BridgeRequestId | undefined,
+  post: (message: { type: string; [k: string]: unknown }) => void,
+): boolean {
+  if (!busy) return false;
+  post(withRequestId({ type: 'lantern:txError', error: BUSY_ERROR }, id));
+  return true;
+}
+
+export interface SignXdrBridge {
+  post(message: { type: string; [k: string]: unknown }): void;
+  // The site was approved through lantern:getPublicKey.
+  connected: boolean;
+  address: string;
+  network: NetworkId;
+  networkPassphrase: string;
+  rpcUrl?: string;
+  origin?: string;
+  scan(input: WalletScanInput): Promise<ScanVerdict>;
+}
+
+/**
+ * Take a `lantern:signXdr` request up to the review: acknowledge it before
+ * anything asynchronous, reject what can't be reviewed, scan the rest.
+ * Resolves to the review to show, or null when a reply has already been sent.
+ */
+export async function beginSignXdr(data: unknown, bridge: SignXdrBridge): Promise<SignXdrReview | null> {
+  const id = bridgeRequestId(data);
+  const reply = (m: { type: string; [k: string]: unknown }) => bridge.post(withRequestId(m, id));
+  if (!bridge.connected) {
+    reply({ type: 'lantern:txError', error: 'Connect the wallet first.' });
+    return null;
+  }
+  // Synchronously, before any await: the dApp is timing this.
+  reply({ type: 'lantern:signing' });
+  const validated = validateSignXdr((data ?? {}) as Record<string, unknown>, {
+    networkPassphrase: bridge.networkPassphrase,
+    address: bridge.address,
+  });
+  if (!validated.ok) {
+    reply({ type: 'lantern:txError', error: validated.error });
+    return null;
+  }
+  const scanInput = signXdrScanInput(validated.value, {
+    network: bridge.network,
+    address: bridge.address,
+    rpcUrl: bridge.rpcUrl,
+    origin: bridge.origin,
+  });
+  try {
+    const verdict = await bridge.scan(scanInput);
+    return { ...(id !== undefined ? { id } : {}), value: validated.value, scanInput, verdict };
+  } catch {
+    reply({ type: 'lantern:txError', error: 'Could not check the transaction.' });
+    return null;
+  }
 }

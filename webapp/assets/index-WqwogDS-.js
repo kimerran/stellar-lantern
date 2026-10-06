@@ -1,1 +1,0 @@
-import{r as o}from"./index-DPKeA_Vc.js";import"./index-D6XuB__2.js";var a;(function(t){t.Dark="DARK",t.Light="LIGHT",t.Default="DEFAULT"})(a||(a={}));var r;(function(t){t.None="NONE",t.Slide="SLIDE",t.Fade="FADE"})(r||(r={}));const i=r,u=a,e=o("StatusBar");export{r as Animation,e as StatusBar,i as StatusBarAnimation,u as StatusBarStyle,a as Style};
