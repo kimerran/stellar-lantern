@@ -116,6 +116,30 @@ Each flush sends one envelope:
 }
 ```
 
+## The web app (`platform: "web"`, #239)
+
+The browser build at `app.golantern.xyz` reports as its own platform, `web`,
+with the same consent model as the extension and Android (opt-in, off by
+default, delete on request) and the same events. It adds one:
+
+- **Attribution.** On the very first open, the web app reads the first
+  `?src=` value and keeps it in its own storage as one of `homepage-ios`,
+  `homepage`, `launch` or `other` (anything unrecognised). The raw value is
+  never stored or sent. An open without `src` records `launch` when the app
+  runs installed (from the Home Screen), and nothing in a browser tab; later
+  opens never change it (`src/shared/web/attribution.ts`). On iOS the Home
+  Screen app has its own storage, so `homepage-ios` is only seen there when
+  the Home Screen icon keeps the `?src=` URL. After opt-in it
+  is sent once, as `web_attributed`. The server accepts that event only from
+  `web`, and rejects `demo_scanned` from `web`.
+- **Off until the server is ready.** `vite.config.web.ts` pins the web
+  build's `telemetry` flag to `WEB_TELEMETRY_ENABLED` (`src/web/telemetry.ts`,
+  `false`) and fixes its ingest URL in the source, like the playground. While
+  it is `false`, the web bundle carries no telemetry code and sends nothing
+  (asserted against the committed `webapp/`). Flip it only once the
+  lantern-api release that accepts `web` is live and, if `ALLOWED_ORIGINS` is
+  set, it includes `https://app.golantern.xyz`.
+
 ## Consent model
 
 - Consent is the `analyticsConsent` field of the wallet's existing Settings

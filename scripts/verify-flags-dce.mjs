@@ -137,6 +137,8 @@ const WEB_MARKERS = [
   'lantern.web.persist',
   'Add Lantern to your Home Screen',
   'can’t run inside another page',
+  // Slice 3 (#239): the first open's source, kept on the device.
+  'lantern.web.source',
 ];
 const webInExtension = WEB_MARKERS.filter((m) => bundleHas(m));
 
@@ -145,7 +147,7 @@ if (webInExtension.length) {
   console.error(`✗ FAIL: web-app-only code is in the extension bundle (__WEB_BUILD__ guard broken): ${webInExtension.join(', ')}`);
   failed = true;
 } else {
-  console.log('✓ web-app-only code ABSENT from the extension bundle (IndexedDB vault, tab lock, banner, Home Screen step).');
+  console.log('✓ web-app-only code ABSENT from the extension bundle (IndexedDB vault, tab lock, banner, Home Screen step, attribution).');
 }
 if (qrInExtension) {
   console.error('✗ FAIL: the Android QR scanner plugin is in the extension bundle (__NATIVE_BUILD__ guard broken).');
