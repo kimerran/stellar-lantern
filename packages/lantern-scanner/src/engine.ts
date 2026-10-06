@@ -3,6 +3,13 @@ import { decodeTransaction } from './decode';
 import { explainTransaction } from './explainer';
 import { Networks } from '@stellar/stellar-sdk';
 import { truncateAddress } from './format';
+import {
+  baseAccount,
+  beyondSetup,
+  beyondSetupDetail,
+  isRemoval,
+  signingRequirements,
+} from './sponsorship';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MOCK scan engine.
@@ -58,6 +65,11 @@ const MODELED_OP_TYPES = new Set<string>([
   'setOptions',
   'invokeHostFunction',
   'accountMerge',
+  // Sponsorship + trustlines (#261).
+  'changeTrust',
+  'beginSponsoringFutureReserves',
+  'endSponsoringFutureReserves',
+  'revokeSponsorship',
 ]);
 
 export interface ScanInput {
@@ -68,7 +80,7 @@ export interface ScanInput {
 
 export function scan({ xdr, networkPassphrase, context }: ScanInput): ScanVerdict {
   const decoded = decodeTransaction(xdr, networkPassphrase);
-  const explanation = explainTransaction(decoded);
+  const explanation = explainTransaction(decoded, context.fromAddress);
   const reasons: ScanReason[] = [];
 
   // Demo override: force a verdict so each UI state is reviewable. Gated behind
@@ -226,7 +238,53 @@ export function scan({ xdr, networkPassphrase, context }: ScanInput): ScanVerdic
     });
   }
 
-  return verdictFrom(reasons, explanation);
+  // ── Sponsorship and someone else's transaction (#261) ──
+  // Which ops the user's signature authorizes; anything beyond setting up
+  // their account in a transaction someone else built (or one using
+  // sponsorship) is high, like any other high-risk transaction.
+  const signing = signingRequirements(decoded, context.fromAddress);
+  const extra = beyondSetup(decoded, signing);
+  if (extra.length > 0) {
+    reasons.push({
+      code: 'authorizes_beyond_setup',
+      severity: 'high',
+      title: 'Your signature approves more than account setup',
+      detail: beyondSetupDetail(decoded, signing, extra),
+    });
+  }
+  // A trustline to an issuer on the deny-list (the same lookup the recipient
+  // gets above): a lookalike token is the classic trap in a setup flow.
+  const badTrust = decoded.operations.find(
+    (o) =>
+      o.type === 'changeTrust' &&
+      !isRemoval(o) &&
+      isReportedAddress(o.assetIssuer, networkPassphrase, __FEATURE_DEMO_AFFORDANCES__),
+  );
+  if (badTrust?.assetIssuer) {
+    reasons.push({
+      code: 'flagged_trustline_issuer',
+      severity: 'high',
+      title: 'Trustline to a reported issuer',
+      detail: `This adds a ${badTrust.assetCode ?? 'token'} trustline to ${truncateAddress(badTrust.assetIssuer, 4, 4)}, an issuer reported for scam activity. Tokens from a reported issuer are often fakes of real ones — do not sign unless you’re certain.`,
+    });
+  }
+  const revoked = decoded.operations.find(
+    (o) =>
+      o.type === 'revokeSponsorship' &&
+      o.revokeAccount !== undefined &&
+      baseAccount(o.revokeAccount) === baseAccount(context.fromAddress),
+  );
+  if (revoked) {
+    reasons.push({
+      code: 'sponsorship_revoked',
+      severity: 'medium',
+      title: 'Ends a sponsorship of your account',
+      detail:
+        'Someone stops paying the reserve for part of your account, so that XLM must come out of your own balance from now on.',
+    });
+  }
+
+  return { ...verdictFrom(reasons, explanation), signing };
 }
 
 function verdictFrom(reasons: ScanReason[], explanation: string): ScanVerdict {
