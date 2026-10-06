@@ -13,7 +13,7 @@
 // The wallet still calls the synchronous `scan()` in engine.ts; this async
 // pipeline lands alongside it and D3 rewires the wallet onto it.
 
-import { Address, MuxedAccount, StrKey, xdr as XDR } from '@stellar/stellar-sdk';
+import { Address, xdr as XDR } from '@stellar/stellar-sdk';
 import { deepFreeze, verdict } from './verdict';
 import { explainRulesBased } from './explain';
 import type {
@@ -46,6 +46,7 @@ import { unverifiedCalls } from './unverified';
 import { decodeScVal } from './scval';
 import type { ScreenAnswer, ScreenLookup } from './registry';
 import { aggregate, classicDeltas, opSource } from './effects';
+import { baseAccount, signingRequirements } from './sponsorship';
 import {
   recogniseTokenCall,
   tokenEffects,
@@ -420,6 +421,31 @@ export function effects(
           opIndex,
           ...(op.signerKey ? { counterparty: op.signerKey } : {}),
         };
+      case 'changeTrust':
+        // The issuer is the counterparty: stage 4 screens it, so a trustline
+        // to a reported issuer is flagged like any reported address (#261).
+        return {
+          kind: 'trustline',
+          opIndex,
+          ...(op.assetIssuer ? { counterparty: op.assetIssuer } : {}),
+          ...(op.assetCode ? { assetCode: op.assetCode } : {}),
+        };
+      case 'beginSponsoringFutureReserves': {
+        // The other party to the sponsorship: the sponsor, or — when the
+        // signer is the one sponsoring — the account it pays for.
+        const sponsor = opSource(decoded, op, fallbackSource);
+        const other =
+          baseAccount(sponsor) === baseAccount(fallbackSource) ? op.sponsoredId : sponsor;
+        return { kind: 'sponsorship', opIndex, ...(other ? { counterparty: other } : {}) };
+      }
+      case 'endSponsoringFutureReserves':
+        return { kind: 'sponsorship', opIndex };
+      case 'revokeSponsorship':
+        return {
+          kind: 'sponsorship',
+          opIndex,
+          ...(op.revokeAccount ? { counterparty: op.revokeAccount } : {}),
+        };
       case 'invokeHostFunction':
         return {
           kind: 'contract_call',
@@ -487,6 +513,7 @@ export function effects(
     observed,
     observedNet: aggregate(observed),
     coverage: covered ? 'full' : 'partial',
+    ...(fallbackSource ? { signing: signingRequirements(decoded, fallbackSource) } : {}),
   };
 }
 
@@ -550,13 +577,6 @@ export async function screen(
   const outcome = hits.length > 0 ? 'flagged' : unknown.length > 0 ? 'unknown' : 'clean';
   const latencyMs = Math.max(0, Math.round(performance.now() - started));
   return { outcome, checked, hits, unknown, answers, latencyMs };
-}
-
-// M… → its base G…; anything else unchanged.
-function baseAccount(address: string): string {
-  return StrKey.isValidMed25519PublicKey(address)
-    ? MuxedAccount.fromAddress(address, '0').baseAccount().accountId()
-    : address;
 }
 
 // Which flag source answers. A registry screener wins outright; the demo
@@ -674,6 +694,7 @@ export async function runPipeline(
     auth: authTree,
     effects: frozenEffects,
     screen: screenResult,
+    signing: frozenEffects.signing ?? null,
   };
 }
 

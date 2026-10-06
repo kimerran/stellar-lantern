@@ -301,5 +301,6 @@ function createProxyExplainer(opts: HostedExplainerOptions): Explainer {
 // configured, and what every failure above degrades to.
 export const explainRulesBased: Explainer = async ({ effects }: ExplainInput) =>
   // explainTransaction only reads its input; the cast drops the readonly
-  // wrapper the shipped signature predates, nothing else.
-  explainTransaction(effects.source as DecodedTx | null);
+  // wrapper the shipped signature predates, nothing else. The signing user
+  // lets a multi-op sentence say which ops need *your* signature (#261).
+  explainTransaction(effects.source as DecodedTx | null, effects.signing?.user);

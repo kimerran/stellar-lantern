@@ -30,6 +30,13 @@ import type {
 } from './types';
 import { toStroops } from './decimal';
 import { LONG_LIVED_ALLOWANCE_LEDGERS } from './token';
+import {
+  baseAccount,
+  beyondSetup,
+  beyondSetupDetail,
+  isRemoval,
+  signingRequirements,
+} from './sponsorship';
 
 // What the XDR cannot tell the core: who is signing and what the wallet
 // knows about the recipient and the balance. All optional but the signer.
@@ -62,6 +69,11 @@ const MODELED_OP_TYPES = new Set([
   'accountMerge',
   'setOptions',
   'invokeHostFunction',
+  // #261
+  'changeTrust',
+  'beginSponsoringFutureReserves',
+  'endSponsoringFutureReserves',
+  'revokeSponsorship',
 ]);
 
 const short = (a: string): string => (a.length > 8 ? `${a.slice(0, 4)}…${a.slice(-4)}` : a);
@@ -388,6 +400,78 @@ export function verdict(input: VerdictInput): Verdict {
         detail: `This transfers your entire XLM balance to ${short(c.destination)} and permanently closes this account. Only continue if you set this up yourself.`,
       },
       { stage: 'verdict', code: 'account_merge', detail: c.destination, ref: `closes[${i}]` },
+    );
+  });
+
+  // ── Sponsorship and someone else's transaction (#261) ─────────────────
+  if (decoded) {
+    const signing = signingRequirements(decoded, me);
+    // Audit line only when someone else signs too: the common
+    // single-signer transaction gains no noise.
+    if (signing.otherSigners.length > 0)
+      signals.push({
+        stage: 'verdict',
+        code: 'signing',
+        detail: `you sign ops [${signing.userOps.join(',')}]; others [${signing.otherOps.join(',')}] by ${signing.otherSigners.map(short).join(', ') || 'nobody'}`,
+        ref: 'signing',
+      });
+    const extra = beyondSetup(decoded, signing);
+    if (extra.length > 0) {
+      reason(
+        {
+          code: 'authorizes_beyond_setup',
+          severity: 'high',
+          title: 'Your signature approves more than account setup',
+          detail: beyondSetupDetail(decoded, signing, extra),
+        },
+        {
+          stage: 'verdict',
+          code: 'authorizes_beyond_setup',
+          detail: extra.map((i) => ops[i]!.type).join(','),
+          ref: `ops[${extra[0]}]`,
+        },
+      );
+    }
+  }
+  ops.forEach((op) => {
+    if (op.type !== 'changeTrust' || !op.assetIssuer || isRemoval(op)) return;
+    const issuer = baseAccount(op.assetIssuer);
+    const hit = screen.hits.findIndex((h) => h.address === issuer);
+    if (hit < 0) return;
+    reason(
+      {
+        code: 'flagged_trustline_issuer',
+        severity: 'high',
+        title: 'Trustline to a reported issuer',
+        detail:
+          `This adds a ${op.assetCode ?? 'token'} trustline to ${short(issuer)}, an issuer on the Lantern blacklist registry. Tokens from a reported issuer are often fakes of real ones` +
+          CONFIRM_TAIL,
+      },
+      {
+        stage: 'screen',
+        code: 'flagged_trustline_issuer',
+        detail: issuer,
+        ref: `screen.hits[${hit}]`,
+      },
+    );
+  });
+  ops.forEach((op, i) => {
+    if (op.type !== 'revokeSponsorship' || !op.revokeAccount) return;
+    if (baseAccount(op.revokeAccount) !== baseAccount(me)) return;
+    reason(
+      {
+        code: 'sponsorship_revoked',
+        severity: 'medium',
+        title: 'Ends a sponsorship of your account',
+        detail:
+          'Someone stops paying the reserve for part of your account, so that XLM must come out of your own balance from now on.',
+      },
+      {
+        stage: 'verdict',
+        code: 'sponsorship_revoked',
+        detail: op.revokeEntry ?? '',
+        ref: `ops[${i}]`,
+      },
     );
   });
 
