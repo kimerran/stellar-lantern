@@ -1,5 +1,48 @@
-// Lantern marketing site — cookie consent, scroll reveals, slideshows, video facade, mobile nav.
+// Lantern marketing site — download buttons per device, cookie consent, scroll
+// reveals, slideshows, video facade, mobile nav.
+
+// Which download fits this visitor: 'ios', 'android', 'chrome' (a desktop
+// Chromium browser, where the extension installs) or 'other' (neither the APK
+// nor the extension applies). A plain global so tests/homepage-cta.test.ts can
+// call it. iPadOS asks for desktop sites and reports itself as a Mac, so it's
+// recognised by its touch screen, as the web app does (src/shared/web/install.ts).
+function lanternPlatform(userAgent, maxTouchPoints) {
+  var ua = String(userAgent || '');
+  if (/iPhone|iPad|iPod/.test(ua)) return 'ios';
+  if (/Macintosh/.test(ua) && (maxTouchPoints || 0) > 1) return 'ios';
+  if (/Android/.test(ua)) return 'android';
+  if (/\b(Chrome|Chromium)\//.test(ua) && !/Mobile/.test(ua)) return 'chrome';
+  return 'other';
+}
+
 (function () {
+  // ── Download buttons, per device ──
+  // The markup lists every option (APK, extension, web app), which is what a
+  // visitor without JS sees. Here the buttons that can't apply are hidden:
+  // - iPhone/iPad, and any device where neither the APK nor the extension
+  //   applies: "Open the web app" with a two-line hint, in place of the APK.
+  // - Android and desktop Chrome: their usual buttons, plus a small
+  //   "or use the web app" link.
+  var platform = lanternPlatform(navigator.userAgent, navigator.maxTouchPoints);
+  var webFirst = platform === 'ios' || platform === 'other';
+  function each(name, fn) {
+    document.querySelectorAll('[data-cta="' + name + '"]').forEach(fn);
+  }
+  function show(name, on) { each(name, function (el) { el.hidden = !on; }); }
+  show('android', !webFirst);
+  show('extension', !webFirst);
+  show('web', webFirst);
+  show('web-hint', platform === 'ios');
+  show('web-hint-browser', platform === 'other');
+  show('web-alt', !webFirst);
+  if (platform === 'ios') {
+    // Every web-app link, not just the buttons: the install card and the
+    // footer count toward homepage-ios too.
+    document.querySelectorAll('a[href^="https://app.golantern.xyz/"]').forEach(function (a) {
+      a.href = 'https://app.golantern.xyz/?src=homepage-ios';
+    });
+  }
+
   // ── Cookie consent ──
   var KEY = 'lantern-cookie-consent';
   var banner = document.getElementById('cookie');
