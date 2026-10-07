@@ -1,5 +1,6 @@
 import { defineManifest } from '@crxjs/vite-plugin';
 import { version } from './package.json';
+import { EXTENSION_PUBLIC_KEY } from './src/shared/origin';
 
 // MV3 manifest. Minimal permissions per SPEC §8 / AGENT §5: only `storage`,
 // and host access limited to the Stellar endpoints (Horizon, friendbot and the
@@ -13,6 +14,11 @@ export default defineManifest({
   description: 'Securely light your path to the decentralized web. A non-custodial Stellar wallet.',
   // From package.json, the single version source (#141) — never hardcode it.
   version,
+  // Pins the extension's id (and so its origin, chrome-extension://<id>) for
+  // every install (#284): a dApp like Centient can then allowlist it, and an
+  // update unpacked into a new folder keeps the same id and so the same
+  // wallet storage. See EXTENSION_PUBLIC_KEY in src/shared/origin.ts.
+  key: EXTENSION_PUBLIC_KEY,
   action: {
     default_popup: 'index.html',
     default_title: 'Lantern',

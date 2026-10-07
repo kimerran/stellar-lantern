@@ -36,7 +36,9 @@ ignores any message it doesn't recognise, and anything without a `type`.
   sender yourself**: accept only messages where `event.source === window.parent`
   and `event.origin` is a Lantern origin you trust.
 - **Lantern's origin**, i.e. the `event.origin` of its replies:
-  - Chrome extension: `chrome-extension://<extension id>`
+  - Chrome extension: `chrome-extension://iflpkjgolcbleombhldiibhojohjpnmd` (a fixed id in
+    builds after 0.6.2; earlier builds' id came from the folder each person loaded them
+    from, so it differed per install)
   - Android: `https://android.golantern.xyz` (its own origin in builds after 0.5.1;
     earlier builds used Capacitor's shared `https://localhost`, so don't trust that)
   - Web app: `https://app.golantern.xyz` (bundled mini-apps only)

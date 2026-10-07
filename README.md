@@ -71,6 +71,7 @@ npm run verify:flags # prove disabled features are stripped from the release bun
 ```
 
 **Load the extension:** `npm run build` → `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select `dist/` → pin **Lantern**.
+The manifest's `key` pins the extension id to `iflpkjgolcbleombhldiibhojohjpnmd` (#284), so a dev build and a release build can't be loaded side by side: Chrome sees the same extension.
 **Android:** `npm run build:mobile && npm run cap:sync`, then open `android/` in Android Studio (or use the `build-debug-apk` CI job).
 **Web app:** `npm run build:web`, then serve `webapp/` as a static site over HTTPS (it will be hosted at `app.golantern.xyz`). One wallet per browser profile, stored in IndexedDB. A new deploy takes effect on the next launch: an open tab keeps running the build it loaded. Testnet only, with a strict CSP; the host must also send the headers in [`docs/web-app-hosting.md`](docs/web-app-hosting.md).
 
