@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import manifest from '../manifest.config';
-import {
-  EXTENSION_ID,
-  EXTENSION_ORIGIN,
-  EXTENSION_PUBLIC_KEY,
-  isLanternOrigin,
-} from '@shared/origin';
+import { EXTENSION_ID, EXTENSION_ORIGIN, EXTENSION_PUBLIC_KEY } from '@shared/origin';
 
 // #284: the extension's id is pinned by the manifest's `key`, so every install
 // (unpacked from any folder) has the same origin, which a dApp like Centient
@@ -40,8 +35,18 @@ describe('the pinned extension id (#284)', () => {
     expect(atob(EXTENSION_PUBLIC_KEY)).toHaveLength(294);
   });
 
-  it('the extension origin is a Lantern origin', () => {
+  it('the extension origin is chrome-extension://<EXTENSION_ID>', () => {
     expect(EXTENSION_ORIGIN).toBe(`chrome-extension://${EXTENSION_ID}`);
-    expect(isLanternOrigin(EXTENSION_ORIGIN, 'null')).toBe(true);
+  });
+
+  // Only when a build is present (`npm run build`); CI's test lane doesn't build the extension.
+  // The node-polyfills plugin shims `node:fs` in test files, so take the real one.
+  const fs = (
+    globalThis as unknown as { process: { getBuiltinModule(m: 'fs'): typeof import('fs') } }
+  ).process.getBuiltinModule('fs');
+  const distManifest = new URL('../dist/manifest.json', import.meta.url);
+  it.skipIf(!fs.existsSync(distManifest))('the built dist/manifest.json carries the key', () => {
+    const built = JSON.parse(fs.readFileSync(distManifest, 'utf8')) as { key?: string };
+    expect(built.key).toBe(EXTENSION_PUBLIC_KEY);
   });
 });

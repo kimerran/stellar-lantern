@@ -18,6 +18,8 @@ export default defineManifest({
   // every install (#284): a dApp like Centient can then allowlist it, and an
   // update unpacked into a new folder keeps the same id and so the same
   // wallet storage. See EXTENSION_PUBLIC_KEY in src/shared/origin.ts.
+  // The Chrome Web Store rejects a manifest `key` (the store sets the id), so a
+  // Web Store build must strip this field before upload.
   key: EXTENSION_PUBLIC_KEY,
   action: {
     default_popup: 'index.html',

@@ -38,7 +38,10 @@ ignores any message it doesn't recognise, and anything without a `type`.
 - **Lantern's origin**, i.e. the `event.origin` of its replies:
   - Chrome extension: `chrome-extension://iflpkjgolcbleombhldiibhojohjpnmd` (a fixed id in
     builds after 0.6.2; earlier builds' id came from the folder each person loaded them
-    from, so it differed per install)
+    from, so it differed per install). The key that fixes this id ships in every
+    manifest, so a sideloaded extension can claim the same id, and on a user's
+    machine take over the wallet stored under it. An origin match tells you which
+    page framed you, not who wrote it: never treat it as authentication.
   - Android: `https://android.golantern.xyz` (its own origin in builds after 0.5.1;
     earlier builds used Capacitor's shared `https://localhost`, so don't trust that)
   - Web app: `https://app.golantern.xyz` (bundled mini-apps only)
