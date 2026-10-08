@@ -1,0 +1,1 @@
+import{r as o}from"./index-BnSedXsS.js";import"./index-DPBAmm63.js";var a;(function(t){t.Dark="DARK",t.Light="LIGHT",t.Default="DEFAULT"})(a||(a={}));var r;(function(t){t.None="NONE",t.Slide="SLIDE",t.Fade="FADE"})(r||(r={}));const i=r,u=a,e=o("StatusBar");export{r as Animation,e as StatusBar,i as StatusBarAnimation,u as StatusBarStyle,a as Style};
