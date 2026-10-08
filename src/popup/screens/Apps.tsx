@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { track } from '@core/telemetry';
 import {
   MINI_APPS,
@@ -6,6 +6,8 @@ import {
   normalizeUrl,
   displayOrigin,
   isRemoteMiniApp,
+  networkChip,
+  appOrigins,
   type MiniApp,
 } from '@core/miniapps/directory';
 import {
@@ -32,7 +34,7 @@ import {
   type PaymentIntent,
   type SignXdrReview,
 } from '@core/miniapps/bridge';
-import { remoteFrameSandbox, replyTargetOrigin, isFromFramedApp } from '@core/miniapps/frame';
+import { remoteFrameSandbox, replyTargetOrigin, isFromFramedApp, frameOrigins } from '@core/miniapps/frame';
 import { signXdrWith } from '@core/dapp/sign-xdr';
 import { scanTx, type WalletScanInput } from '@core/scan/wallet';
 import { useRecheck } from '../hooks/useRecheck';
@@ -61,8 +63,10 @@ const DIRECTORY = __WEB_BUILD__ ? MINI_APPS.filter((a) => !a.url) : MINI_APPS;
 
 export type Open =
   | { kind: 'app'; app: MiniApp; src: string; title: string; origin: string }
-  // `session`: a directory app marked `session: true` (#260). Never set for the URL bar.
-  | { kind: 'url'; src: string; title: string; origin: string; session?: boolean };
+  // `session`: a directory app marked `session: true` (#260). `origins`: every
+  // origin that directory app counts as (appOrigins, #279), which a session
+  // frame may talk to the bridge from. Neither is ever set for the URL bar.
+  | { kind: 'url'; src: string; title: string; origin: string; session?: boolean; origins?: readonly string[] };
 
 // The one place the Open for a remote directory app is built, so tapping the app
 // and an "Open in Lantern" link to it (#263) load it the same way; `src` is the
@@ -72,8 +76,9 @@ export function remoteAppOpen(app: MiniApp, src: string): Open {
     kind: 'url',
     src,
     title: app.name,
-    origin: displayOrigin(app.url!),
+    origin: displayOrigin(src),
     session: app.session === true,
+    origins: appOrigins(app),
   };
 }
 
@@ -240,6 +245,7 @@ export function Apps({
               <AppRow
                 key={app.id}
                 app={app}
+                network={network}
                 favorited
                 onLaunch={() => launchApp(app)}
                 onToggleFavorite={() => toggleFavorite(app.id)}
@@ -264,6 +270,7 @@ export function Apps({
             <AppRow
               key={app.id}
               app={app}
+              network={network}
               favorited={isFavorite(favorites, app.id)}
               onLaunch={() => launchApp(app)}
               onToggleFavorite={() => toggleFavorite(app.id)}
@@ -284,15 +291,18 @@ export function Apps({
 // be its own button — a button can't nest inside a button.
 function AppRow({
   app,
+  network,
   favorited,
   onLaunch,
   onToggleFavorite,
 }: {
   app: MiniApp;
+  network: NetworkId;
   favorited: boolean;
   onLaunch: () => void;
   onToggleFavorite: () => void;
 }) {
+  const chip = networkChip(app, network);
   return (
     <Card as="div" className="flex items-center gap-1">
       <button
@@ -312,6 +322,16 @@ function AppRow({
             {app.demo && (
               <span className="shrink-0 rounded-full bg-surface-container-high px-1.5 py-px text-label-sm text-on-surface-variant">
                 Demo
+              </span>
+            )}
+            {/* Runs on another network than the wallet's (e.g. a testnet-only
+                dApp while Lantern is on mainnet): listed, but labelled. */}
+            {chip && (
+              <span
+                className="shrink-0 rounded-full bg-primary-container/15 px-1.5 py-px text-label-sm text-primary-container"
+                title={`Runs on ${chip} only`}
+              >
+                {chip}
               </span>
             )}
           </span>
@@ -373,7 +393,16 @@ function Browser({
   // Where replies go: a session app's own origin; '*' for an opaque frame (its
   // origin is 'null', so '*' to its own contentWindow is the only way to reach
   // it) and for bundled first-party pages (unchanged).
-  const replyTarget = sandbox ? replyTargetOrigin(open.src, sandbox) : '*';
+  // A session app may answer from any origin its directory entry lists (#279),
+  // e.g. after a redirect from beta.centient.work to centient.work; replies
+  // follow the origin of its latest accepted message (see frame.ts).
+  const extraOrigins = open.kind === 'url' ? open.origins : undefined;
+  const allowedOrigins = useMemo(
+    () => (sandbox ? frameOrigins(open.src, sandbox, extraOrigins) : []),
+    [open.src, sandbox, extraOrigins],
+  );
+  const peerOrigin = useRef<string | null>(null);
+  const replyTarget = () => (sandbox ? replyTargetOrigin(open.src, sandbox, allowedOrigins, peerOrigin.current) : '*');
 
   // ── Wallet bridge (read-only connect) ──
   // A mini-app posts { type: 'lantern:getPublicKey' }; we reply (after the user
@@ -432,7 +461,7 @@ function Browser({
   const submittingRef = useRef(false);
 
   function postToApp(message: unknown) {
-    frameRef.current?.contentWindow?.postMessage(message, replyTarget);
+    frameRef.current?.contentWindow?.postMessage(message, replyTarget());
   }
   function sendPublicKey() {
     postToApp({ type: 'lantern:publicKey', publicKey: address, network });
@@ -559,11 +588,13 @@ function Browser({
 
   useEffect(() => {
     granted.current = false; // re-prompt per opened app
+    peerOrigin.current = null;
     function onMessage(e: MessageEvent) {
       const win = frameRef.current?.contentWindow;
-      // Only our embedded app: its window, and (remote) the origin we reply to.
+      // Only our embedded app: its window, and (remote) one of its origins.
       if (!win || e.source !== win) return;
-      if (sandbox && !isFromFramedApp(e, win, replyTarget)) return;
+      if (sandbox && !isFromFramedApp(e, win, allowedOrigins)) return;
+      if (sandbox) peerOrigin.current = e.origin; // replies follow it (#279)
       const data = e.data as { type?: string; intent?: unknown; message?: unknown } | null;
       if (data?.type === 'lantern:getPublicKey') {
         postToApp({ type: 'lantern:connecting' }); // ack → dApp waits for approval
@@ -589,7 +620,7 @@ function Browser({
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open.src, sandbox, replyTarget, address, network, config]);
+  }, [open.src, sandbox, allowedOrigins, address, network, config]);
 
   function approveConnect() {
     granted.current = true;

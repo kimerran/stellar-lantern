@@ -5,8 +5,9 @@ import {
   remoteFrameSandbox,
   replyTargetOrigin,
   isFromFramedApp,
+  frameOrigins,
 } from '@core/miniapps/frame';
-import { MINI_APPS, isRemoteMiniApp } from '@core/miniapps/directory';
+import { MINI_APPS, isRemoteMiniApp, appOrigins, findMiniApp } from '@core/miniapps/directory';
 import { ANDROID_ORIGIN, WEB_APP_ORIGIN, isLanternOrigin } from '@shared/origin';
 
 // node-polyfills shims `node:fs` in tests; read through the real Node module.
@@ -93,12 +94,84 @@ describe('replies and incoming messages (#260)', () => {
   });
 });
 
+describe('an app with several origins (#279)', () => {
+  const BETA = 'https://beta.centient.work/lantern';
+  const SET = ['https://beta.centient.work', 'https://centient.work'];
+  const win = {};
+
+  it('a session frame accepts its src origin and the app\'s other origins', () => {
+    expect(frameOrigins(BETA, SESSION_SANDBOX, SET, ANDROID_ORIGIN)).toEqual(SET);
+    // src first, even when it's the extra one.
+    expect(frameOrigins('https://centient.work/x', SESSION_SANDBOX, SET, ANDROID_ORIGIN)).toEqual([
+      'https://centient.work',
+      'https://beta.centient.work',
+    ]);
+    expect(frameOrigins(BETA, SESSION_SANDBOX, undefined, ANDROID_ORIGIN)).toEqual(['https://beta.centient.work']);
+  });
+
+  it('an opaque frame accepts only "null", whatever the app lists', () => {
+    expect(frameOrigins(BETA, OPAQUE_SANDBOX, SET, ANDROID_ORIGIN)).toEqual(['null']);
+  });
+
+  it('never accepts a Lantern origin or a non-https one', () => {
+    for (const self of SELVES) {
+      const got = frameOrigins(BETA, SESSION_SANDBOX, [...SET, ANDROID_ORIGIN, WEB_APP_ORIGIN, self, 'http://centient.work', 'https://u@centient.work', 'nope'], self);
+      expect(got).toEqual(SET);
+      for (const o of got) expect(isLanternOrigin(o, self)).toBe(false);
+    }
+  });
+
+  it('accepts messages from any listed origin, and nothing else', () => {
+    const allowed = frameOrigins(BETA, SESSION_SANDBOX, SET, ANDROID_ORIGIN);
+    expect(isFromFramedApp({ source: win, origin: 'https://beta.centient.work' }, win, allowed)).toBe(true);
+    expect(isFromFramedApp({ source: win, origin: 'https://centient.work' }, win, allowed)).toBe(true);
+    for (const origin of ['https://evil.centient.work', 'https://www.centient.work', 'http://centient.work', 'null', ANDROID_ORIGIN]) {
+      expect(isFromFramedApp({ source: win, origin }, win, allowed)).toBe(false);
+    }
+    // The right origin from the wrong window is still refused.
+    expect(isFromFramedApp({ source: {}, origin: 'https://centient.work' }, win, allowed)).toBe(false);
+    // Opaque set.
+    expect(isFromFramedApp({ source: win, origin: 'null' }, win, ['null'])).toBe(true);
+    expect(isFromFramedApp({ source: win, origin: 'https://centient.work' }, win, ['null'])).toBe(false);
+  });
+
+  it('replies follow the latest accepted origin when it is in the set, else the opened origin; never *', () => {
+    const allowed = frameOrigins(BETA, SESSION_SANDBOX, SET, ANDROID_ORIGIN);
+    expect(replyTargetOrigin(BETA, SESSION_SANDBOX, allowed)).toBe('https://beta.centient.work');
+    expect(replyTargetOrigin(BETA, SESSION_SANDBOX, allowed, null)).toBe('https://beta.centient.work');
+    // Redirected to the apex: replies go there.
+    expect(replyTargetOrigin(BETA, SESSION_SANDBOX, allowed, 'https://centient.work')).toBe('https://centient.work');
+    // Anything outside the set is ignored.
+    for (const last of ['https://evil.centient.work', 'null', '*', ANDROID_ORIGIN]) {
+      expect(replyTargetOrigin(BETA, SESSION_SANDBOX, allowed, last)).toBe('https://beta.centient.work');
+    }
+    expect(replyTargetOrigin('not a url', SESSION_SANDBOX, allowed)).not.toBe('*');
+    // Opaque frames are unchanged.
+    expect(replyTargetOrigin(BETA, OPAQUE_SANDBOX, ['null'], 'null')).toBe('*');
+  });
+
+  it('Centient: the session frame at beta talks to both hosts and gets allow-same-origin', () => {
+    const app = findMiniApp('centient')!;
+    for (const self of SELVES) {
+      expect(remoteFrameSandbox(app.url!, true, self)).toBe(SESSION_SANDBOX);
+      expect(frameOrigins(app.url!, SESSION_SANDBOX, appOrigins(app), self)).toEqual(SET);
+    }
+  });
+});
+
 describe('directory session apps (#260)', () => {
   it('every session app is a remote https app off Lantern’s origins', () => {
     for (const app of MINI_APPS.filter((a) => a.session)) {
       expect(isRemoteMiniApp(app)).toBe(true);
       expect(new URL(app.url!).protocol).toBe('https:');
       for (const self of SELVES) expect(isLanternOrigin(app.url!, self)).toBe(false);
+      // Nor any origin it lists (#279): allow-same-origin is never granted to Lantern.
+      for (const origin of appOrigins(app)) {
+        for (const self of SELVES) {
+          expect(isLanternOrigin(origin, self)).toBe(false);
+          expect(remoteFrameSandbox(`${origin}/`, true, self)).toBe(SESSION_SANDBOX);
+        }
+      }
     }
   });
 
@@ -107,5 +180,8 @@ describe('directory session apps (#260)', () => {
     expect(src).toContain('remoteFrameSandbox(');
     expect(src).not.toMatch(/sandbox=\{?["'`][^"'`]*allow-same-origin/);
     expect(src).not.toContain("postMessage(message, '*')");
+    // #279: incoming messages are checked against the app's origin set.
+    expect(src).toContain('isFromFramedApp(e, win, allowedOrigins)');
+    expect(src).toContain('frameOrigins(open.src, sandbox,');
   });
 });

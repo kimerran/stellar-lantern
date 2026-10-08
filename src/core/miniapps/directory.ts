@@ -6,7 +6,10 @@
 // Swapping in the real connection broker (spec — README "Mini-app browser")
 // doesn't touch this module's shape.
 
-export type MiniAppCategory = 'DeFi' | 'Payments' | 'NFTs' | 'Tools';
+import type { NetworkId } from '@shared/constants';
+import { isLanternOrigin } from '@shared/origin';
+
+export type MiniAppCategory = 'DeFi' | 'Payments' | 'NFTs' | 'Tools' | 'Earn';
 
 export interface MiniApp {
   id: string;
@@ -36,9 +39,26 @@ export interface MiniApp {
    * own API. It still reaches the wallet only through the bridge. Set it only
    * for a curated app that needs a session; the URL bar never gets it, and
    * Lantern's own origin never does (see remoteFrameSandbox in frame.ts).
-   * `url` must be the app's final origin: replies are posted to it.
+   * `url`'s origin, or one listed in `origins`, must be where the app ends up:
+   * replies are posted only to an origin in appOrigins(app).
    */
   session?: boolean;
+  /**
+   * Remote apps only (#279): extra https origins that count as the same app,
+   * e.g. the apex while `url` is on a `beta.` host serving the same build. They
+   * join `url`'s origin everywhere an app's origin matters: "Open in Lantern"
+   * links and the Android asset statements (deep-link.ts), and the bridge's
+   * `event.origin` check and reply target (frame.ts). Origins only: no path,
+   * no credentials, no wildcards. See appOrigins.
+   */
+  origins?: readonly string[];
+  /**
+   * The Stellar networks the app runs on. Omitted = any network (it follows
+   * whatever network the wallet shares). When set and Lantern's active network
+   * isn't in it, the row stays listed but shows a chip naming where the app
+   * does run (see networkChip) — e.g. a testnet-only dApp on mainnet.
+   */
+  networks?: readonly NetworkId[];
 }
 
 export const MINI_APPS: MiniApp[] = [
@@ -76,7 +96,76 @@ export const MINI_APPS: MiniApp[] = [
     verified: false,
     demo: true,
   },
+  // Centient (epic #258): earn USDC by ranking AI answers. Remote, with a
+  // session so its login survives (#260). Testnet-only for now, so on mainnet
+  // it shows a "Testnet" chip rather than disappearing. `verified` flips to
+  // true once the device QA in slice 8 (#266) passes.
+  {
+    id: 'centient',
+    name: 'Centient',
+    tagline: 'Earn USDC by ranking AI answers.',
+    category: 'Earn',
+    icon: 'payments',
+    // beta.centient.work is where contributors go for the testnet launch (#279);
+    // the apex serves the same build and stays listed, so links to either
+    // work and moving back needs no release.
+    url: 'https://beta.centient.work/',
+    origins: ['https://centient.work'],
+    verified: false,
+    session: true,
+    networks: ['TESTNET'],
+  },
 ];
+
+const NETWORK_LABEL: Record<NetworkId, string> = { TESTNET: 'Testnet', PUBLIC: 'Mainnet' };
+
+/**
+ * The network chip a directory row shows, or null for none. An app that runs
+ * on the active network (or didn't say — `networks` omitted) gets no chip; one
+ * that doesn't shows where it does run, e.g. "Testnet" for a testnet-only app
+ * while Lantern is on mainnet. Listing it with a chip beats hiding it.
+ */
+export function networkChip(app: MiniApp, active: NetworkId): string | null {
+  if (!app.networks || app.networks.length === 0 || app.networks.includes(active)) return null;
+  return app.networks.map((n) => NETWORK_LABEL[n]).join(' / ');
+}
+
+/** `value`'s origin if it's a plain https origin or URL (no credentials), else null. */
+function httpsOrigin(value: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' || url.username || url.password) return null;
+  return url.origin;
+}
+
+/**
+ * Every web origin a remote directory app counts as (#279): `url`'s origin,
+ * then each of `origins`, deduplicated, in that order. Only https origins
+ * without credentials, and never Lantern's own (isLanternOrigin, compared
+ * against Lantern's fixed origins: `self` defaults to 'null' so the answer
+ * doesn't depend on where it runs; the Android asset statements are generated
+ * from it in Node). Bundled apps have none, and so does an app whose own `url`
+ * doesn't qualify (its extras too). An `origins` entry with a path is reduced
+ * to its origin; anything unparseable is dropped.
+ */
+export function appOrigins(app: MiniApp, self = 'null'): string[] {
+  if (!app.url) return [];
+  const primary = httpsOrigin(app.url);
+  // An app whose own url doesn't qualify gets nothing, extras included.
+  if (!primary || isLanternOrigin(primary, self)) return [];
+  const out = [primary];
+  for (const value of app.origins ?? []) {
+    if (typeof value !== 'string') continue;
+    const origin = httpsOrigin(value);
+    if (!origin || isLanternOrigin(origin, self) || out.includes(origin)) continue;
+    out.push(origin);
+  }
+  return out;
+}
 
 export function findMiniApp(id: string): MiniApp | undefined {
   return MINI_APPS.find((a) => a.id === id);

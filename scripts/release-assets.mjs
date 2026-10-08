@@ -152,7 +152,7 @@ export function releaseNotes({ version, tag, sha, runNumber, flags, assets, sums
     '## Install',
     '',
     `- **Android** — download \`${assets.apk}\` on the phone, open it from the notification or Downloads, allow installs from this source if asked, tap **Install**. It is debug-signed for sideloading.`,
-    `- **Chrome / Edge / Brave** — download \`${assets.zip}\`, unzip it somewhere you will keep (not Downloads), open \`chrome://extensions\`, turn on **Developer mode**, **Load unpacked**, pick the unzipped folder (it has \`manifest.json\` at its top level).`,
+    `- **Chrome / Edge / Brave** — download \`${assets.zip}\`, unzip it somewhere you will keep (not Downloads), open \`chrome://extensions\`, turn on **Developer mode**, **Load unpacked**, pick the unzipped folder (it has \`manifest.json\` at its top level). Updating from 0.6.2 or earlier: unzip into a new folder, then import your wallet with your recovery phrase (the extension's id changes once).`,
     '',
     '## Verify what you downloaded',
     '',

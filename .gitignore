@@ -16,6 +16,8 @@ BRAND.md
 
 # Packaged extension artifacts
 release
+# Private keys (the extension's signing key must never be committed, #284)
+*.pem
 
 # Capacitor / Android build outputs
 android/app/build/
