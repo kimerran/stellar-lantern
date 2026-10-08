@@ -67,8 +67,8 @@
 <tr>
 <th>Metric</th>
 <th>Target</th>
-<th>At 2026-09-17 (snapshot)</th>
-<th>Change</th>
+<th>At 2026-10-08 (snapshot)</th>
+<th>Change since 17 Sep</th>
 <th>Met</th>
 </tr>
 </thead>
@@ -76,56 +76,64 @@
 <tr>
 <td>Transactions scanned end-to-end</td>
 <td>≥ 60</td>
-<td>18</td>
-<td>+18 (first data: 16 Sep)</td>
-<td>Not yet</td>
+<td>272 (236 in the wallet, 36 visitor scans on the playground)</td>
+<td>+254</td>
+<td>Met</td>
 </tr>
 <tr>
 <td>Unique wallets that ran a scan</td>
 <td>≥ 15</td>
-<td>4</td>
-<td>+4</td>
-<td>Not yet</td>
+<td>58</td>
+<td>+54</td>
+<td>Met</td>
 </tr>
 <tr>
 <td>Addresses reported on-chain</td>
 <td>≥ 20</td>
-<td>no reading yet</td>
-<td>—</td>
-<td>Not yet</td>
+<td>20</td>
+<td>first reading</td>
+<td>Met (see below)</td>
 </tr>
 <tr>
 <td>On-chain registry executions</td>
 <td>≥ 30</td>
-<td>no reading yet</td>
-<td>—</td>
-<td>Not yet</td>
+<td>35</td>
+<td>first reading</td>
+<td>Met</td>
 </tr>
 <tr>
 <td>Transactions signed</td>
 <td>—</td>
-<td>6 across 4 wallets</td>
-<td>—</td>
+<td>133 across 56 wallets</td>
+<td>+127</td>
 <td>—</td>
 </tr>
 <tr>
 <td>Installs reporting</td>
 <td>—</td>
-<td>6 (4 with a wallet address)</td>
+<td>101 (70 distinct wallet addresses)</td>
+<td>+95</td>
 <td>—</td>
+</tr>
+<tr>
+<td>Demo scans (seeded)</td>
+<td>—</td>
+<td>52 (engagement only, not in the headline)</td>
+<td>first reading</td>
 <td>—</td>
 </tr>
 <tr>
 <td>Download intents</td>
 <td>—</td>
-<td>no reading yet (links are live)</td>
-<td>—</td>
+<td>188 (133 Android, 55 Chrome extension)</td>
+<td>first reading</td>
 <td>—</td>
 </tr>
 </tbody>
 </table></div><p>The download row is the context that makes the wallet numbers legible: <em>60 clicks, 15 wallets scanning</em> and <em>16 clicks, 15 wallets scanning</em> are very different results, and only the second is a good one. It is a click count from our own redirect links, with no identity and no consent behind it, so it is never joined to the analytics rows — only shown next to them.</p>
-<p>The two registry rows are not analytics: <em>addresses reported</em> is the registry contract's <code>count()</code> (distinct subjects), and <em>registry executions</em> is the number of transactions that invoked the contract, both read from the testnet explorer. Neither had a wallet-side path to move it before Deliverable 3 lands the one-click report; the first reading is taken with the Week 3 report. Reports made during the alpha exercises are <strong>seeded testnet entries</strong> (addresses generated for the exercise, two per tester) and are recorded here as such, not as organic community reports.</p>
-<p>Snapshot read from the analytics export on 2026-09-17; window 2026-09-16 → 2026-09-17 (the first day the instrumented builds were in testers' hands). The scanner is a library in Week 2 — every scan above came from the alpha wallet's existing review screen. The SOW's counts are expected to move in Weeks 3 and 4, when the D2 scanner sits in the wallet's pre-sign review (D3) and a public playground opens (D4).</p>
+<p>Installs and wallets differ because one wallet address can report from more than one install: the extension and the phone, or a reinstall. About a third of the installs (34) came from a single campus onboarding session on 2 Oct.</p>
+<p>The two registry rows are not analytics: <em>addresses reported</em> is the registry contract's <code>count()</code> (distinct subjects), and <em>registry executions</em> is the number of contract invocations, both read from the testnet explorer. Reports made during the alpha exercises are <strong>seeded testnet entries</strong> (addresses generated for the exercise, two per tester), and the 20 include them, so the reported-addresses target is met on testnet activity, not yet on organic community reports.</p>
+<p>Snapshot read on 2026-10-08: the analytics rows from the raw export (all data since the first instrumented build on 16 Sep), the registry rows from stellar.expert, and the download intents from the API's download log (links live since 23 Sep). Every scan above came from the wallet's pre-sign review (Deliverable 3) or the public playground (Deliverable 4).</p>
 <h2>History</h2>
 <div class="table"><table><thead>
 <tr>
@@ -142,8 +150,26 @@
 <td>4</td>
 <td>6</td>
 </tr>
+<tr>
+<td>2026-09-27</td>
+<td>167</td>
+<td>26</td>
+<td>84</td>
+</tr>
+<tr>
+<td>2026-10-04</td>
+<td>255</td>
+<td>56</td>
+<td>126</td>
+</tr>
+<tr>
+<td>2026-10-08</td>
+<td>272</td>
+<td>58</td>
+<td>133</td>
+</tr>
 </tbody>
-</table></div><p>Each weekly report from Week 3 on adds a row.</p>
+</table></div><p>The 17 Sep row was read on that day. The later rows were recomputed on 8 Oct from the same export, counting everything up to the end of the day shown (UTC); <em>Scanned</em> includes the playground's visitor scans from 30 Sep on.</p>
 
         </article>
         <footer class="docs-foot">
