@@ -115,6 +115,24 @@ export const MINI_APPS: MiniApp[] = [
     session: true,
     networks: ['TESTNET'],
   },
+  // Paiflow (#290, their handoff webnxt-2030/pinkraft#945): programmable
+  // payment flows. Its public testnet pages (/trigger/:id, /allowance/:id)
+  // connect and use lantern:signXdr; Paiflow submits and reconciles. A
+  // session because those pages call Paiflow's own API and need durable
+  // storage and Web Locks, which the opaque sandbox doesn't give. One origin:
+  // beta.paiflow.xyz is their marketing site, not the app. `verified` flips
+  // once device QA passes.
+  {
+    id: 'paiflow',
+    name: 'Paiflow',
+    tagline: 'Build and run programmable payment flows on Stellar.',
+    category: 'Payments',
+    icon: 'account_tree',
+    url: 'https://beta.app.paiflow.xyz/',
+    verified: false,
+    session: true,
+    networks: ['TESTNET'],
+  },
 ];
 
 const NETWORK_LABEL: Record<NetworkId, string> = { TESTNET: 'Testnet', PUBLIC: 'Mainnet' };

@@ -212,6 +212,19 @@ describe('deepLinkOrigins / asset_statements', () => {
     expect(assetXml).toContain('\\"site\\":\\"https://centient.work\\"');
   });
 
+  it('the real directory lets a link open Paiflow\'s public pages, and nothing else on its domain (#290)', () => {
+    expect(deepLinkOrigins()).toContain('https://beta.app.paiflow.xyz');
+    for (const url of ['https://beta.app.paiflow.xyz/trigger/dep-1', 'https://beta.app.paiflow.xyz/allowance/dep-1']) {
+      expect(parseDeepLink(link(url))).toMatchObject({ kind: 'open', url, app: { id: 'paiflow', session: true } });
+    }
+    // The marketing host and other subdomains are not the app.
+    expect(parseDeepLink(link('https://beta.paiflow.xyz/'))).toEqual({ kind: 'refused', origin: 'beta.paiflow.xyz' });
+    expect(parseDeepLink(link('https://evil.app.paiflow.xyz/'))).toEqual({ kind: 'refused', origin: 'evil.app.paiflow.xyz' });
+    expect(parseDeepLink(link('https://beta.app.paiflow.xyz@evil.com/'))?.kind).toBe('refused');
+    expect(assetXml).toContain('\\"site\\":\\"https://beta.app.paiflow.xyz\\"');
+    expect(assetXml).not.toContain('\\"site\\":\\"https://beta.paiflow.xyz\\"');
+  });
+
   it('the committed Android resource names every directory origin', () => {
     for (const o of deepLinkOrigins(MINI_APPS)) expect(assetXml).toContain(`\\"site\\":\\"${o}\\"`);
   });
