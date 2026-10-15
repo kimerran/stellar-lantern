@@ -234,7 +234,9 @@ function describeSetOptions(op: DecodedOp): string {
   }
 
   const joined =
-    parts.length > 1 ? `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}` : parts[0];
+    parts.length > 1
+      ? `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`
+      : parts[0];
   return `This ${joined}. Only continue if you set this up yourself.`;
 }
 

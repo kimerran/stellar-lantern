@@ -46,7 +46,8 @@ async function scanFixture(name: string): Promise<ScanResult> {
     },
     {
       simulate: async (xdr) => {
-        if (xdr !== f.xdr) throw new Error('simulate called with an XDR the fixture did not record');
+        if (xdr !== f.xdr)
+          throw new Error('simulate called with an XDR the fixture did not record');
         return f.simulation;
       },
       isFlagged: async () => false,
@@ -155,7 +156,10 @@ describe('describeSimulatedMovement', () => {
     outIsTotal: false,
     ...over,
   });
-  const fx = (observedNet: NetDelta[], kind: 'contract_call' | 'token_transfer' = 'contract_call') =>
+  const fx = (
+    observedNet: NetDelta[],
+    kind: 'contract_call' | 'token_transfer' = 'contract_call',
+  ) =>
     ({
       effects: [{ kind, opIndex: 0, counterparty: SPLITTER }],
       observedNet,
@@ -181,13 +185,25 @@ describe('describeSimulatedMovement', () => {
     ).toBe('In the simulation, you send up to 5 XLM; you receive at least 2.5 XLM.');
   });
 
-  it('skips amounts whose decimals are unknown rather than show base units', () => {
+  it('never shows base units: an outflow with unknown decimals is named without an amount', () => {
     const unknown = net(ME, { out: '123456789', asset: { code: 'ABC', decimals: null } });
-    expect(describeSimulatedMovement(fx([unknown]))).toBeUndefined();
+    expect(describeSimulatedMovement(fx([unknown]))).toBe(
+      'In the simulation, you send an amount of ABC Lantern can’t size.',
+    );
+  });
+
+  it('a sized and an unsized outflow together: the unsized one is not dropped', () => {
+    const sized = net(ME, { out: '1.0000000' });
+    const unsized = net(ME, { out: '999999999999', asset: { code: 'ABC', decimals: null } });
+    expect(describeSimulatedMovement(fx([sized, unsized]))).toBe(
+      'In the simulation, you send 1 XLM; you also send an amount of ABC Lantern can’t size.',
+    );
   });
 
   it('says nothing for a decoded root call, or when nothing moved', () => {
-    expect(describeSimulatedMovement(fx([net(ME, { out: '1.0000000' })], 'token_transfer'))).toBeUndefined();
+    expect(
+      describeSimulatedMovement(fx([net(ME, { out: '1.0000000' })], 'token_transfer')),
+    ).toBeUndefined();
     expect(describeSimulatedMovement(fx([]))).toBeUndefined();
   });
 });

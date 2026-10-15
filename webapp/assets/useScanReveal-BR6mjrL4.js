@@ -1,1 +1,0 @@
-import{r as e}from"./index-BRU4E-4R.js";function f(u,r,t){const[a,s]=e.useState(!1),c=e.useRef(null),n=e.useRef(void 0);return e.useEffect(()=>{!u||!r||t==null||c.current===t||(c.current=t,s(!0),clearTimeout(n.current),n.current=setTimeout(()=>s(!1),Math.min(r.latencyMs,600)))},[u,r,t]),e.useEffect(()=>()=>clearTimeout(n.current),[]),a}export{f as u};

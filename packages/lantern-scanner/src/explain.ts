@@ -329,9 +329,7 @@ const MAX_NAMED_RECEIVERS = 3;
 // token calls already say what they move. Built from `observedNet` — the
 // ledger entries the simulation would write — so it states facts, not a
 // reading of the contract's arguments. Undefined when there is nothing to say.
-export function describeSimulatedMovement(
-  effects: DeepReadonly<EffectSet>,
-): string | undefined {
+export function describeSimulatedMovement(effects: DeepReadonly<EffectSet>): string | undefined {
   const root = effects.effects.find((e) => e.kind === 'contract_call');
   if (!root) return undefined;
   const me = effects.signing?.user ?? effects.source?.source;
@@ -343,6 +341,19 @@ export function describeSimulatedMovement(
     ...mine.filter((n) => positive(n.out)).map((n) => `you send ${amountOf(n, 'out')}`),
     ...mine.filter((n) => positive(n.in)).map((n) => `you receive ${amountOf(n, 'in')}`),
   ];
+  // An outflow of yours in a token whose decimals are unknown can't be shown
+  // as an amount (base units would mislead), but it must not vanish either:
+  // without this, "you send 1 XLM" would read as everything you send.
+  const unsized = effects.observedNet.filter(
+    (n) =>
+      (n.asset.decimals === null || n.asset.decimals === undefined) &&
+      n.address === me &&
+      positive(n.out),
+  );
+  for (const n of unsized) {
+    const also = parts.length ? 'also ' : '';
+    parts.push(`you ${also}send an amount of ${codeOf(n)} Lantern can’t size`);
+  }
   const receivers = shown
     .filter((n) => n.address !== me && positive(n.in))
     .sort((a, b) => Number(b.in) - Number(a.in));
@@ -350,7 +361,8 @@ export function describeSimulatedMovement(
     .slice(0, MAX_NAMED_RECEIVERS)
     .map((n) => `${truncateAddress(n.address, 4, 4)} receives ${amountOf(n, 'in')}`);
   const rest = receivers.length - named.length;
-  if (rest > 0) named.push(`${rest} more ${rest === 1 ? 'account receives' : 'accounts receive'} funds`);
+  if (rest > 0)
+    named.push(`${rest} more ${rest === 1 ? 'account receives' : 'accounts receive'} funds`);
   if (named.length) parts.push(joinList(named));
   if (!parts.length) return undefined;
   return `In the simulation, ${parts.join('; ')}.`;
@@ -362,8 +374,13 @@ function positive(amount: string): boolean {
 
 function amountOf(n: DeepReadonly<NetDelta>, side: 'in' | 'out'): string {
   const bound = side === 'in' ? (n.inAtLeast ? 'at least ' : '') : n.outUpTo ? 'up to ' : '';
-  const code = n.asset.code || (n.asset.contractId ? truncateAddress(n.asset.contractId, 4, 4) : 'tokens');
-  return `${bound}${formatAmount(side === 'in' ? n.in : n.out)} ${code}`;
+  return `${bound}${formatAmount(side === 'in' ? n.in : n.out)} ${codeOf(n)}`;
+}
+
+function codeOf(n: DeepReadonly<NetDelta>): string {
+  return (
+    n.asset.code || (n.asset.contractId ? truncateAddress(n.asset.contractId, 4, 4) : 'tokens')
+  );
 }
 
 function joinList(items: string[]): string {
