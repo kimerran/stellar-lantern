@@ -205,7 +205,7 @@ export function ScanResultView({ scan }: { scan: DemoScan }) {
           </span>
         </p>
         <div className="mt-1">
-          <RiskCallout risk={result.risk} reasons={[...result.reasons]} explanation={result.explanation} />
+          <RiskCallout risk={result.risk} reasons={[...result.reasons]} explanation={result.explanation} badge={false} />
         </div>
       </section>
 
