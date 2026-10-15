@@ -125,7 +125,7 @@ function DemoWarnings({ showToast }: { showToast: (message: string, variant?: 'e
                   <p className="text-label-md text-on-surface">{v.explanation}</p>
                 </Card>
               ) : (
-                <RiskCallout risk={v.risk} reasons={v.reasons} explanation={v.explanation} />
+                <RiskCallout risk={v.risk} reasons={v.reasons} explanation={v.explanation} badge={false} />
               )}
             </div>
           );

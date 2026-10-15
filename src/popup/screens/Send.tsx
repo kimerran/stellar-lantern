@@ -16,6 +16,7 @@ import { formatAmount, truncateAddress } from '@shared/format';
 import { scanTx, type WalletScanInput } from '@core/scan/wallet';
 import type { ScanVerdict } from '@core/scan';
 import { useRecheck } from '../hooks/useRecheck';
+import { useScanReveal } from '../hooks/useScanReveal';
 import { RecheckNotice } from '../components/RecheckNotice';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
@@ -65,19 +66,13 @@ export function Send({ address, network, onDone }: Props) {
   // ── Lantern pre-sign scan state ──
   const [verdict, setVerdict] = useState<ScanVerdict | null>(null);
   const [scanInput, setScanInput] = useState<WalletScanInput | null>(null);
-  const [scanning, setScanning] = useState(false);
   const [confirmText, setConfirmText] = useState('');
   // Re-simulate immediately before submit (#121, SOW §3.9).
   const recheck = useRecheck();
 
   // Reveal the verdict after a short, latency-shaped delay so the scan reads as
   // "checked just now" (approval UI shown immediately, low risk resolves fast).
-  useEffect(() => {
-    if (step !== 'review' || !verdict) return;
-    setScanning(true);
-    const t = setTimeout(() => setScanning(false), Math.min(verdict.latencyMs, 600));
-    return () => clearTimeout(t);
-  }, [step, verdict]);
+  const scanning = useScanReveal(step === 'review', verdict, scanInput);
 
   function backToForm() {
     setStep('form');

@@ -1,5 +1,6 @@
 import type { RiskLevel, ScanReason } from '@core/scan';
 import { Icon } from './Icon';
+import { ScanBadge } from './ScanBadge';
 
 // Renders a risk verdict's reasons + explanation as a coloured callout. Shared by
 // the pre-sign approval scan and paste-to-check. One focal element per view
@@ -31,12 +32,21 @@ interface Props {
   reasons: ScanReason[];
   explanation?: string;
   whatToDo?: string;
+  /** Lead with the risk-level badge ("High risk — action needed") for medium
+   *  and high, so the level is named in words, not only in colour. Off where
+   *  the caller already shows a ScanBadge beside the callout. */
+  badge?: boolean;
 }
 
-export function RiskCallout({ risk, reasons, explanation, whatToDo }: Props) {
+export function RiskCallout({ risk, reasons, explanation, whatToDo, badge = true }: Props) {
   const t = THEME[risk];
   return (
     <div className={`rounded-2xl border ${t.border} ${t.bg} p-3.5`}>
+      {badge && risk !== 'low' && (
+        <div className="mb-2.5">
+          <ScanBadge risk={risk} />
+        </div>
+      )}
       <div className="flex items-start gap-2.5">
         <Icon name={t.icon} filled size={20} className={`mt-0.5 shrink-0 ${t.text}`} />
         <div className="min-w-0 flex-1 space-y-2">

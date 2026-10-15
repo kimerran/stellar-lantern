@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { track } from '@core/telemetry';
 import type { NetworkConfig } from '@shared/constants';
 import { sendMessage } from '@shared/messages';
 import { scanTx, type WalletScanInput } from '@core/scan/wallet';
 import type { ScanVerdict } from '@core/scan';
 import { useRecheck } from '../hooks/useRecheck';
+import { useScanReveal } from '../hooks/useScanReveal';
 import { RecheckNotice } from '../components/RecheckNotice';
 import { recoveryCoSignError } from '@core/recovery/guardians';
 import { isNativePlatform } from '@shared/kv';
@@ -33,7 +34,6 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
   const [step, setStep] = useState<Step>('paste');
   const [xdr, setXdr] = useState('');
   const [verdict, setVerdict] = useState<ScanVerdict | null>(null);
-  const [scanning, setScanning] = useState(false);
   // Held across the scanTx() await (#84): no double-tap re-running the pipeline
   // and double-counting tx_scanned, and the button shows the wait.
   const [reviewing, setReviewing] = useState(false);
@@ -47,12 +47,7 @@ export function CoSignRecovery({ address, network, onBack }: Props) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (step !== 'review' || !verdict) return;
-    setScanning(true);
-    const t = setTimeout(() => setScanning(false), Math.min(verdict.latencyMs, 600));
-    return () => clearTimeout(t);
-  }, [step, verdict]);
+  const scanning = useScanReveal(step === 'review', verdict, scanInput);
 
   async function toReview() {
     if (reviewing) return;
