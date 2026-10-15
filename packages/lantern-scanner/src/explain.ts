@@ -310,6 +310,7 @@ function createProxyExplainer(opts: HostedExplainerOptions): Explainer {
 // The deterministic fallback, as an Explainer. What ships when no model is
 // configured, and what every failure above degrades to.
 export const explainRulesBased: Explainer = async ({ effects }: ExplainInput) =>
+  describeRootApproval(effects) ??
   // explainTransaction only reads its input; the cast drops the readonly
   // wrapper the shipped signature predates, nothing else. The signing user
   // lets a multi-op sentence say which ops need *your* signature (#261).
@@ -318,6 +319,47 @@ export const explainRulesBased: Explainer = async ({ effects }: ExplainInput) =>
     effects.signing?.user,
     describeSimulatedMovement(effects),
   );
+
+// Soroban closes a ledger about every 5 seconds.
+const SECONDS_PER_LEDGER = 5;
+
+// A transaction that is one token `approve` by the signing user, in words
+// (#294): who may spend, how much of what, and for about how long. The
+// generic sentence named the token contract ("calls “approve” on CDLZ…"),
+// which is the one address the user doesn't need. Undefined for anything
+// else, so the caller falls back to the generic wording.
+export function describeRootApproval(effects: DeepReadonly<EffectSet>): string | undefined {
+  const root = effects.effects.find((e) => e.kind === 'token_approve');
+  if (!root || effects.effects.length !== 1) return undefined;
+  const me = effects.signing?.user ?? effects.source?.source;
+  const ap = effects.approvals.find((a) => a.depth === 0 && a.opIndex === root.opIndex);
+  if (!ap || ap.owner !== me) return undefined;
+  const spender = truncateAddress(ap.spender, 4, 4);
+  const code =
+    ap.asset.code ||
+    (ap.asset.contractId ? truncateAddress(ap.asset.contractId, 4, 4) : 'this token');
+  if (/^0+$/.test(ap.amount)) {
+    return `This removes ${spender}’s permission to spend your ${code}. Only continue if you trust it.`;
+  }
+  const what = ap.unlimited
+    ? `any amount of your ${code}`
+    : ap.amountScaled !== null
+      ? `up to ${formatAmount(ap.amountScaled)} ${code} from your account`
+      : `some of your ${code} (Lantern can’t read this token’s decimals, so the amount isn’t shown)`;
+  const lasts = durationUntil(ap.expirationLedger, effects.latestLedger);
+  return `This lets ${spender} spend ${what}${lasts ? ` ${lasts}` : ''}, without asking you again. Only continue if you trust it.`;
+}
+
+function durationUntil(
+  expirationLedger: number,
+  latestLedger: number | undefined,
+): string | undefined {
+  if (latestLedger === undefined || expirationLedger <= latestLedger) return undefined;
+  const hours = ((expirationLedger - latestLedger) * SECONDS_PER_LEDGER) / 3600;
+  if (hours < 1) return 'for less than an hour';
+  if (hours < 48) return `for about ${Math.round(hours)} hour${Math.round(hours) === 1 ? '' : 's'}`;
+  return `for about ${Math.round(hours / 24)} days`;
+}
 
 // Receivers named before the rest are summarised as "N more".
 const MAX_NAMED_RECEIVERS = 3;
