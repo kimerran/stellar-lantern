@@ -148,9 +148,22 @@ describe('decode + explain', () => {
   });
 
   it('matches DeFi function names case-insensitively', () => {
-    const explanation = explainTransaction(decodeTransaction(invokeXdr('WITHDRAW'), pp));
-    expect(explanation).toMatch(/^Withdraws funds from a lending pool/);
-    expect(explanation).toMatch(/calls .*WITHDRAW.* on a smart contract/i);
+    const explanation = explainTransaction(decodeTransaction(invokeXdr('BORROW'), pp));
+    expect(explanation).toMatch(/^Borrows against your collateral/);
+    expect(explanation).toMatch(/calls .*BORROW.* on a smart contract/i);
+  });
+
+  it('does not call a generic deposit or withdraw a lending pool (#294)', () => {
+    // Vaults, escrows and payment pipelines (Paiflow's deposit trigger) use
+    // these names too; the contract is unverified, so only the action is said.
+    for (const [fn, lead] of [
+      ['deposit', 'Deposits funds'],
+      ['Withdraw', 'Withdraws funds'],
+    ] as const) {
+      const explanation = explainTransaction(decodeTransaction(invokeXdr(fn), pp));
+      expect(explanation.startsWith(`${lead} — calls “${fn}” on a smart contract`)).toBe(true);
+      expect(explanation).not.toMatch(/lending pool/i);
+    }
   });
 
   it('keeps the generic wording for an unrecognized contract function (no regression)', () => {
