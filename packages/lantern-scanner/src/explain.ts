@@ -331,6 +331,10 @@ const SECONDS_PER_LEDGER = 5;
 export function describeRootApproval(effects: DeepReadonly<EffectSet>): string | undefined {
   const root = effects.effects.find((e) => e.kind === 'token_approve');
   if (!root || effects.effects.length !== 1) return undefined;
+  // Anything else the auth tree decoded means the approve isn't the whole
+  // story: keep the generic, cautious sentence.
+  if (effects.approvals.length !== 1 || effects.deltas.length > 0 || effects.unverified.length > 0)
+    return undefined;
   const me = effects.signing?.user ?? effects.source?.source;
   const ap = effects.approvals.find((a) => a.depth === 0 && a.opIndex === root.opIndex);
   if (!ap || ap.owner !== me) return undefined;

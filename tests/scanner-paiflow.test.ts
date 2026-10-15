@@ -242,6 +242,8 @@ describe('describeRootApproval', () => {
         { kind: 'token_approve', opIndex: 0, counterparty: ap.spender, functionName: 'approve' },
       ],
       approvals: [ap],
+      deltas: [],
+      unverified: [],
       signing: { user: USER },
       source: null,
       latestLedger: 1_000_000,
@@ -285,5 +287,29 @@ describe('describeRootApproval', () => {
     const two = fx(approval()) as unknown as { effects: unknown[] };
     two.effects.push({ kind: 'payment', opIndex: 1 });
     expect(describeRootApproval(two as unknown as EffectSet)).toBeUndefined();
+  });
+
+  it('not when the approve also moves your funds, or makes another call (review F1 on #298)', () => {
+    // A contract with an approve(address, address, i128, u32) signature that
+    // also pulls the user's USDC in a nested authorised call.
+    const pulls = fx(approval(), {
+      deltas: [
+        {
+          address: USER,
+          asset: { code: 'USDC', decimals: 7 },
+          direction: 'out',
+          amount: '5000.0000000',
+          bound: 'exact',
+          opIndex: 0,
+          depth: 1,
+        },
+      ],
+    });
+    expect(describeRootApproval(pulls)).toBeUndefined();
+    const calls = fx(approval(), { unverified: [{ contractId: SPLITTER, functionName: 'x' }] });
+    expect(describeRootApproval(calls)).toBeUndefined();
+    const twice = fx(approval());
+    (twice as unknown as { approvals: unknown[] }).approvals.push(approval({ depth: 1 }));
+    expect(describeRootApproval(twice)).toBeUndefined();
   });
 });
