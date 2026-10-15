@@ -18,8 +18,18 @@
 //     So is one that claims the transaction was blocked, at any risk: the
 //     wallet is advise-and-gate and never blocks (#150).
 
-import type { Approval, AssetDelta, ExplainInput, Explainer, ScanAction } from './types';
+import type {
+  Approval,
+  AssetDelta,
+  DeepReadonly,
+  EffectSet,
+  ExplainInput,
+  Explainer,
+  NetDelta,
+  ScanAction,
+} from './types';
 import { explainTransaction } from './explainer';
+import { formatAmount, truncateAddress } from './format';
 import type { DecodedTx } from './types';
 
 export interface HostedExplainerOptions {
@@ -303,4 +313,60 @@ export const explainRulesBased: Explainer = async ({ effects }: ExplainInput) =>
   // explainTransaction only reads its input; the cast drops the readonly
   // wrapper the shipped signature predates, nothing else. The signing user
   // lets a multi-op sentence say which ops need *your* signature (#261).
-  explainTransaction(effects.source as DecodedTx | null, effects.signing?.user);
+  explainTransaction(
+    effects.source as DecodedTx | null,
+    effects.signing?.user,
+    describeSimulatedMovement(effects),
+  );
+
+// Receivers named before the rest are summarised as "N more".
+const MAX_NAMED_RECEIVERS = 3;
+
+// What the simulation proved a contract call moves, as one sentence (#294).
+// Only for a root call the scanner could not decode (a coarse `contract_call`
+// row): there the unverified-contract reason tells the user to review the
+// balance changes, and this is the only place the review shows them. Decoded
+// token calls already say what they move. Built from `observedNet` — the
+// ledger entries the simulation would write — so it states facts, not a
+// reading of the contract's arguments. Undefined when there is nothing to say.
+export function describeSimulatedMovement(
+  effects: DeepReadonly<EffectSet>,
+): string | undefined {
+  const root = effects.effects.find((e) => e.kind === 'contract_call');
+  if (!root) return undefined;
+  const me = effects.signing?.user ?? effects.source?.source;
+  const shown = effects.observedNet.filter(
+    (n) => n.asset.decimals !== null && n.asset.decimals !== undefined,
+  );
+  const mine = shown.filter((n) => n.address === me);
+  const parts: string[] = [
+    ...mine.filter((n) => positive(n.out)).map((n) => `you send ${amountOf(n, 'out')}`),
+    ...mine.filter((n) => positive(n.in)).map((n) => `you receive ${amountOf(n, 'in')}`),
+  ];
+  const receivers = shown
+    .filter((n) => n.address !== me && positive(n.in))
+    .sort((a, b) => Number(b.in) - Number(a.in));
+  const named = receivers
+    .slice(0, MAX_NAMED_RECEIVERS)
+    .map((n) => `${truncateAddress(n.address, 4, 4)} receives ${amountOf(n, 'in')}`);
+  const rest = receivers.length - named.length;
+  if (rest > 0) named.push(`${rest} more ${rest === 1 ? 'account receives' : 'accounts receive'} funds`);
+  if (named.length) parts.push(joinList(named));
+  if (!parts.length) return undefined;
+  return `In the simulation, ${parts.join('; ')}.`;
+}
+
+function positive(amount: string): boolean {
+  return /[1-9]/.test(amount) && !amount.startsWith('-');
+}
+
+function amountOf(n: DeepReadonly<NetDelta>, side: 'in' | 'out'): string {
+  const bound = side === 'in' ? (n.inAtLeast ? 'at least ' : '') : n.outUpTo ? 'up to ' : '';
+  const code = n.asset.code || (n.asset.contractId ? truncateAddress(n.asset.contractId, 4, 4) : 'tokens');
+  return `${bound}${formatAmount(side === 'in' ? n.in : n.out)} ${code}`;
+}
+
+function joinList(items: string[]): string {
+  if (items.length <= 1) return items.join('');
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}

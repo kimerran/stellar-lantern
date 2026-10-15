@@ -15,7 +15,16 @@ import {
 //
 // `user` (optional) is the account reviewing it: when given, a multi-op
 // explanation says which operations need *your* signature (#261).
-export function explainTransaction(tx: DecodedTx | null, user?: string): string {
+//
+// `simulated` (optional) is a sentence about what the simulation proved the
+// call moves (#294), slotted in before the closing "Only continue…" of a
+// contract call the scanner can't otherwise describe. The pipeline's
+// rules-based explainer builds it; the legacy XDR-only path has none.
+export function explainTransaction(
+  tx: DecodedTx | null,
+  user?: string,
+  simulated?: string,
+): string {
   if (!tx || tx.operations.length === 0) {
     return 'This transaction could not be read. Only continue if you trust the source.';
   }
@@ -27,10 +36,11 @@ export function explainTransaction(tx: DecodedTx | null, user?: string): string 
       // For well-known DeFi/lending functions, lead with a friendly description
       // of the action; otherwise keep the generic wording (no regression).
       const action = describeDefiFunction(call.contractFunction);
+      const proved = simulated ? ` ${simulated}` : '';
       if (action) {
-        return `${action} — calls “${call.contractFunction}” on a smart contract${on}. Only continue if you trust it.`;
+        return `${action} — calls “${call.contractFunction}” on a smart contract${on}.${proved} Only continue if you trust it.`;
       }
-      return `This calls “${call.contractFunction}” on a smart contract${on} that may move funds or change permissions. Only continue if you trust it.`;
+      return `This calls “${call.contractFunction}” on a smart contract${on} that may move funds or change permissions.${proved} Only continue if you trust it.`;
     }
     return 'This lets a smart contract move funds or change permissions on your account. Only continue if you trust it.';
   }

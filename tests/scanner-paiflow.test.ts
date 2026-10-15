@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { runPipeline, type RawSimulation, type ScanResult } from '@lantern/scanner';
+import {
+  describeSimulatedMovement,
+  runPipeline,
+  type EffectSet,
+  type NetDelta,
+  type RawSimulation,
+  type ScanResult,
+} from '@lantern/scanner';
 
 // Paiflow's envelopes (#294): what Lantern shows when Paiflow asks it to sign
 // a trigger (splitter `distribute`, pipeline `deposit`) or a subscription
@@ -110,5 +117,77 @@ describe('Paiflow envelopes', () => {
         unlimited: false,
       }),
     ]);
+  });
+
+  it('the review sentence says what the simulation moved: 10 XLM out, 6 and 4 to the recipients (#294)', async () => {
+    const distribute = await scanFixture('paiflow-splitter-distribute');
+    expect(distribute.explanation).toBe(
+      'This calls “distribute” on a smart contract (CDON...EY27) that may move funds or change permissions. ' +
+        'In the simulation, you send 10 XLM; GDVE...ZA57 receives 6 XLM and GBVG...FJBP receives 4 XLM. ' +
+        'Only continue if you trust it.',
+    );
+    // Through the trigger → splitter hop, the pass-through contracts net to
+    // zero and are not named; the end recipients are.
+    const deposit = await scanFixture('paiflow-pipeline-deposit');
+    expect(deposit.explanation).toContain(
+      'In the simulation, you send 10 XLM; GDVE...ZA57 receives 6 XLM and GBVG...FJBP receives 4 XLM.',
+    );
+  });
+
+  it('a decoded token call (the approve) gets no simulated-movement sentence', async () => {
+    const r = await scanFixture('paiflow-subscription-approve');
+    expect(describeSimulatedMovement(r.effects)).toBeUndefined();
+    expect(r.explanation).not.toContain('In the simulation');
+  });
+});
+
+describe('describeSimulatedMovement', () => {
+  const ME = USER;
+  const xlm = { code: 'XLM', decimals: 7 };
+  const net = (address: string, over: Partial<NetDelta> = {}): NetDelta => ({
+    address,
+    asset: xlm,
+    in: '0.0000000',
+    inAtLeast: false,
+    inIsTotal: false,
+    out: '0.0000000',
+    outUpTo: false,
+    outIsTotal: false,
+    ...over,
+  });
+  const fx = (observedNet: NetDelta[], kind: 'contract_call' | 'token_transfer' = 'contract_call') =>
+    ({
+      effects: [{ kind, opIndex: 0, counterparty: SPLITTER }],
+      observedNet,
+      signing: { user: ME },
+      source: null,
+    }) as unknown as EffectSet;
+
+  it('names three receivers by amount, then counts the rest', () => {
+    const others = ['GA', 'GB', 'GC', 'GD', 'GE'].map((p, i) =>
+      net(p.padEnd(56, 'A'), { in: `${i + 1}.0000000` }),
+    );
+    expect(describeSimulatedMovement(fx([net(ME, { out: '15.0000000' }), ...others]))).toBe(
+      'In the simulation, you send 15 XLM; GEAA...AAAA receives 5 XLM, GDAA...AAAA receives 4 XLM, ' +
+        'GCAA...AAAA receives 3 XLM and 2 more accounts receive funds.',
+    );
+  });
+
+  it('says what comes back to you, and marks bounds', () => {
+    expect(
+      describeSimulatedMovement(
+        fx([net(ME, { out: '5.0000000', outUpTo: true, in: '2.5000000', inAtLeast: true })]),
+      ),
+    ).toBe('In the simulation, you send up to 5 XLM; you receive at least 2.5 XLM.');
+  });
+
+  it('skips amounts whose decimals are unknown rather than show base units', () => {
+    const unknown = net(ME, { out: '123456789', asset: { code: 'ABC', decimals: null } });
+    expect(describeSimulatedMovement(fx([unknown]))).toBeUndefined();
+  });
+
+  it('says nothing for a decoded root call, or when nothing moved', () => {
+    expect(describeSimulatedMovement(fx([net(ME, { out: '1.0000000' })], 'token_transfer'))).toBeUndefined();
+    expect(describeSimulatedMovement(fx([]))).toBeUndefined();
   });
 });
