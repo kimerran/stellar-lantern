@@ -23,5 +23,6 @@
   "paiflow-live-deposit",
   "paiflow-live-splitter-distribute",
   "paiflow-live-streamer-top-up",
-  "paiflow-live-token-approve"
+  "paiflow-live-token-approve",
+  "paiflow-deploy-pipeline-fresh"
 ]

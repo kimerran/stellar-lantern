@@ -140,6 +140,8 @@ export {
   createHostedExplainer,
   explainRulesBased,
   describeSimulatedMovement,
+  describeCreatedContracts,
+  describeAuthorisedTransfers,
   describeRootApproval,
   buildPrompt,
   sanitise,

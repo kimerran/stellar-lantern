@@ -199,6 +199,23 @@ exports[`verdict: corpus snapshots > nested-subinvocation 1`] = `
 }
 `;
 
+exports[`verdict: corpus snapshots > paiflow-deploy-pipeline-fresh 1`] = `
+{
+  "action": "warn",
+  "reasons": [
+    "medium:unverified_contract",
+  ],
+  "risk": "medium",
+  "signals": [
+    "ingest:simulated@simulation",
+    "auth:nested_invocations@auth.calls",
+    "effects:coverage_partial@effects.coverage",
+    "screen:clean@screen",
+    "effects:unverified_contract@unverified",
+  ],
+}
+`;
+
 exports[`verdict: corpus snapshots > paiflow-live-deposit 1`] = `
 {
   "action": "warn",
