@@ -5,6 +5,11 @@
 // `lantern-integration`, commit ad6fe7d6). That repo is private, so download
 // the packet first and pass its folder:
 //
+// Paiflow's packet README asks for approval before onward delivery. They
+// approved keeping all five envelopes and the retained distribute simulation
+// in this repo, and so in the public mirror, on 2026-10-16. The approval was
+// given directly to the team, not on pinkraft#1021.
+//
 //   d=$(mktemp -d); for f in manifest.json splitter-distribute.simulation-public.json \
 //     factory-deploy-pipeline.unsigned.xdr deposit.unsigned.xdr splitter-distribute.unsigned.xdr \
 //     streamer-top-up.unsigned.xdr token-approve.unsigned.xdr; do
