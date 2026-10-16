@@ -36,6 +36,14 @@ const SUBSCRIPTION = 'CDQZHL55LRY76ONEBHBAUOLHSYSZ2CSWZ5DXZN3LJKRRVTWBDVDADX4M';
 const RECIPIENT_60 = 'GDVEU3DD4KOFECV66VIHWEZOYX4ZKR3WV27L464SIIPOU2IUI3JCZA57';
 const RECIPIENT_40 = 'GBVG3DQJNAYAPTB4FKPLL65BUNF76K2TKPTK72LDIAJKRATGRY5BFJBP';
 
+const LIVE = [
+  'paiflow-live-factory-deploy-pipeline',
+  'paiflow-live-deposit',
+  'paiflow-live-splitter-distribute',
+  'paiflow-live-streamer-top-up',
+  'paiflow-live-token-approve',
+];
+
 async function scanFixture(name: string): Promise<ScanResult> {
   const f = byName[name];
   if (!f) throw new Error(`no fixture named ${name}`);
@@ -61,12 +69,13 @@ const moved = (r: ScanResult, address: string) =>
 
 describe('Paiflow envelopes', () => {
   it('are on disk, with the user as source and a successful simulation', () => {
-    expect(Object.keys(byName).sort()).toEqual([
+    const ours = Object.keys(byName).filter((n) => !n.startsWith('paiflow-live-'));
+    expect(ours.sort()).toEqual([
       'paiflow-pipeline-deposit',
       'paiflow-splitter-distribute',
       'paiflow-subscription-approve',
     ]);
-    for (const f of Object.values(byName)) {
+    for (const f of ours.map((n) => byName[n]!)) {
       expect(f.source).toBe(USER);
       expect((f.simulation as { result?: { error?: unknown } }).result?.error).toBeUndefined();
     }
@@ -311,5 +320,77 @@ describe('describeRootApproval', () => {
     const twice = fx(approval());
     (twice as unknown as { approvals: unknown[] }).approvals.push(approval({ depth: 1 }));
     expect(describeRootApproval(twice)).toBeUndefined();
+  });
+});
+
+// Paiflow's own five samples (#300): real, expired, unsigned envelopes their
+// app built, from pinkraft#1022, recorded by record-paiflow-live.mjs. Only the
+// distribute kept Paiflow's simulation; the other four were simulated again,
+// and the deploy now reverts (its salts were used), so it must fail closed.
+const LIVE_USER = 'GCDF6TFSMWXBK7DGO4AQ4WYBSTS5OHM6S4OJRG7MZ7V34AT2LYSOJNWZ';
+const simError = (f: Fixture) => (f.simulation as { result?: { error?: unknown } }).result?.error;
+
+describe("Paiflow's live samples (pinkraft#1022)", () => {
+  it("are all on disk, with Paiflow's account as source", () => {
+    for (const name of LIVE) expect(byName[name]?.source).toBe(LIVE_USER);
+  });
+
+  it('none scans as low risk while its simulation fails, and none throws', async () => {
+    for (const name of LIVE) {
+      const r = await scanFixture(name);
+      if (simError(byName[name]!)) expect(r.risk).not.toBe('low');
+    }
+  });
+
+  it('every review names the function Paiflow calls', async () => {
+    const fns: Record<string, string> = {
+      'paiflow-live-factory-deploy-pipeline': 'deploy_pipeline',
+      'paiflow-live-deposit': 'deposit',
+      'paiflow-live-splitter-distribute': 'distribute',
+      'paiflow-live-streamer-top-up': 'top_up',
+      'paiflow-live-token-approve': 'approve',
+    };
+    for (const [name, fn] of Object.entries(fns)) {
+      const r = await scanFixture(name);
+      expect(r.effects.effects[0]?.functionName).toBe(fn);
+    }
+  });
+
+  it('factory deploy: the reverted simulation blocks behind the confirm step', async () => {
+    const r = await scanFixture('paiflow-live-factory-deploy-pipeline');
+    expect(simError(byName['paiflow-live-factory-deploy-pipeline']!)).toBeDefined();
+    expect(r.risk).toBe('high');
+    expect(r.action).toBe('block_confirm');
+    expect(r.reasons.map((x) => x.code)).toContain('simulation_reverted');
+  });
+
+  it('deposit: the authorised 0.1 XLM transfer into the trigger is decoded', async () => {
+    const r = await scanFixture('paiflow-live-deposit');
+    expect(r.risk).toBe('medium');
+    expect(r.effects.deltas).toEqual([
+      expect.objectContaining({ address: LIVE_USER, direction: 'out', amount: '0.1000000' }),
+      expect.objectContaining({
+        address: 'CAICBJOPVUT6F5RK4QQO5ZNMPNGQH6N33KZG722EXCH7GJD4UXDETFTL',
+        direction: 'in',
+        amount: '0.1000000',
+      }),
+    ]);
+    expect(r.explanation).toContain('Deposits funds');
+  });
+
+  it('streamer top-up: the review says 0.1 XLM goes from you to the streamer', async () => {
+    const r = await scanFixture('paiflow-live-streamer-top-up');
+    expect(r.risk).toBe('medium');
+    expect(r.explanation).toContain(
+      'In the simulation, you send 0.1 XLM; CB7W...GMRU receives 0.1 XLM.',
+    );
+  });
+
+  it('token approve: a one-stroop allowance reads as who, how much and how long', async () => {
+    const r = await scanFixture('paiflow-live-token-approve');
+    expect(r.risk).toBe('low');
+    expect(r.explanation).toBe(
+      'This lets CCKH...GPP5 spend up to 0.0000001 XLM from your account for about 180 days, without asking you again. Only continue if you trust it.',
+    );
   });
 });
