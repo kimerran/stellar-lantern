@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  describeRootApproval,
   describeSimulatedMovement,
   runPipeline,
   type EffectSet,
@@ -140,6 +141,16 @@ describe('Paiflow envelopes', () => {
     expect(describeSimulatedMovement(r.effects)).toBeUndefined();
     expect(r.explanation).not.toContain('In the simulation');
   });
+
+  it('the allowance reads as who may spend how much, for how long (#294)', async () => {
+    const r = await scanFixture('paiflow-subscription-approve');
+    expect(r.explanation).toBe(
+      'This lets CDQZ...DX4M spend up to 60 XLM from your account for about 180 days, ' +
+        'without asking you again. Only continue if you trust it.',
+    );
+    // The subscription contract is named; the XLM token contract isn't.
+    expect(r.explanation).not.toContain('CDLZ');
+  });
 });
 
 describe('describeSimulatedMovement', () => {
@@ -205,5 +216,100 @@ describe('describeSimulatedMovement', () => {
       describeSimulatedMovement(fx([net(ME, { out: '1.0000000' })], 'token_transfer')),
     ).toBeUndefined();
     expect(describeSimulatedMovement(fx([]))).toBeUndefined();
+  });
+});
+
+describe('describeRootApproval', () => {
+  const approval = (over: Record<string, unknown> = {}) => ({
+    owner: USER,
+    spender: SUBSCRIPTION,
+    asset: {
+      code: 'USDC',
+      contractId: 'CAQCFVLOBK5GIULPNZRGATJJMIZL5BSP7X5YJVMGCPTUEPFM4AVSRCJU',
+      decimals: 7,
+    },
+    amount: '600000000',
+    amountScaled: '60.0000000',
+    expirationLedger: 1_000_000 + 720, // one hour of ledgers
+    unlimited: false,
+    opIndex: 0,
+    depth: 0,
+    ...over,
+  });
+  const fx = (ap: ReturnType<typeof approval>, extra: Record<string, unknown> = {}) =>
+    ({
+      effects: [
+        { kind: 'token_approve', opIndex: 0, counterparty: ap.spender, functionName: 'approve' },
+      ],
+      approvals: [ap],
+      deltas: [],
+      unverified: [],
+      signing: { user: USER },
+      source: null,
+      latestLedger: 1_000_000,
+      ...extra,
+    }) as unknown as EffectSet;
+
+  it('unlimited: says any amount', () => {
+    expect(
+      describeRootApproval(
+        fx(approval({ unlimited: true, expirationLedger: 1_000_000 + 17_280 * 30 })),
+      ),
+    ).toBe(
+      'This lets CDQZ...DX4M spend any amount of your USDC for about 30 days, without asking you again. Only continue if you trust it.',
+    );
+  });
+
+  it('short expiries read in hours; no ledger, no duration', () => {
+    expect(describeRootApproval(fx(approval()))).toContain(
+      'up to 60 USDC from your account for about 1 hour,',
+    );
+    expect(describeRootApproval(fx(approval(), { latestLedger: undefined }))).toBe(
+      'This lets CDQZ...DX4M spend up to 60 USDC from your account, without asking you again. Only continue if you trust it.',
+    );
+  });
+
+  it('zero amount reads as removing the permission', () => {
+    expect(describeRootApproval(fx(approval({ amount: '0', amountScaled: '0.0000000' })))).toBe(
+      'This removes CDQZ...DX4M’s permission to spend your USDC. Only continue if you trust it.',
+    );
+  });
+
+  it('unknown decimals: no amount is shown', () => {
+    expect(describeRootApproval(fx(approval({ amountScaled: null })))).toContain(
+      'spend some of your USDC (Lantern can’t read this token’s decimals, so the amount isn’t shown)',
+    );
+  });
+
+  it('only for one approve by the signing user', () => {
+    expect(describeRootApproval(fx(approval({ owner: RECIPIENT_60 })))).toBeUndefined();
+    expect(describeRootApproval(fx(approval({ depth: 1 })))).toBeUndefined();
+    const two = fx(approval()) as unknown as { effects: unknown[] };
+    two.effects.push({ kind: 'payment', opIndex: 1 });
+    expect(describeRootApproval(two as unknown as EffectSet)).toBeUndefined();
+  });
+
+  it('not when the approve also moves your funds, or makes another call (review F1 on #298)', () => {
+    // A contract with an approve(address, address, i128, u32) signature that
+    // also pulls the user's USDC in a nested authorised call.
+    const pulls = fx(approval(), {
+      deltas: [
+        {
+          address: USER,
+          asset: { code: 'USDC', decimals: 7 },
+          direction: 'out',
+          amount: '5000.0000000',
+          bound: 'exact',
+          opIndex: 0,
+          depth: 1,
+        },
+      ],
+    });
+    expect(describeRootApproval(pulls)).toBeUndefined();
+    const calls = fx(approval(), { unverified: [{ contractId: SPLITTER, functionName: 'x' }] });
+    expect(describeRootApproval(calls)).toBeUndefined();
+    const twice = fx(approval());
+    (twice as unknown as { approvals: unknown[] }).approvals.push(approval({ depth: 1 }));
+    expect(describeRootApproval(twice)).toBeUndefined();
   });
 });

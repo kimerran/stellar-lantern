@@ -514,6 +514,7 @@ export function effects(
     observedNet: aggregate(observed),
     coverage: covered ? 'full' : 'partial',
     ...(fallbackSource ? { signing: signingRequirements(decoded, fallbackSource) } : {}),
+    ...(simulation.latestLedger !== undefined ? { latestLedger: simulation.latestLedger } : {}),
   };
 }
 

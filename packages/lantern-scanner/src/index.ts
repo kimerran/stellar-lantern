@@ -140,6 +140,7 @@ export {
   createHostedExplainer,
   explainRulesBased,
   describeSimulatedMovement,
+  describeRootApproval,
   buildPrompt,
   sanitise,
   contradictsVerdict,

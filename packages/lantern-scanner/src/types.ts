@@ -488,6 +488,9 @@ export interface EffectSet {
   // only so hand-built EffectSets stay valid; `effects()` sets it whenever the
   // transaction decoded.
   signing?: SigningRequirements;
+  // The ledger the simulation ran at, when it reported one: lets the
+  // explainer turn an approval's expiration ledger into a duration (#294).
+  latestLedger?: number;
 }
 
 // Stage 4 — Screen. Three outcomes, never two: a registry that could not be
