@@ -28,6 +28,7 @@ import type {
   NetDelta,
   ScanAction,
 } from './types';
+import { assetKey } from './effects';
 import { explainTransaction } from './explainer';
 import { formatAmount, truncateAddress } from './format';
 import type { DecodedTx } from './types';
@@ -317,8 +318,70 @@ export const explainRulesBased: Explainer = async ({ effects }: ExplainInput) =>
   explainTransaction(
     effects.source as DecodedTx | null,
     effects.signing?.user,
-    describeSimulatedMovement(effects),
+    describeContractCall(effects),
   );
+
+// What the simulation and the auth tree say about an undecoded contract call,
+// in the order a reader needs it: contracts it creates (#305), money it moves
+// (#294), then a transfer you authorise that the net movement hides (#305).
+function describeContractCall(effects: DeepReadonly<EffectSet>): string | undefined {
+  const parts = [
+    describeCreatedContracts(effects),
+    describeSimulatedMovement(effects),
+    describeAuthorisedTransfers(effects),
+  ].filter((p): p is string => !!p);
+  return parts.length ? parts.join(' ') : undefined;
+}
+
+// A contract call that creates contracts says so, and how many (#305). From
+// the simulation's ledger writes (new contract instance entries), so it never
+// guesses from the call's arguments; who administers them isn't claimed.
+export function describeCreatedContracts(effects: DeepReadonly<EffectSet>): string | undefined {
+  if (!effects.effects.some((e) => e.kind === 'contract_call')) return undefined;
+  const n = effects.createdContracts?.length ?? 0;
+  if (n === 0) return undefined;
+  return `In the simulation, this creates ${n === 1 ? 'a new contract' : `${n} new contracts`}.`;
+}
+
+// A transfer out of your account that the auth tree decodes, named even when
+// the simulated net movement is zero (#305): a deposit whose funds come back
+// to you still has you authorise sending them first. Skipped per asset when
+// the movement sentence already says you send it, so nothing is said twice.
+export function describeAuthorisedTransfers(effects: DeepReadonly<EffectSet>): string | undefined {
+  if (!effects.effects.some((e) => e.kind === 'contract_call')) return undefined;
+  const me = effects.signing?.user ?? effects.source?.source;
+  if (!me) return undefined;
+  const shownOut = new Set(
+    effects.observedNet
+      .filter((n) => n.address === me && positive(n.out))
+      .map((n) => assetKey(n.asset)),
+  );
+  const parts: string[] = [];
+  const d = effects.deltas;
+  for (let i = 0; i < d.length; i++) {
+    const x = d[i]!;
+    if (x.source !== 'token' || x.direction !== 'out' || x.address !== me) continue;
+    if (shownOut.has(assetKey(x.asset))) continue;
+    // A token `transfer` records its two sides back to back (token.ts).
+    const next = d[i + 1];
+    const to =
+      next &&
+      next.source === 'token' &&
+      next.direction === 'in' &&
+      next.raw === x.raw &&
+      next.depth === x.depth &&
+      next.opIndex === x.opIndex
+        ? next.address
+        : undefined;
+    const bound = x.bound === 'max' ? 'up to ' : x.bound === 'min' ? 'at least ' : '';
+    const amount =
+      x.amount === null
+        ? `an amount of ${codeOf(x)} Lantern can’t size`
+        : `${bound}${formatAmount(x.amount)} ${codeOf(x)}`;
+    parts.push(`sending ${amount}${to ? ` to ${truncateAddress(to, 4, 4)}` : ''}`);
+  }
+  return parts.length ? `You authorise ${joinList(parts)}.` : undefined;
+}
 
 // Soroban closes a ledger about every 5 seconds.
 const SECONDS_PER_LEDGER = 5;
@@ -423,7 +486,7 @@ function amountOf(n: DeepReadonly<NetDelta>, side: 'in' | 'out'): string {
   return `${bound}${formatAmount(side === 'in' ? n.in : n.out)} ${codeOf(n)}`;
 }
 
-function codeOf(n: DeepReadonly<NetDelta>): string {
+function codeOf(n: DeepReadonly<Pick<NetDelta, 'asset'>>): string {
   return (
     n.asset.code || (n.asset.contractId ? truncateAddress(n.asset.contractId, 4, 4) : 'tokens')
   );

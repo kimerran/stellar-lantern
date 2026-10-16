@@ -105,6 +105,7 @@ const CORPUS = [
   'paiflow-live-splitter-distribute',
   'paiflow-live-streamer-top-up',
   'paiflow-live-token-approve',
+  'paiflow-deploy-pipeline-fresh',
 ];
 
 describe('fixture corpus', () => {
@@ -134,6 +135,7 @@ describe('fixture corpus', () => {
         'paiflow-live-splitter-distribute',
         'paiflow-live-streamer-top-up',
         'paiflow-live-token-approve',
+        'paiflow-deploy-pipeline-fresh',
       ];
       if (soroban.includes(name)) expect(f.simulation).not.toBeNull();
       else expect(f.simulation).toBeNull();

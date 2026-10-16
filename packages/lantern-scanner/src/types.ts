@@ -491,6 +491,10 @@ export interface EffectSet {
   // The ledger the simulation ran at, when it reported one: lets the
   // explainer turn an approval's expiration ledger into a duration (#294).
   latestLedger?: number;
+  // Contracts the simulation proved this transaction creates: a contract
+  // instance entry it would write that didn't exist before (#305). Absent
+  // when there are none, or without a simulation.
+  createdContracts?: string[];
 }
 
 // Stage 4 — Screen. Three outcomes, never two: a registry that could not be

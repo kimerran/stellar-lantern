@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
+  describeAuthorisedTransfers,
+  describeCreatedContracts,
   describeRootApproval,
   describeSimulatedMovement,
   runPipeline,
@@ -69,7 +71,9 @@ const moved = (r: ScanResult, address: string) =>
 
 describe('Paiflow envelopes', () => {
   it('are on disk, with the user as source and a successful simulation', () => {
-    const ours = Object.keys(byName).filter((n) => !n.startsWith('paiflow-live-'));
+    const ours = Object.keys(byName).filter(
+      (n) => !n.startsWith('paiflow-live-') && n !== 'paiflow-deploy-pipeline-fresh',
+    );
     expect(ours.sort()).toEqual([
       'paiflow-pipeline-deposit',
       'paiflow-splitter-distribute',
@@ -392,5 +396,131 @@ describe("Paiflow's live samples (pinkraft#1022)", () => {
     expect(r.explanation).toBe(
       'This lets CCKH...GPP5 spend up to 0.0000001 XLM from your account for about 180 days, without asking you again. Only continue if you trust it.',
     );
+  });
+});
+
+// #305: what the review adds for a call that creates contracts, and for a
+// transfer you authorise that the simulated net movement hides.
+describe('contracts created and transfers authorised (#305)', () => {
+  it('fresh deploy_pipeline: says it creates 2 new contracts, verdict unchanged', async () => {
+    const r = await scanFixture('paiflow-deploy-pipeline-fresh');
+    expect(r.effects.createdContracts).toHaveLength(2);
+    expect(r.explanation).toBe(
+      'This calls “deploy_pipeline” on a smart contract (CBFZ...ZJNK) that may move funds or change permissions. ' +
+        'In the simulation, this creates 2 new contracts. Only continue if you trust it.',
+    );
+    expect([r.risk, r.action]).toEqual(['medium', 'warn']);
+  });
+
+  it('live deposit: names the 0.1 XLM you authorise into the trigger, verdict unchanged', async () => {
+    const r = await scanFixture('paiflow-live-deposit');
+    expect(r.explanation).toBe(
+      'Deposits funds — calls “deposit” on a smart contract (CAIC...TFTL). ' +
+        'You authorise sending 0.1 XLM to CAIC...TFTL. Only continue if you trust it.',
+    );
+    expect([r.risk, r.action]).toEqual(['medium', 'warn']);
+  });
+
+  it('the reverted live deploy creates nothing: no ledger writes, no claim', async () => {
+    const r = await scanFixture('paiflow-live-factory-deploy-pipeline');
+    expect(r.effects.createdContracts).toBeUndefined();
+    expect(r.explanation).not.toContain('creates');
+  });
+
+  it('our own deposit already says "you send": the authorised transfer is not repeated', async () => {
+    const r = await scanFixture('paiflow-pipeline-deposit');
+    expect(r.explanation).not.toContain('You authorise');
+  });
+
+  const ME5 = 'GAMNECU4TYT4H7IBKGFXKJW3YACZSZTQUF2NOZSZECMYQ72RSB7USRNK';
+  const TO = 'CAICBJOPVUT6F5RK4QQO5ZNMPNGQH6N33KZG722EXCH7GJD4UXDETFTL';
+  const xlm = { code: 'XLM', decimals: 7 };
+  const d = (address: string, direction: 'in' | 'out', amount: string | null, extra = {}) => ({
+    address,
+    direction,
+    asset: xlm,
+    amount,
+    raw: '1000000',
+    bound: 'exact',
+    opIndex: 0,
+    depth: 1,
+    source: 'token',
+    ...extra,
+  });
+  const fx5 = (over: Record<string, unknown>) =>
+    ({
+      effects: [{ kind: 'contract_call', opIndex: 0, counterparty: TO }],
+      deltas: [],
+      observedNet: [],
+      signing: { user: ME5 },
+      source: null,
+      ...over,
+    }) as unknown as EffectSet;
+
+  it('describeCreatedContracts: one, many, none, and only for a contract call', () => {
+    expect(describeCreatedContracts(fx5({ createdContracts: [TO] }))).toBe(
+      'In the simulation, this creates a new contract.',
+    );
+    expect(describeCreatedContracts(fx5({ createdContracts: [TO, 'CB', 'CC'] }))).toBe(
+      'In the simulation, this creates 3 new contracts.',
+    );
+    expect(describeCreatedContracts(fx5({}))).toBeUndefined();
+    expect(
+      describeCreatedContracts(
+        fx5({
+          createdContracts: [TO],
+          effects: [{ kind: 'token_transfer', opIndex: 0, counterparty: TO }],
+        }),
+      ),
+    ).toBeUndefined();
+  });
+
+  it('describeAuthorisedTransfers: names the receiver, sizes or refuses to size, and stays quiet otherwise', () => {
+    const pair = [d(ME5, 'out', '0.1000000'), d(TO, 'in', '0.1000000')];
+    expect(describeAuthorisedTransfers(fx5({ deltas: pair }))).toBe(
+      'You authorise sending 0.1 XLM to CAIC...TFTL.',
+    );
+    // Unknown decimals: no base units, but not dropped either.
+    const unsized = [
+      d(ME5, 'out', null, { asset: { code: 'ABC', decimals: null } }),
+      d(TO, 'in', null, { asset: { code: 'ABC', decimals: null } }),
+    ];
+    expect(describeAuthorisedTransfers(fx5({ deltas: unsized }))).toBe(
+      'You authorise sending an amount of ABC Lantern can’t size to CAIC...TFTL.',
+    );
+    // A burn has no receiver.
+    expect(describeAuthorisedTransfers(fx5({ deltas: [d(ME5, 'out', '2.0000000')] }))).toBe(
+      'You authorise sending 2 XLM.',
+    );
+    // The simulation already shows what you send: nothing to add.
+    expect(
+      describeAuthorisedTransfers(
+        fx5({
+          deltas: pair,
+          observedNet: [{ address: ME5, asset: xlm, in: '0', out: '0.1000000' }],
+        }),
+      ),
+    ).toBeUndefined();
+    // A round trip in another asset is still named when you send XLM net.
+    const usdc = {
+      code: 'USDC',
+      issuer: 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5',
+      decimals: 7,
+    };
+    expect(
+      describeAuthorisedTransfers(
+        fx5({
+          deltas: [
+            d(ME5, 'out', '100.0000000', { asset: usdc, raw: '1000000000' }),
+            d(TO, 'in', '100.0000000', { asset: usdc, raw: '1000000000' }),
+          ],
+          observedNet: [{ address: ME5, asset: xlm, in: '0', out: '1.0000000' }],
+        }),
+      ),
+    ).toBe('You authorise sending 100 USDC to CAIC...TFTL.');
+    // Someone else's transfer isn't yours to authorise.
+    expect(
+      describeAuthorisedTransfers(fx5({ deltas: [d(TO, 'out', '1.0000000')] })),
+    ).toBeUndefined();
   });
 });
