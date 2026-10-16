@@ -35,6 +35,10 @@ export const FLAG_DEFS = {
   // promise for the builds it is on in — OFF by default, and must be off in
   // any store submission.
   telemetryIdentity: { envVar: 'VITE_FEATURE_TELEMETRY_IDENTITY', literal: '__FEATURE_TELEMETRY_IDENTITY__', default: false },
+  // Web connect (#246/#248): web pages can reach the extension through
+  // window.lantern. OFF by default until the slices are done and #247's terms
+  // are met; a flag-off build has no content scripts and no page API at all.
+  webConnect: { envVar: 'VITE_FEATURE_WEB_CONNECT', literal: '__FEATURE_WEB_CONNECT__', default: false },
 } as const satisfies Record<string, FlagDef>;
 
 export type FlagKey = keyof typeof FLAG_DEFS;
