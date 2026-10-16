@@ -181,7 +181,7 @@
 <tr>
 <td><code>not_allowed</code></td>
 <td>The site isn't connected, or Lantern is on Mainnet.</td>
-<td>Call <code>requestAccess()</code>.</td>
+<td>Call <code>requestAccess()</code>. If that also fails with <code>not_allowed</code>, Lantern is on Mainnet: ask the user to switch to Testnet.</td>
 </tr>
 <tr>
 <td><code>account_mismatch</code></td>
@@ -225,7 +225,7 @@
 </tr>
 </tbody>
 </table></div><h2>Stellar Wallets Kit</h2>
-<p>Most Stellar dApps get their wallet list from <a href="https://github.com/Creit-Tech/Stellar-Wallets-Kit" target="_blank" rel="noopener">Stellar Wallets Kit</a>. Lantern's module is a single file with no imports, MIT-licensed, at <code>packages/lantern-wallets-kit-module/src/lantern.module.ts</code> in the Lantern repository. Copy it into your app until it's upstream. It works with kit 1.x (tested on 1.9.5) and 2.x (typed against 2.7.0).</p>
+<p>Most Stellar dApps get their wallet list from <a href="https://github.com/Creit-Tech/Stellar-Wallets-Kit" target="_blank" rel="noopener">Stellar Wallets Kit</a>. Lantern's module is a single file with no imports, MIT-licensed: <a href="https://github.com/kimerran/stellar-lantern/blob/main/packages/lantern-wallets-kit-module/src/lantern.module.ts" target="_blank" rel="noopener"><code>lantern.module.ts</code></a> in Lantern's public repository. It's published there with the first release that includes connecting; until then, ask the Lantern team for a copy. Copy it into your app until it's upstream in the kit. It works with kit 1.x (tested on 1.9.5) and 2.x (typed against 2.7.0).</p>
 <pre><code class="language-ts">import { StellarWalletsKit, WalletNetwork, FreighterModule, FREIGHTER_ID } from '@creit.tech/stellar-wallets-kit';
 import { LanternModule } from './lantern.module';
 

@@ -84,7 +84,7 @@ How long a call waits before it rejects with `timeout`:
 | `code` | When | Suggested handling |
 |---|---|---|
 | `user_rejected` | The user said no, or closed Lantern's window. `message` is always `User rejected the request`. | Treat as cancelled. Don't retry on your own. |
-| `not_allowed` | The site isn't connected, or Lantern is on Mainnet. | Call `requestAccess()`. |
+| `not_allowed` | The site isn't connected, or Lantern is on Mainnet. | Call `requestAccess()`. If that also fails with `not_allowed`, Lantern is on Mainnet: ask the user to switch to Testnet. |
 | `account_mismatch` | `address` isn't the connected account. | Call `getAddress()` and rebuild the transaction. |
 | `network_mismatch` | The passphrase isn't Lantern's network. | Ask the user to switch networks in Lantern. |
 | `invalid_request` | Malformed call, undecodable XDR, fee bump, or not this account's transaction. | Fix the request. |
@@ -96,7 +96,7 @@ How long a call waits before it rejects with `timeout`:
 
 ## Stellar Wallets Kit
 
-Most Stellar dApps get their wallet list from [Stellar Wallets Kit](https://github.com/Creit-Tech/Stellar-Wallets-Kit). Lantern's module is a single file with no imports, MIT-licensed, at `packages/lantern-wallets-kit-module/src/lantern.module.ts` in the Lantern repository. Copy it into your app until it's upstream. It works with kit 1.x (tested on 1.9.5) and 2.x (typed against 2.7.0).
+Most Stellar dApps get their wallet list from [Stellar Wallets Kit](https://github.com/Creit-Tech/Stellar-Wallets-Kit). Lantern's module is a single file with no imports, MIT-licensed: [`lantern.module.ts`](https://github.com/kimerran/stellar-lantern/blob/main/packages/lantern-wallets-kit-module/src/lantern.module.ts) in Lantern's public repository. It's published there with the first release that includes connecting; until then, ask the Lantern team for a copy. Copy it into your app until it's upstream in the kit. It works with kit 1.x (tested on 1.9.5) and 2.x (typed against 2.7.0).
 
 ```ts
 import { StellarWalletsKit, WalletNetwork, FreighterModule, FREIGHTER_ID } from '@creit.tech/stellar-wallets-kit';
