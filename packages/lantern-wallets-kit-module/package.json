@@ -1,0 +1,16 @@
+{
+  "name": "@lantern/wallets-kit-module",
+  "version": "0.1.0",
+  "description": "Lantern for Stellar Wallets Kit: a wallet module that lists Lantern in a dApp's wallet picker.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/lantern.module.ts"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "sideEffects": false
+}
