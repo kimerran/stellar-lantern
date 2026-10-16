@@ -198,14 +198,66 @@ describe('connect through the approval window', () => {
     expect((await page({ type: 'WC_NEXT' })).data).toMatchObject({ pending: 1 });
   });
 
-  it('a request that arrives as the window closes is not rejected unseen', async () => {
+  it('a request that arrives after the window found the queue empty keeps its place', async () => {
+    const p = port();
+    p.msg!({ id: 'r0', method: 'requestAccess' });
+    await flush();
+    const first = await page({ type: 'WC_NEXT' });
+    await page({
+      type: 'WC_DECIDE',
+      entryId: (first.data as { entryId: string }).entryId,
+      approve: false,
+    });
+    // The window asks again, finds nothing, and closes itself…
+    expect((await page({ type: 'WC_NEXT' })).data).toBeNull();
+    // …and a new request lands before the close is reported.
+    p.msg!({ id: 'r1', method: 'requestAccess' });
+    await flush();
+    hooks.windowRemoved!(100);
+    await flush();
+    expect(p.posted).toEqual([
+      {
+        id: 'r0',
+        ok: false,
+        error: { code: 'user_rejected', message: 'User rejected the request' },
+      },
+    ]);
+    expect(windowsCreated).toHaveLength(2);
+    expect((await page({ type: 'WC_NEXT' })).data).toMatchObject({ pending: 1 });
+  });
+
+  it('closing the window from the Unlock screen (nothing fetched yet) rejects the request', async () => {
     const p = port();
     p.msg!({ id: 'r1', method: 'requestAccess' });
     await flush();
-    hooks.windowRemoved!(100); // closed before the window ever fetched r1
+    hooks.windowRemoved!(100); // locked: the window showed Unlock and never asked WC_NEXT
     await flush();
-    expect(p.posted).toEqual([]);
-    expect(windowsCreated).toHaveLength(2);
+    expect(p.posted).toEqual([
+      {
+        id: 'r1',
+        ok: false,
+        error: { code: 'user_rejected', message: 'User rejected the request' },
+      },
+    ]);
+    expect(windowsCreated).toHaveLength(1);
+  });
+
+  it('Reset Wallet tells only the sites that were connected', async () => {
+    const connected = port(SITE, 1);
+    const stranger = port('https://other.example', 2);
+    connected.msg!({ id: 'r1', method: 'requestAccess' });
+    await flush();
+    const { data } = await page({ type: 'WC_NEXT' });
+    await page({
+      type: 'WC_DECIDE',
+      entryId: (data as { entryId: string }).entryId,
+      approve: true,
+    });
+    await flush();
+    await page({ type: 'RESET_WALLET' });
+    await flush();
+    expect(connected.posted.at(-1)).toEqual({ event: 'change', data: { reason: 'account' } });
+    expect(stranger.posted).toEqual([]);
   });
 
   it('a fourth waiting request from one site is answered busy', async () => {

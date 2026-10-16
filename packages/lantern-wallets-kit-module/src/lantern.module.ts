@@ -40,6 +40,7 @@ interface LanternApi {
     opts?: { networkPassphrase?: string; address?: string },
   ): Promise<unknown>;
   on(event: 'change', cb: (data: Record<string, unknown>) => void): void;
+  off(event: 'change', cb: (data: Record<string, unknown>) => void): void;
 }
 
 /** The kit's error shape: `{ code, message, ext? }`, as its parseError builds it. */
@@ -76,6 +77,9 @@ export class LanternModule {
   productName = 'Lantern';
   productUrl = 'https://golantern.xyz';
   productIcon = 'https://golantern.xyz/wallet-icon.png';
+  // The window.lantern listener onChange registered, so a second call
+  // replaces it instead of adding another.
+  private changeListener?: () => void;
 
   private api(): LanternApi {
     const api = lantern();
@@ -130,7 +134,7 @@ export class LanternModule {
   ): Promise<{ signedTxXdr: string; signerAddress?: string }> {
     if (opts?.submit) {
       throw {
-        code: -3,
+        code: -1,
         message: 'Lantern signs only; submit the transaction yourself.',
         ext: 'unsupported',
       } satisfies KitError;
@@ -200,12 +204,14 @@ export class LanternModule {
   ): void {
     const api = lantern();
     if (!api) return;
-    api.on('change', () => {
+    if (this.changeListener) api.off('change', this.changeListener);
+    this.changeListener = () => {
       void Promise.all([api.getAddress(), api.getNetwork()]).then(
         ([{ address }, { network, networkPassphrase }]) =>
           callback({ address, network, networkPassphrase }),
         (e) => callback({ address: '', network: '', networkPassphrase: '', error: toKitError(e) }),
       );
-    });
+    };
+    api.on('change', this.changeListener);
   }
 }

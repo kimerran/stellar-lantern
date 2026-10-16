@@ -36,12 +36,14 @@ let api: {
   | 'signTransaction'
   | 'signAuthEntry'
   | 'signMessage'
-  | 'on',
+  | 'on'
+  | 'off',
   Fn
 >;
-let changeCb: (() => void) | undefined;
+const changeCbs = new Set<() => void>();
+const fireChange = () => changeCbs.forEach((cb) => cb());
 beforeEach(() => {
-  changeCb = undefined;
+  changeCbs.clear();
   api = {
     isLantern: true,
     apiVersion: 1,
@@ -65,7 +67,8 @@ beforeEach(() => {
         'This version of Lantern does not support that request yet',
       );
     }),
-    on: vi.fn((_e: string, cb: () => void) => (changeCb = cb)),
+    on: vi.fn((_e: string, cb: () => void) => void changeCbs.add(cb)),
+    off: vi.fn((_e: string, cb: () => void) => void changeCbs.delete(cb)),
   };
   (globalThis as Record<string, unknown>).window = { lantern: api };
 });
@@ -127,7 +130,7 @@ describe('LanternModule', () => {
   it('refuses submit: Lantern signs only', async () => {
     await expect(
       new LanternModule().signTransaction('XDR', { submit: true }),
-    ).rejects.toMatchObject({ code: -3, ext: 'unsupported' });
+    ).rejects.toMatchObject({ code: -1, ext: 'unsupported' });
     expect(api.signTransaction).not.toHaveBeenCalled();
   });
 
@@ -176,12 +179,12 @@ describe('LanternModule', () => {
   it('onChange (kit 2.x) reports the new account and network, or the error after a disconnect', async () => {
     const events: unknown[] = [];
     new LanternModule().onChange((e) => events.push(e));
-    changeCb!();
+    fireChange();
     await new Promise((r) => setTimeout(r, 0));
     api.getAddress.mockRejectedValueOnce(
       new FakeLanternError('not_allowed', 'This site is not connected to Lantern'),
     );
-    changeCb!();
+    fireChange();
     await new Promise((r) => setTimeout(r, 0));
     expect(events).toEqual([
       {
@@ -196,5 +199,18 @@ describe('LanternModule', () => {
         error: { code: -3, message: 'This site is not connected to Lantern', ext: 'not_allowed' },
       },
     ]);
+  });
+
+  it('a second onChange replaces the first listener instead of adding one', async () => {
+    const m = new LanternModule();
+    const first = vi.fn();
+    const second = vi.fn();
+    m.onChange(first);
+    m.onChange(second);
+    expect(changeCbs.size).toBe(1);
+    fireChange();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledTimes(1);
   });
 });
