@@ -112,6 +112,39 @@ console.log('Building with VITE_FEATURE_SCANNER_AI=false …');
 buildScannerAi(false);
 const scannerOffHas = bundleHas('/v1/explain') || bundleHas(SCANNER_API);
 
+// Web connect (#248): with the flag off, the extension has no content scripts
+// and no web-connect code at all: no "read and change all your data on all
+// websites" permission, and nothing a web page could reach. With it on, both
+// scripts are in the manifest and the page script is a standalone file (no
+// runtime import a page's CSP could block).
+const WEB_CONNECT_MARKER = 'lantern-webconnect';
+function buildWebConnect(on) {
+  execSync('npx vite build', {
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      VITE_FEATURE_DEMO_AFFORDANCES: 'false',
+      VITE_FEATURE_WEB_CONNECT: on ? 'true' : 'false',
+    },
+  });
+}
+const manifestContentScripts = () =>
+  JSON.parse(readFileSync(join(DIST, 'manifest.json'), 'utf8')).content_scripts ?? [];
+
+console.log('Building with VITE_FEATURE_WEB_CONNECT=true …');
+buildWebConnect(true);
+const wcOnScripts = manifestContentScripts();
+const wcPage = wcOnScripts.find((c) => c.world === 'MAIN')?.js?.[0];
+const wcOnHas =
+  wcOnScripts.length === 2 &&
+  bundleHas(WEB_CONNECT_MARKER) &&
+  !!wcPage &&
+  !readFileSync(join(DIST, wcPage), 'utf8').includes('import(');
+
+console.log('Building with VITE_FEATURE_WEB_CONNECT=false …');
+buildWebConnect(false);
+const wcOffHas = manifestContentScripts().length > 0 || bundleHas(WEB_CONNECT_MARKER);
+
 // Leave dist/ in the default (flag-off) state.
 build(false);
 
@@ -198,6 +231,18 @@ if (!scannerOnHas) {
   failed = true;
 } else {
   console.log('✓ explainer endpoint present with SCANNER_AI=true (sanity check).');
+}
+if (wcOffHas) {
+  console.error('✗ FAIL: web connect (content scripts or the page API) is in the build with WEB_CONNECT=false.');
+  failed = true;
+} else {
+  console.log('✓ web connect ABSENT with WEB_CONNECT=false (no content scripts, no page API).');
+}
+if (!wcOnHas) {
+  console.error('✗ FAIL: with WEB_CONNECT=true, expected two content scripts and a standalone page script (no import()).');
+  failed = true;
+} else {
+  console.log('✓ web connect present with WEB_CONNECT=true: relay + standalone MAIN-world page script.');
 }
 if (offHas) {
   console.error(

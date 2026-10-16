@@ -114,7 +114,7 @@ What it costs:
 
 ## Slices this binds
 
-- **#248:** the sender check on the existing listener (extension id and extension-origin URL, not `sender.tab`), a separate port, the build flag, the relay and the main-world script, plus the Settings switch.
+- **#248:** the sender check on the existing listener (extension id and extension-origin URL, not `sender.tab`), a separate port, the build flag, the relay and the main-world script. The Settings switch moves to #250, beside Connected sites: hiding `window.lantern` needs the content scripts registered at runtime, which belongs with the per-site controls.
 - **#249:** the approval window, focus delay, per-origin cap of 3, and tab-close cleanup.
 - **#250:** grants per origin, network and account; `not_allowed` without leaking state; directory chip versus Unverified.
 - **#252:** sign-only; body and existing signatures kept; network and account checks before any window; fail closed.

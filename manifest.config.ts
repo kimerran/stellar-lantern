@@ -2,7 +2,8 @@ import { defineManifest } from '@crxjs/vite-plugin';
 import { version } from './package.json';
 import { EXTENSION_PUBLIC_KEY } from './src/shared/origin';
 
-// MV3 manifest. Minimal permissions per SPEC §8 / AGENT §5: only `storage`,
+// MV3 manifest. Minimal permissions per SPEC §8 / AGENT §5 (a web-connect
+// build also gets content scripts on https pages: manifest.webconnect.ts): only `storage`,
 // and host access limited to the Stellar endpoints (Horizon, friendbot and the
 // testnet Soroban RPC the scanner simulates and screens against) plus ONE
 // origin of our own — the Lantern API on Railway, which the opt-in telemetry
