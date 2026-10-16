@@ -4,7 +4,12 @@ import { handle, lock } from '@core/session/handler';
 import { bootTelemetry } from '@core/telemetry';
 import { APP_VERSION } from '@shared/version';
 import { isExtensionSender } from '@core/webconnect/protocol';
-import { listenForWebConnect } from './webconnect';
+import {
+  afterWalletMessage,
+  handleWebConnectPage,
+  isWebConnectPageRequest,
+  listenForWebConnect,
+} from './webconnect';
 
 // Telemetry (#87): the service worker signs and submits (tx_signed), so it
 // needs its own consent-gated sink. No session_start here — the popup owns
@@ -31,7 +36,18 @@ chrome.runtime.onMessage.addListener((req: Request, sender, sendResponse) => {
     sendResponse({ ok: false, error: 'Not allowed', code: 'VALIDATION' });
     return false;
   }
-  telemetryReady.then(() => handle(req)).then(sendResponse);
+  if (__FEATURE_WEB_CONNECT__ && isWebConnectPageRequest(req)) {
+    void handleWebConnectPage(req).then(sendResponse);
+    return true;
+  }
+  const handled = telemetryReady.then(() => handle(req));
+  handled.then(sendResponse);
+  // Tell connected sites when the account changed (#251).
+  if (__FEATURE_WEB_CONNECT__) {
+    void handled.then((res) => {
+      if (res.ok) void afterWalletMessage(req);
+    });
+  }
   return true; // keep the message channel open for the async response
 });
 

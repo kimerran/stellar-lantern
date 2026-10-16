@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import type { Request } from '@shared/messages';
+import { __setKV } from '@shared/kv';
 
 // The background worker's privileged listener (#247/#248): once web connect
 // adds content scripts, a web page's script can call chrome.runtime.sendMessage
@@ -21,6 +22,7 @@ interface FakePort {
   sender: unknown;
   posted: unknown[];
   onMessage: { addListener: (cb: (m: unknown) => void) => void };
+  onDisconnect: { addListener: (cb: () => void) => void };
   postMessage: (m: unknown) => void;
   deliver: (m: unknown) => void;
 }
@@ -38,7 +40,16 @@ beforeAll(async () => {
       onStartup: { addListener: () => {} },
       onInstalled: { addListener: () => {} },
     },
+    windows: { onRemoved: { addListener: () => {} } },
+    tabs: { onRemoved: { addListener: () => {} } },
+    storage: { onChanged: { addListener: () => {} } },
   };
+  const data = new Map<string, string>();
+  __setKV({
+    get: async (k) => data.get(k) ?? null,
+    set: async (k, v) => void data.set(k, v),
+    remove: async (k) => void data.delete(k),
+  });
   await import('../src/background/index');
 });
 
@@ -114,6 +125,7 @@ function fakePort(sender: unknown, name = 'lantern-webconnect'): FakePort {
     sender,
     posted: [],
     onMessage: { addListener: (f) => (cb = f) },
+    onDisconnect: { addListener: () => {} },
     postMessage: (m) => port.posted.push(m),
     deliver: (m) => cb(m),
   };

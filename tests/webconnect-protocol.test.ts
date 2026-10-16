@@ -14,7 +14,6 @@ import {
   unwrapPageMessage,
   webConnectOrigin,
 } from '@core/webconnect/protocol';
-import { answerWebConnect, routeWebConnect } from '@core/webconnect/router';
 
 const EXT_ID = 'iflpkjgolcbleombhldiibhojohjpnmd';
 const EXT_ORIGIN = `chrome-extension://${EXT_ID}`;
@@ -238,43 +237,5 @@ describe('webConnectOrigin (who a web-connect port speaks for)', () => {
     expect(
       webConnectOrigin({ origin: 'http://evil.localhost.example', frameId: 0, tab }, true),
     ).toBeNull();
-  });
-});
-
-describe('routeWebConnect (slice 2: isConnected only)', () => {
-  const ctx = { origin: 'https://app.paiflow.xyz' };
-
-  it('answers isConnected with the API version', async () => {
-    expect(await routeWebConnect({ id: 'a', method: 'isConnected', params: {} }, ctx)).toEqual({
-      id: 'a',
-      ok: true,
-      result: { isConnected: true, apiVersion: 1 },
-    });
-  });
-
-  it('answers every other method `unsupported`, never a fake success', async () => {
-    for (const method of [
-      'requestAccess',
-      'getAddress',
-      'getNetwork',
-      'getNetworkDetails',
-      'signTransaction',
-      'signAuthEntry',
-      'signMessage',
-    ] as const) {
-      expect(await routeWebConnect({ id: 'a', method, params: {} }, ctx)).toMatchObject({
-        ok: false,
-        error: { code: 'unsupported' },
-      });
-    }
-  });
-
-  it('answers an invalid request with its id, and drops one with no id', async () => {
-    expect(await answerWebConnect({ id: 'a', method: 'nope' }, ctx)).toMatchObject({
-      id: 'a',
-      ok: false,
-      error: { code: 'invalid_request' },
-    });
-    expect(await answerWebConnect({ method: 'isConnected' }, ctx)).toBeNull();
   });
 });

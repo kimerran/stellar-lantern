@@ -28,7 +28,36 @@ export type Request =
   | { type: 'SIGN_ONLY'; xdr: string; networkPassphrase: string }
   | { type: 'SUBMIT_ONLY'; xdr: string; networkPassphrase: string; horizonUrl: string }
   | { type: 'SIGN_MESSAGE'; message: string }
-  | { type: 'RESET_WALLET' };
+  | { type: 'RESET_WALLET' }
+  // Web connect (#249/#250), extension only: the approval window reads the
+  // request on screen and decides it; Settings lists and revokes connected
+  // sites. Served by src/background/webconnect.ts, for Lantern pages only.
+  | { type: 'WC_NEXT' }
+  | { type: 'WC_DECIDE'; entryId: string; approve: boolean; result?: unknown }
+  | { type: 'WC_GRANTS' }
+  | { type: 'WC_REVOKE'; origin?: string };
+
+/** The web-connect request on screen in the approval window (WC_NEXT). */
+export interface WebConnectPending {
+  entryId: string;
+  kind: 'connect' | 'sign';
+  origin: string;
+  method: string;
+  params: Record<string, unknown>;
+  /** How many requests are waiting, this one included. */
+  pending: number;
+  address: string | null;
+  network: 'TESTNET' | 'PUBLIC';
+}
+
+/** A connected site (WC_GRANTS). */
+export interface WebConnectGrant {
+  origin: string;
+  address: string;
+  network: 'TESTNET' | 'PUBLIC';
+  grantedAt: number;
+  lastUsedAt: number;
+}
 
 // Every response is a Result so the UI can branch on success without try/catch.
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string; code?: ErrorCode };
@@ -59,6 +88,10 @@ export type ResponseMap = {
   SUBMIT_ONLY: { hash: string };
   SIGN_MESSAGE: { signature: string };
   RESET_WALLET: { ok: true };
+  WC_NEXT: WebConnectPending | null;
+  WC_DECIDE: { remaining: number };
+  WC_GRANTS: WebConnectGrant[];
+  WC_REVOKE: { ok: true };
 };
 
 export type ResponseFor<R extends Request> = Result<ResponseMap[R['type']]>;
