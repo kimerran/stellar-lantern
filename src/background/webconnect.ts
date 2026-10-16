@@ -46,6 +46,10 @@ const queue = new ApprovalQueue();
 const waiters = new Map<string, (res: WebConnectResponse) => void>();
 let approvalWindowId: number | null = null;
 let opening: Promise<void> | null = null;
+// When the approval window last found the queue empty (WC_NEXT → null), and
+// so closed itself. A request queued after that and never shown is the only
+// one that survives the window closing.
+let emptyAt: number | null = null;
 
 async function walletAddress(): Promise<string | null> {
   const res = (await handle({ type: 'GET_STATUS' })) as Result<{ address: string | null }>;
@@ -140,7 +144,7 @@ function emitChange(reason: 'account' | 'network' | 'revoke', origins?: Set<stri
   }
 }
 
-async function connectedOrigins(): Promise<Set<string>> {
+export async function connectedOrigins(): Promise<Set<string>> {
   return new Set((await listGrants()).map((g) => g.origin));
 }
 
@@ -157,7 +161,10 @@ export async function handleWebConnectPage(req: WebConnectPageRequest): Promise<
   switch (req.type) {
     case 'WC_NEXT': {
       const head = queue.head();
-      if (!head) return { ok: true, data: null };
+      if (!head) {
+        emptyAt = Date.now();
+        return { ok: true, data: null };
+      }
       head.shown = true;
       const net = await activeNetwork();
       return {
@@ -205,11 +212,19 @@ export async function handleWebConnectPage(req: WebConnectPageRequest): Promise<
   }
 }
 
-/** After a privileged wallet message: tell connected sites when the account changed. */
-export async function afterWalletMessage(req: Request): Promise<void> {
+/**
+ * After a privileged wallet message: tell connected sites when the account
+ * changed. A reset deletes every grant, so the caller reads the connected
+ * origins before it runs and passes them in; a site that never connected
+ * learns nothing.
+ */
+export async function afterWalletMessage(
+  req: Request,
+  connectedBefore?: Set<string>,
+): Promise<void> {
   if (req.type === 'CREATE_WALLET' || req.type === 'IMPORT_WALLET')
     emitChange('account', await connectedOrigins());
-  if (req.type === 'RESET_WALLET') emitChange('account');
+  if (req.type === 'RESET_WALLET') emitChange('account', connectedBefore ?? new Set());
 }
 
 // --- The port --------------------------------------------------------------
@@ -249,13 +264,19 @@ export function listenForWebConnect(): void {
     });
   });
 
-  // Closing the approval window rejects the request on screen. Anything still
-  // queued behind it gets the window back.
+  // Closing the approval window rejects the request at its head, including
+  // one the user dismissed from the Unlock screen (never fetched, so never
+  // `shown`). The one exception: a request that arrived after the window
+  // found the queue empty and closed itself was never in front of the user,
+  // so it keeps its place. Anything still queued gets the window back.
   chrome.windows.onRemoved.addListener((windowId) => {
     if (windowId !== approvalWindowId) return;
     approvalWindowId = null;
     const head = queue.head();
-    if (head?.shown) {
+    const arrivedAfterClose =
+      !!head && !head.shown && emptyAt !== null && head.createdAt >= emptyAt;
+    emptyAt = null;
+    if (head && !arrivedAfterClose) {
       queue.take(head.entryId);
       rejectEntry(head);
     }
@@ -282,5 +303,6 @@ export function __resetWebConnect(): void {
   while (queue.head()) queue.take(queue.head()!.entryId);
   approvalWindowId = null;
   opening = null;
+  emptyAt = null;
   nextPortId = 1;
 }
