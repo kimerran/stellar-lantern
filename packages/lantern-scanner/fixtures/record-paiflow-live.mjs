@@ -83,7 +83,13 @@ for (const sample of manifest.samples) {
   }
   const fixture = {
     name,
-    description: `${DESCRIPTIONS[sample.id]} From pinkraft#1022; executed on testnet as ${sample.transactionHashTestnet}.`,
+    // Only the samples Paiflow actually submitted say "executed": the
+    // distribute was simulated only (chainExecution is null in the manifest).
+    description: `${DESCRIPTIONS[sample.id]} From pinkraft#1022; ${
+      sample.chainExecution?.status === 'SUCCESS'
+        ? `executed on testnet as ${sample.transactionHashTestnet}`
+        : `simulated only, never submitted (transaction hash ${sample.transactionHashTestnet})`
+    }.`,
     networkPassphrase: PASSPHRASE,
     source: sample.source,
     recordedAt,

@@ -1,6 +1,6 @@
 {
   "name": "paiflow-live-splitter-distribute",
-  "description": "Paiflow trigger page, real sample: `distribute(from, 0.1 XLM)` on a splitter paying one recipient (the user). Paiflow's retained public simulation. From pinkraft#1022; executed on testnet as 0217cd1936cc6cc0b8b8b5b186895f3c3f98ab0cc3bac91bbab877cdf1fd190e.",
+  "description": "Paiflow trigger page, real sample: `distribute(from, 0.1 XLM)` on a splitter paying one recipient (the user). Paiflow's retained public simulation. From pinkraft#1022; simulated only, never submitted (transaction hash 0217cd1936cc6cc0b8b8b5b186895f3c3f98ab0cc3bac91bbab877cdf1fd190e).",
   "networkPassphrase": "Test SDF Network ; September 2015",
   "source": "GCDF6TFSMWXBK7DGO4AQ4WYBSTS5OHM6S4OJRG7MZ7V34AT2LYSOJNWZ",
   "recordedAt": "2026-10-15T16:50:13.330Z",
