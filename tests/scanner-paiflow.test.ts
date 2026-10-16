@@ -89,6 +89,9 @@ describe('Paiflow envelopes', () => {
     expect(r.risk).toBe('medium');
     expect(r.effects.effects[0]).toMatchObject({ counterparty: DEPOSIT, functionName: 'deposit' });
     expect(r.explanation).toContain('“deposit”');
+    // A pipeline trigger, not a lending pool: the wording must not guess (#294).
+    expect(r.explanation).toMatch(/^Deposits funds — calls “deposit”/);
+    expect(r.explanation).not.toMatch(/lending pool/i);
     expect(moved(r, USER)).toMatchObject({ out: '10.0000000' });
     expect(moved(r, RECIPIENT_60)).toMatchObject({ in: '6.0000000' });
     expect(moved(r, RECIPIENT_40)).toMatchObject({ in: '4.0000000' });
