@@ -65,6 +65,7 @@ Registry, read from the ledger on 30 September: **19 addresses reported, 30 repo
 ## Decisions
 
 - **Reporting from the playground is signed by the visitor's own wallet** (Albedo, Freighter, xBull or LOBSTR), not by Lantern's. A web page can't reach the Lantern extension, and a bridge into it would be exactly the surface wallet phishing attacks. Albedo runs in the browser, so reporting still needs nothing installed.
+  _Update, 16 October 2026:_ this no longer holds for the product. Web pages will be able to ask the Lantern extension to connect and sign, through a narrow, testnet-first page API with every request reviewed in Lantern's own window. The playground keeps using the visitor's own wallet.
 - **The playground's AI summaries have their own daily budget**, so public traffic can never use up the wallet's.
 - **An example click is never counted as a scan.** Only a visitor scanning their own pasted or composed transaction counts toward §6.3's "transactions scanned end-to-end"; example clicks are reported beside it.
 - **No shortcut for our own contract.** A report from the playground is scanned like any other transaction before the wallet signs it.
