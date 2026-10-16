@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Connect with Lantern — Lantern — Instawards Phase 1</title>
+    <meta name="description" content="Evidence site for Lantern's Stellar Development Foundation Instawards sprint: weekly reports, deliverable traceability, and an index of every on-chain and off-chain artifact." />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/docs/docs.css" />
+  </head>
+  <body class="docs">
+    <header class="docs-top">
+      <div class="docs-top-inner">
+        <a class="brand" href="/docs/"><img src="/logo.jpg" alt="Lantern logo" /><span>Lantern</span><em>Instawards evidence</em></a>
+        <a class="md-link" href="/docs/reference/connect.md" title="This page as markdown">view as markdown</a>
+      </div>
+    </header>
+    <div class="docs-layout">
+      <nav class="side" aria-label="Pages"><ul><li><a href="/docs/">Overview</a></li><li><a href="/docs/sow/">Statement of Work</a></li><li class="group"><span>Weekly reports</span><ul><li><a href="/docs/weekly/week-1/">Week 1 — 7–13 Sep</a></li><li><a href="/docs/weekly/week-2/">Week 2 — 14–20 Sep</a></li><li><a href="/docs/weekly/week-3/">Week 3 — 21–27 Sep</a></li><li><a href="/docs/weekly/week-4/">Week 4 — 28 Sep – 4 Oct</a></li></ul></li><li class="group"><span>Deliverables</span><ul><li><a href="/docs/deliverables/d1/">D1 — On-chain blacklist registry</a></li><li><a href="/docs/deliverables/d2/">D2 — Transaction security scanner</a></li><li><a href="/docs/deliverables/d3/">D3 — Scanner in the wallet</a></li><li><a href="/docs/deliverables/d4/">D4 — Public demo</a></li></ul></li><li class="group"><span>Reference</span><ul><li><a href="/docs/reference/scanner/">Scanner package</a></li><li><a href="/docs/reference/registry/">Registry contract</a></li><li class="on"><a href="/docs/reference/connect/">Connect with Lantern</a></li><li><a href="/docs/reference/verify/">Verify it yourself</a></li><li><a href="/docs/reference/metrics/">Metrics</a></li><li><a href="/docs/reference/evidence/">Evidence index</a></li><li><a href="/docs/reference/changelog/">Full changelog</a></li></ul></li></ul></nav>
+      <main class="docs-main">
+        <p class="crumbs"><a href="/docs/">Lantern — Instawards Phase 1</a> <span class="sep">/</span> <span>Reference</span> <span class="sep">/</span> <span>Connect with Lantern</span></p>
+        <article class="prose">
+<h1>Connect with Lantern (for dApp developers)</h1>
+<p>How a website connects to the Lantern wallet and asks it to sign. It covers the page API, what Lantern guarantees, the error codes, and the Stellar Wallets Kit module.</p>
+<h2>Status</h2>
+<div class="table"><table><thead>
+<tr>
+<th>Piece</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Chrome extension: <code>window.lantern</code> page API, connect, <code>signTransaction</code></td>
+<td><strong>Built, not yet in a release.</strong> It's behind a build flag while it finishes review. This page will name the first release that includes it.</td>
+</tr>
+<tr>
+<td>Stellar Wallets Kit module (kit 1.x and 2.x)</td>
+<td><strong>Built.</strong> One file you can copy in; see below. Not yet upstream in the kit.</td>
+</tr>
+<tr>
+<td>Android app, over WalletConnect v2</td>
+<td><strong>Planned.</strong> Not in any build.</td>
+</tr>
+<tr>
+<td>Web app (<code>app.golantern.xyz</code>)</td>
+<td>Takes no requests from websites, by design.</td>
+</tr>
+<tr>
+<td><code>signAuthEntry</code>, <code>signMessage</code> (SEP-53)</td>
+<td>Not supported. Calls reject with <code>unsupported</code>.</td>
+</tr>
+<tr>
+<td>Mainnet</td>
+<td>Not supported. The first release connects on <strong>Testnet only</strong>.</td>
+</tr>
+<tr>
+<td>SEP-7 links</td>
+<td>Not supported. Don't show Lantern for SEP-7.</td>
+</tr>
+</tbody>
+</table></div><p>Until a release ships it, nothing on this page works in an installed Lantern.</p>
+<h2>Detection</h2>
+<p>The extension adds <code>window.lantern</code> to every https page before the page's own scripts run, in the top frame only (not in iframes). It's frozen and can't be replaced.</p>
+<pre><code class="language-js">if (window.lantern?.isLantern) {
+  const { isConnected, apiVersion } = await window.lantern.isConnected(); // { isConnected: true, apiVersion: 1 }
+}
+</code></pre>
+<p><code>apiVersion</code> is <code>1</code>. It changes only when a method or a response shape changes in a way that breaks callers. The extension's id is <code>iflpkjgolcbleombhldiibhojohjpnmd</code>, the same for every install.</p>
+<h2>Methods</h2>
+<p>Every method returns a promise. Failures throw a <code>LanternError</code> with a stable <code>code</code> and a <code>message</code> meant for people.</p>
+<div class="table"><table><thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Needs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>isConnected()</code></td>
+<td><code>{ isConnected: true, apiVersion }</code></td>
+<td>nothing (it means &quot;Lantern is installed&quot;)</td>
+</tr>
+<tr>
+<td><code>requestAccess()</code></td>
+<td><code>{ address }</code></td>
+<td>the user approves in Lantern's window, unless this site is already connected for the current account and network</td>
+</tr>
+<tr>
+<td><code>getAddress()</code></td>
+<td><code>{ address }</code></td>
+<td>a connected site</td>
+</tr>
+<tr>
+<td><code>getNetwork()</code></td>
+<td><code>{ network: 'TESTNET', networkPassphrase }</code></td>
+<td>a connected site</td>
+</tr>
+<tr>
+<td><code>getNetworkDetails()</code></td>
+<td><code>{ network, networkPassphrase, networkUrl, sorobanRpcUrl }</code></td>
+<td>a connected site; the URLs are the ones Lantern actually uses, including the user's own servers if they set any</td>
+</tr>
+<tr>
+<td><code>signTransaction(xdr, { networkPassphrase?, address? })</code></td>
+<td><code>{ signedTxXdr, signerAddress }</code></td>
+<td>a connected site, then the user approves in Lantern's window</td>
+</tr>
+<tr>
+<td><code>signAuthEntry</code>, <code>signMessage</code></td>
+<td>rejects with <code>unsupported</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>on('change', cb)</code> / <code>off('change', cb)</code></td>
+<td></td>
+<td><code>cb({ reason })</code> with <code>reason</code> one of <code>account</code>, <code>network</code>, <code>revoke</code>. Call <code>getAddress()</code> again when it fires.</td>
+</tr>
+</tbody>
+</table></div><p>How long a call waits before it rejects with <code>timeout</code>:</p>
+<ul>
+<li><code>requestAccess</code>, <code>signTransaction</code>, <code>signAuthEntry</code> and <code>signMessage</code> wait 10 minutes, so the user has time to read the review.</li>
+<li>Everything else waits 15 seconds.</li>
+</ul>
+<h2>Connecting</h2>
+<ul>
+<li>Connecting is per <strong>site, account and network</strong>. If the user switches account or network in Lantern, the site has to connect again.</li>
+<li>A site that isn't connected learns nothing: <code>getAddress()</code> rejects with <code>not_allowed</code> the same way whether Lantern has a wallet or not, and whether it's locked or not.</li>
+<li>The approval window shows the site's full origin, as the browser reports it. Sites listed in Lantern's Apps directory are marked <strong>Listed in Lantern</strong>; every other site is marked <strong>Unverified site</strong>.</li>
+<li>Users can disconnect a site in Lantern's Settings, under Connected sites. The site's open tabs then get a <code>change</code> event with <code>reason: 'revoke'</code>.</li>
+</ul>
+<h2>Signing: what Lantern guarantees</h2>
+<p><code>signTransaction</code> is <strong>sign-only</strong>:</p>
+<ol>
+<li>
+<p>Lantern <strong>never submits</strong> the transaction. Your app submits it and checks the result.</p>
+</li>
+<li>
+<p>The returned envelope has <strong>exactly the transaction body you sent</strong>, so the same hash. Lantern doesn't re-prepare it, change the fee, or bump the sequence.</p>
+</li>
+<li>
+<p><strong>Signatures already on the envelope stay</strong>, for example a sponsor's. Lantern adds one signature, from the connected account.</p>
+</li>
+<li>
+<p>Before showing the user anything, Lantern refuses:</p>
+<ul>
+<li>a site that isn't connected (<code>not_allowed</code>);</li>
+<li>an <code>address</code> other than the connected account (<code>account_mismatch</code>);</li>
+<li>a <code>networkPassphrase</code> other than the network Lantern is on (<code>network_mismatch</code>);</li>
+<li>XDR that doesn't decode, a <strong>fee-bump</strong> envelope, or a transaction this account doesn't need to sign (<code>invalid_request</code>).</li>
+</ul>
+<p>Leaving out <code>networkPassphrase</code> means &quot;the network Lantern is on&quot;.</p>
+</li>
+<li>
+<p>Every request that passes is <strong>scanned and explained</strong> in Lantern's window: who signs which operation, what the transaction does, and its risk. High-risk transactions need an extra confirmation. Lantern simulates the transaction again right before signing, and stops if the result got worse.</p>
+</li>
+</ol>
+<p><strong>Fee bumps:</strong> send the inner transaction, and wrap it in the fee bump after Lantern returns it.</p>
+<p><strong>Supported envelopes:</strong> classic transactions with any number of operations, where the connected account is the transaction source or an operation source, and Soroban <code>invokeHostFunction</code> transactions that have already been simulated and assembled. The XDR can be up to 200,000 characters.</p>
+<p><strong>One request at a time:</strong> Lantern shows one request at a time. At most 3 can wait per site; a fourth is refused with <code>busy</code>.</p>
+<h2>Error codes</h2>
+<div class="table"><table><thead>
+<tr>
+<th><code>code</code></th>
+<th>When</th>
+<th>Suggested handling</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>user_rejected</code></td>
+<td>The user said no, or closed Lantern's window. <code>message</code> is always <code>User rejected the request</code>.</td>
+<td>Treat as cancelled. Don't retry on your own.</td>
+</tr>
+<tr>
+<td><code>not_allowed</code></td>
+<td>The site isn't connected, or Lantern is on Mainnet.</td>
+<td>Call <code>requestAccess()</code>. If that also fails with <code>not_allowed</code>, Lantern is on Mainnet: ask the user to switch to Testnet.</td>
+</tr>
+<tr>
+<td><code>account_mismatch</code></td>
+<td><code>address</code> isn't the connected account.</td>
+<td>Call <code>getAddress()</code> and rebuild the transaction.</td>
+</tr>
+<tr>
+<td><code>network_mismatch</code></td>
+<td>The passphrase isn't Lantern's network.</td>
+<td>Ask the user to switch networks in Lantern.</td>
+</tr>
+<tr>
+<td><code>invalid_request</code></td>
+<td>Malformed call, undecodable XDR, fee bump, or not this account's transaction.</td>
+<td>Fix the request.</td>
+</tr>
+<tr>
+<td><code>unsupported</code></td>
+<td>A method this version doesn't support.</td>
+<td>Hide that feature for Lantern.</td>
+</tr>
+<tr>
+<td><code>busy</code></td>
+<td>Too many waiting requests from this site.</td>
+<td>Wait for the open request to finish.</td>
+</tr>
+<tr>
+<td><code>timeout</code></td>
+<td>No answer in time.</td>
+<td>The outcome is unknown: don't sign the same transaction again without checking.</td>
+</tr>
+<tr>
+<td><code>connection_lost</code></td>
+<td>The extension restarted or was updated while the call was open.</td>
+<td>Same as <code>timeout</code>.</td>
+</tr>
+<tr>
+<td><code>internal</code></td>
+<td>A bug in Lantern. Nothing signed left Lantern.</td>
+<td>Retry once, then report it.</td>
+</tr>
+</tbody>
+</table></div><h2>Stellar Wallets Kit</h2>
+<p>Most Stellar dApps get their wallet list from <a href="https://github.com/Creit-Tech/Stellar-Wallets-Kit" target="_blank" rel="noopener">Stellar Wallets Kit</a>. Lantern's module is a single file with no imports, MIT-licensed: <a href="https://github.com/kimerran/stellar-lantern/blob/main/packages/lantern-wallets-kit-module/src/lantern.module.ts" target="_blank" rel="noopener"><code>lantern.module.ts</code></a> in Lantern's public repository. It's published there with the first release that includes connecting; until then, ask the Lantern team for a copy. Copy it into your app until it's upstream in the kit. It works with kit 1.x (tested on 1.9.5) and 2.x (typed against 2.7.0).</p>
+<pre><code class="language-ts">import { StellarWalletsKit, WalletNetwork, FreighterModule, FREIGHTER_ID } from '@creit.tech/stellar-wallets-kit';
+import { LanternModule } from './lantern.module';
+
+const kit = new StellarWalletsKit({
+  network: WalletNetwork.TESTNET,
+  selectedWalletId: FREIGHTER_ID,
+  modules: [new FreighterModule(), new LanternModule()],
+});
+</code></pre>
+<p>The module turns Lantern's errors into the kit's <code>{ code, message, ext }</code> shape:</p>
+<ul>
+<li><code>user_rejected</code> becomes <strong>-4</strong>;</li>
+<li><code>not_allowed</code> and <code>account_mismatch</code> become <strong>-3</strong>;</li>
+<li>everything else becomes <strong>-1</strong>.</li>
+</ul>
+<p>Lantern's own code is kept in <code>ext</code>. <code>signTransaction(xdr, { submit: true })</code> is refused, because Lantern signs only. The wallet icon is <code>https://golantern.xyz/wallet-icon.png</code> (180 × 180).</p>
+<h2>Android (planned)</h2>
+<p>Lantern for Android will connect over WalletConnect v2, using the <code>stellar</code> namespace, the chain <code>stellar:testnet</code>, and the method <code>stellar_signXDR</code> (sign-only). Its wallet id, deep link and universal link will be listed here once it's in a build. Until then, don't list Lantern in a mobile wallet picker.</p>
+<h2>Verifying a build</h2>
+<p>Each release publishes its builds and a <code>SHA256SUMS.txt</code>; see <a href="/docs/reference/verify/">Verify it yourself</a>. The extension's id is <code>iflpkjgolcbleombhldiibhojohjpnmd</code>. The Android package is <code>com.lantern.wallet</code>; its signing-certificate fingerprint will be published here with the first release that supports connecting.</p>
+
+        </article>
+        <footer class="docs-foot">
+          <p>Unlisted evidence site for the Stellar Development Foundation Instawards programme. Not indexed; no links from the landing page. Machine-readable index: <a href="/docs/llms.txt">llms.txt</a>.</p>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>
