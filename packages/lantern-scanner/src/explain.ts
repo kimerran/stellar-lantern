@@ -28,6 +28,7 @@ import type {
   NetDelta,
   ScanAction,
 } from './types';
+import { assetKey } from './effects';
 import { explainTransaction } from './explainer';
 import { formatAmount, truncateAddress } from './format';
 import type { DecodedTx } from './types';
@@ -344,18 +345,23 @@ export function describeCreatedContracts(effects: DeepReadonly<EffectSet>): stri
 
 // A transfer out of your account that the auth tree decodes, named even when
 // the simulated net movement is zero (#305): a deposit whose funds come back
-// to you still has you authorise sending them first. Skipped when the
-// movement sentence already says what you send, so nothing is said twice.
+// to you still has you authorise sending them first. Skipped per asset when
+// the movement sentence already says you send it, so nothing is said twice.
 export function describeAuthorisedTransfers(effects: DeepReadonly<EffectSet>): string | undefined {
   if (!effects.effects.some((e) => e.kind === 'contract_call')) return undefined;
   const me = effects.signing?.user ?? effects.source?.source;
   if (!me) return undefined;
-  if (effects.observedNet.some((n) => n.address === me && positive(n.out))) return undefined;
+  const shownOut = new Set(
+    effects.observedNet
+      .filter((n) => n.address === me && positive(n.out))
+      .map((n) => assetKey(n.asset)),
+  );
   const parts: string[] = [];
   const d = effects.deltas;
   for (let i = 0; i < d.length; i++) {
     const x = d[i]!;
     if (x.source !== 'token' || x.direction !== 'out' || x.address !== me) continue;
+    if (shownOut.has(assetKey(x.asset))) continue;
     // A token `transfer` records its two sides back to back (token.ts).
     const next = d[i + 1];
     const to =

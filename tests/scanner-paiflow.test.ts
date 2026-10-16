@@ -501,6 +501,23 @@ describe('contracts created and transfers authorised (#305)', () => {
         }),
       ),
     ).toBeUndefined();
+    // A round trip in another asset is still named when you send XLM net.
+    const usdc = {
+      code: 'USDC',
+      issuer: 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5',
+      decimals: 7,
+    };
+    expect(
+      describeAuthorisedTransfers(
+        fx5({
+          deltas: [
+            d(ME5, 'out', '100.0000000', { asset: usdc, raw: '1000000000' }),
+            d(TO, 'in', '100.0000000', { asset: usdc, raw: '1000000000' }),
+          ],
+          observedNet: [{ address: ME5, asset: xlm, in: '0', out: '1.0000000' }],
+        }),
+      ),
+    ).toBe('You authorise sending 100 USDC to CAIC...TFTL.');
     // Someone else's transfer isn't yours to authorise.
     expect(
       describeAuthorisedTransfers(fx5({ deltas: [d(TO, 'out', '1.0000000')] })),
