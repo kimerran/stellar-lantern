@@ -6,6 +6,7 @@ import { APP_VERSION } from '@shared/version';
 import { isExtensionSender } from '@core/webconnect/protocol';
 import {
   afterWalletMessage,
+  connectedOrigins,
   handleWebConnectPage,
   isWebConnectPageRequest,
   listenForWebConnect,
@@ -40,12 +41,18 @@ chrome.runtime.onMessage.addListener((req: Request, sender, sendResponse) => {
     void handleWebConnectPage(req).then(sendResponse);
     return true;
   }
-  const handled = telemetryReady.then(() => handle(req));
+  // A reset deletes every grant: note which sites were connected first, so
+  // only they hear about it (#251).
+  const before: Promise<Set<string> | undefined> =
+    __FEATURE_WEB_CONNECT__ && req.type === 'RESET_WALLET'
+      ? connectedOrigins()
+      : Promise.resolve(undefined);
+  const handled = before.then(() => telemetryReady.then(() => handle(req)));
   handled.then(sendResponse);
   // Tell connected sites when the account changed (#251).
   if (__FEATURE_WEB_CONNECT__) {
-    void handled.then((res) => {
-      if (res.ok) void afterWalletMessage(req);
+    void Promise.all([handled, before]).then(([res, origins]) => {
+      if (res.ok) void afterWalletMessage(req, origins);
     });
   }
   return true; // keep the message channel open for the async response
