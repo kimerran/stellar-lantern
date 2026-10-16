@@ -26,7 +26,7 @@ The decision recorded in week 4 (with #187) was the opposite: "a bridge into it 
 A content script calling `chrome.runtime.sendMessage` reaches the **same** `onMessage` listener as the popup. If we add one without changing that listener, any page that controls the content script's input could ask for `SIGN_AND_SUBMIT` or a wallet export.
 
 **Rule:**
-- The existing listener refuses any message whose `sender.tab` is set, or whose `sender.url` isn't the extension's own origin.
+- The existing listener accepts a message only when `sender.id === chrome.runtime.id` and the origin of `sender.url` is the extension's own (`chrome.runtime.getURL('')`). Content scripts report the page's URL, so they are refused, and Lantern's own popup, tab and approval window still work. Having a `sender.tab` is not the test: the approval window (#249) has one too.
 - Web connect uses a **separate** `chrome.runtime.onConnect` port with its own name and its own small set of message types, validated like the bridge's.
 - Nothing on that port reaches `handle()` directly. The background turns each request into a queued approval (#249), and only an approval the user gave in Lantern's own window leads to `SIGN_ONLY`.
 - A unit test proves that a content-script sender is refused for every existing message type. This is #248's first acceptance item.
@@ -81,7 +81,7 @@ A page floods requests, or swaps the request while the user is reading.
 | `optional_host_permissions`, granted per site | No: SWK's wallet list can't see Lantern until the user grants the site from Lantern's menu | None at install | Breaks discovery |
 | `activeTab` + `scripting.executeScript` | No: needs a click on the toolbar icon first | None | Breaks the normal "Connect wallet" flow |
 
-The chosen option is what Freighter, xBull and every other Stellar extension wallet does. The scripts it needs:
+The chosen option is what Freighter does (its MV3 manifest runs a content script on `<all_urls>` at `document_start`). The scripts it needs:
 - **An isolated-world relay** (`document_start`, top frame only). It never reads the page's DOM, cookies or storage, and only forwards namespaced `postMessage` envelopes after checking `event.source === window`.
 - **A main-world script** (`"world": "MAIN"`, Chrome 111+) that defines `window.lantern`.
 
@@ -114,7 +114,7 @@ What it costs:
 
 ## Slices this binds
 
-- **#248:** the sender check on the existing listener, a separate port, the build flag, the relay and the main-world script, plus the Settings switch.
+- **#248:** the sender check on the existing listener (extension id and extension-origin URL, not `sender.tab`), a separate port, the build flag, the relay and the main-world script, plus the Settings switch.
 - **#249:** the approval window, focus delay, per-origin cap of 3, and tab-close cleanup.
 - **#250:** grants per origin, network and account; `not_allowed` without leaking state; directory chip versus Unverified.
 - **#252:** sign-only; body and existing signatures kept; network and account checks before any window; fail closed.
