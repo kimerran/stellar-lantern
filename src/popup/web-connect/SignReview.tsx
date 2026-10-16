@@ -32,9 +32,17 @@ interface Props {
 }
 
 export function SignReview({ origin, entryId, params, address, network, armed, onDecided }: Props) {
+  // Keyed on the request's values, not the `params` object: the window polls
+  // every second and gets a fresh object each time, which would otherwise
+  // re-validate, re-scan and reset the verdict every second.
+  const { xdr, networkPassphrase } = params;
   const validation = useMemo(
-    () => validateSignXdr(params, { networkPassphrase: network.passphrase, address }),
-    [params, network.passphrase, address],
+    () =>
+      validateSignXdr(
+        { xdr, networkPassphrase },
+        { networkPassphrase: network.passphrase, address },
+      ),
+    [xdr, networkPassphrase, network.passphrase, address],
   );
   const scanInput = useMemo(
     () =>
