@@ -97,6 +97,9 @@ const CORPUS = [
   'nested-subinvocation',
   'unknown-contract',
   'malformed-xdr',
+  'paiflow-splitter-distribute',
+  'paiflow-pipeline-deposit',
+  'paiflow-subscription-approve',
 ];
 
 describe('fixture corpus', () => {
@@ -118,6 +121,9 @@ describe('fixture corpus', () => {
         'archived-state',
         'deep-auth',
         'token-admin',
+        'paiflow-splitter-distribute',
+        'paiflow-pipeline-deposit',
+        'paiflow-subscription-approve',
       ];
       if (soroban.includes(name)) expect(f.simulation).not.toBeNull();
       else expect(f.simulation).toBeNull();
