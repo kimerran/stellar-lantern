@@ -10,6 +10,7 @@ import {
   type WebConnectResponse,
 } from '@core/webconnect/protocol';
 import { answerWebConnect, type WebConnectDeps } from '@core/webconnect/router';
+import { checkSigned, validateSignXdr } from '@core/dapp/sign-xdr';
 import { ApprovalQueue, type PendingApproval } from '@core/webconnect/queue';
 import {
   addGrant,
@@ -198,8 +199,7 @@ export async function handleWebConnectPage(req: WebConnectPageRequest): Promise<
         answer(entry, { id: entry.request.id, ok: true, result: { address } });
         return { ok: true, data: { remaining: queue.size } };
       }
-      rejectEntry(entry);
-      return { ok: false, error: 'Unsupported request.' };
+      return decideSign(entry, req.result);
     }
     case 'WC_GRANTS':
       return { ok: true, data: await listGrants() };
@@ -210,6 +210,36 @@ export async function handleWebConnectPage(req: WebConnectPageRequest): Promise<
       return { ok: true, data: { ok: true } };
     }
   }
+}
+
+/**
+ * The approval window signed (#252): check what it hands back before the page
+ * gets it. The site must still be connected for this account and network, the
+ * transaction body must be the one requested (same hash), every signature it
+ * already had must still be there, and this account's signature must be on it.
+ * Anything else answers `internal` and nothing signed leaves Lantern.
+ */
+async function decideSign(entry: PendingApproval, result: unknown): Promise<Result<unknown>> {
+  const [address, net] = await Promise.all([walletAddress(), activeNetwork()]);
+  const fail = (code: 'not_allowed' | 'internal', error: string): Result<unknown> => {
+    answer(entry, { id: entry.request.id, ok: false, error: webConnectError(code) });
+    return { ok: false, error };
+  };
+  if (!address || net.id !== 'TESTNET' || !(await findGrant(entry.origin, address, net.id))) {
+    return fail('not_allowed', 'This site is no longer connected for this account and network.');
+  }
+  const v = validateSignXdr(entry.request.params, { networkPassphrase: net.passphrase, address });
+  const signedXdr = (result as { signedXdr?: unknown } | undefined)?.signedXdr;
+  if (!v.ok || typeof signedXdr !== 'string')
+    return fail('internal', 'The signed transaction is missing.');
+  const problem = checkSigned(v.value.xdr, signedXdr, v.value.networkPassphrase, address);
+  if (problem) return fail('internal', problem);
+  answer(entry, {
+    id: entry.request.id,
+    ok: true,
+    result: { signedTxXdr: signedXdr, signerAddress: address },
+  });
+  return { ok: true, data: { remaining: queue.size } };
 }
 
 /**

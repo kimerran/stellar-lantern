@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { sendMessage, type WebConnectPending } from '@shared/messages';
 import { listedApp } from '@core/webconnect/trust';
 import { truncateAddress } from '@shared/format';
+import { resolveNetworkConfig } from '@shared/network';
 import { Icon } from '../components/Icon';
+import { useSettings } from '../hooks/useSettings';
+import { SignReview } from './SignReview';
 
 // Web connect (#249/#251): Lantern's approval window (index.html?approve=1).
 //
@@ -27,6 +30,7 @@ export function WebConnectApproval({ noWallet = false }: { noWallet?: boolean })
   const [armedAt, setArmedAt] = useState(() => Date.now() + FOCUS_DELAY_MS);
   const [now, setNow] = useState(() => Date.now());
   const entryRef = useRef<string | null>(null);
+  const { settings } = useSettings();
 
   const poll = useCallback(async () => {
     const res = await sendMessage({ type: 'WC_NEXT' });
@@ -142,6 +146,17 @@ export function WebConnectApproval({ noWallet = false }: { noWallet?: boolean })
               Connected sites.
             </p>
           </>
+        ) : pending.kind === 'sign' && settings ? (
+          <SignReview
+            key={pending.entryId}
+            origin={pending.origin}
+            entryId={pending.entryId}
+            params={pending.params}
+            address={pending.address}
+            network={resolveNetworkConfig(settings)}
+            armed={armed}
+            onDecided={() => void poll()}
+          />
         ) : (
           <p className="text-body-md text-on-surface">
             This version of Lantern can’t handle that request yet.
@@ -150,24 +165,27 @@ export function WebConnectApproval({ noWallet = false }: { noWallet?: boolean })
         {error && <p className="text-center text-label-md text-error">{error}</p>}
       </main>
 
-      <footer className="flex gap-2 border-t border-outline-variant/30 p-4">
-        <button
-          onClick={() => void decide(false)}
-          disabled={busy}
-          className="flex-1 rounded-full border border-outline px-4 py-2.5 text-label-md font-semibold text-on-surface-variant active:scale-95 disabled:opacity-50"
-        >
-          Reject
-        </button>
-        {pending.kind === 'connect' && pending.address && !noWallet && (
+      {/* A sign request has its own buttons, beside its review. */}
+      {pending.kind !== 'sign' && (
+        <footer className="flex gap-2 border-t border-outline-variant/30 p-4">
           <button
-            onClick={() => void decide(true)}
-            disabled={busy || !armed}
-            className="flex-1 rounded-full bg-primary-container px-4 py-2.5 text-label-md font-semibold text-on-primary-container shadow-primary active:scale-95 disabled:opacity-50"
+            onClick={() => void decide(false)}
+            disabled={busy}
+            className="flex-1 rounded-full border border-outline px-4 py-2.5 text-label-md font-semibold text-on-surface-variant active:scale-95 disabled:opacity-50"
           >
-            Connect
+            Reject
           </button>
-        )}
-      </footer>
+          {pending.kind === 'connect' && pending.address && !noWallet && (
+            <button
+              onClick={() => void decide(true)}
+              disabled={busy || !armed}
+              className="flex-1 rounded-full bg-primary-container px-4 py-2.5 text-label-md font-semibold text-on-primary-container shadow-primary active:scale-95 disabled:opacity-50"
+            >
+              Connect
+            </button>
+          )}
+        </footer>
+      )}
     </div>
   );
 }

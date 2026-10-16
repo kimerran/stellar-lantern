@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Networks } from '@stellar/stellar-sdk';
+import {
+  Account,
+  Asset,
+  FeeBumpTransaction,
+  Keypair,
+  Networks,
+  Operation,
+  TransactionBuilder,
+} from '@stellar/stellar-sdk';
 import { __setKV, type KV } from '@shared/kv';
 import {
   addGrant,
@@ -259,8 +267,8 @@ describe('routeWebConnect (#251)', () => {
     expect(d.approve).not.toHaveBeenCalled();
   });
 
-  it('signing methods stay unsupported in this slice', async () => {
-    for (const m of ['signTransaction', 'signAuthEntry', 'signMessage'] as const) {
+  it('signAuthEntry and signMessage stay unsupported (#253, #254)', async () => {
+    for (const m of ['signAuthEntry', 'signMessage'] as const) {
       expect(await routeWebConnect(req(m), ctx, deps())).toMatchObject({
         ok: false,
         error: { code: 'unsupported' },
@@ -288,5 +296,91 @@ describe('Reset Wallet (#250)', () => {
     await addGrant(SITE, A, 'TESTNET', 1);
     expect(await handle({ type: 'RESET_WALLET' })).toMatchObject({ ok: true });
     expect(await listGrants()).toEqual([]);
+  });
+});
+
+describe('signTransaction (#252): checked before any window', () => {
+  const user = Keypair.random();
+  const testnet = {
+    id: 'TESTNET' as const,
+    passphrase: Networks.TESTNET,
+    horizonUrl: 'https://horizon-testnet.stellar.org',
+  };
+  const ctx = { origin: SITE };
+  const payment = (source = user.publicKey(), passphrase = Networks.TESTNET) =>
+    new TransactionBuilder(new Account(source, '1'), { fee: '100', networkPassphrase: passphrase })
+      .addOperation(Operation.payment({ destination: B, asset: Asset.native(), amount: '1' }))
+      .setTimeout(0)
+      .build();
+  function deps() {
+    return {
+      address: async () => user.publicKey(),
+      network: async () => testnet,
+      findGrant,
+      touchGrant,
+      approve: vi.fn(async (_k: unknown, r: WebConnectRequest) => ({
+        id: r.id,
+        ok: true as const,
+        result: 'queued',
+      })),
+    };
+  }
+  const sign = (params: Record<string, unknown>): WebConnectRequest => ({
+    id: 's1',
+    method: 'signTransaction',
+    params,
+  });
+
+  beforeEach(async () => {
+    await addGrant(SITE, user.publicKey(), 'TESTNET', 1);
+  });
+
+  it('queues a valid request, filling in the active network when the dApp leaves it out', async () => {
+    const d = deps();
+    const xdr = payment().toXDR();
+    expect(await routeWebConnect(sign({ xdr }), ctx, d)).toMatchObject({ ok: true });
+    expect(d.approve).toHaveBeenCalledWith(
+      'sign',
+      sign({ xdr, networkPassphrase: Networks.TESTNET }),
+      ctx,
+    );
+  });
+
+  it('needs a grant for this account', async () => {
+    await revokeAll();
+    const d = deps();
+    expect(await routeWebConnect(sign({ xdr: payment().toXDR() }), ctx, d)).toMatchObject({
+      error: { code: 'not_allowed' },
+    });
+    expect(d.approve).not.toHaveBeenCalled();
+  });
+
+  it('refuses another account, another network, bad XDR, a fee bump, and a tx this account doesn’t sign, with no window', async () => {
+    const d = deps();
+    const inner = payment();
+    inner.sign(user);
+    const bump = TransactionBuilder.buildFeeBumpTransaction(user, '200', inner, Networks.TESTNET);
+    expect(bump).toBeInstanceOf(FeeBumpTransaction);
+    const cases: Array<[Record<string, unknown>, string]> = [
+      [{ xdr: payment().toXDR(), address: B }, 'account_mismatch'],
+      [
+        {
+          xdr: payment(user.publicKey(), Networks.PUBLIC).toXDR(),
+          networkPassphrase: Networks.PUBLIC,
+        },
+        'network_mismatch',
+      ],
+      [{ xdr: 'not-xdr', networkPassphrase: Networks.TESTNET }, 'invalid_request'],
+      [{ networkPassphrase: Networks.TESTNET }, 'invalid_request'],
+      [{ xdr: bump.toXDR(), networkPassphrase: Networks.TESTNET }, 'invalid_request'],
+      [{ xdr: payment(B).toXDR(), networkPassphrase: Networks.TESTNET }, 'invalid_request'],
+    ];
+    for (const [params, code] of cases) {
+      expect(await routeWebConnect(sign(params), ctx, d), code).toMatchObject({
+        ok: false,
+        error: { code },
+      });
+    }
+    expect(d.approve).not.toHaveBeenCalled();
   });
 });
