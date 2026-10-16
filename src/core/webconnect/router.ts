@@ -8,6 +8,7 @@ import {
 } from './protocol';
 import type { ApprovalKind } from './queue';
 import type { Grant } from './grants';
+import { validateSignXdr } from '@core/dapp/sign-xdr';
 
 // Web connect (#246): what the background answers on the web-connect port.
 //
@@ -66,11 +67,8 @@ export async function routeWebConnect(
     // read the address is requestAccess/getAddress's business.
     return done(req, { isConnected: true, apiVersion: WEB_CONNECT_API_VERSION });
   }
-  if (
-    req.method === 'signAuthEntry' ||
-    req.method === 'signMessage' ||
-    req.method === 'signTransaction'
-  ) {
+  if (req.method === 'signAuthEntry' || req.method === 'signMessage') {
+    // Not in the first release (#253, #254): each needs its own review.
     return fail(req, 'unsupported');
   }
 
@@ -89,6 +87,7 @@ export async function routeWebConnect(
 
   if (!grant || !address) return fail(req, 'not_allowed');
   await deps.touchGrant(ctx.origin, address, net.id);
+  if (req.method === 'signTransaction') return signTransaction(req, ctx, deps, address, net);
   switch (req.method) {
     case 'getAddress':
       return done(req, { address });
@@ -104,6 +103,40 @@ export async function routeWebConnect(
     default:
       return fail(req, 'unsupported');
   }
+}
+
+/**
+ * signTransaction (#252): checked before any window opens, so a request for
+ * the wrong network or account, or one that isn't a transaction this account
+ * signs, never reaches the user. What reaches the approval window is the
+ * request with its network passphrase filled in: a dApp that leaves it out
+ * (as Freighter allows) means "the network Lantern is on".
+ */
+async function signTransaction(
+  req: WebConnectRequest,
+  ctx: WebConnectContext,
+  deps: WebConnectDeps,
+  address: string,
+  net: NetworkView,
+): Promise<WebConnectResponse> {
+  const { xdr, networkPassphrase, address: asked } = req.params;
+  if (asked !== undefined && asked !== address) return fail(req, 'account_mismatch');
+  const passphrase = networkPassphrase === undefined ? net.passphrase : networkPassphrase;
+  const v = validateSignXdr(
+    { xdr, networkPassphrase: passphrase },
+    { networkPassphrase: net.passphrase, address },
+  );
+  if (!v.ok)
+    return fail(
+      req,
+      v.code === 'network_mismatch' ? 'network_mismatch' : 'invalid_request',
+      v.error,
+    );
+  return deps.approve(
+    'sign',
+    { ...req, params: { xdr: v.value.xdr, networkPassphrase: v.value.networkPassphrase } },
+    ctx,
+  );
 }
 
 /**

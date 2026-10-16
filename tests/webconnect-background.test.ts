@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { __setKV, type KV } from '@shared/kv';
-import { listGrants } from '@core/webconnect/grants';
+import { addGrant, listGrants, revokeAll } from '@core/webconnect/grants';
+import {
+  Account,
+  Asset,
+  Keypair,
+  Networks,
+  Operation,
+  TransactionBuilder,
+} from '@stellar/stellar-sdk';
 
 // Web connect's background service end to end (#249–#251), against a fake
 // chrome: a page connects over the port, asks for access, Lantern's approval
@@ -265,5 +273,120 @@ describe('connect through the approval window', () => {
       ),
     );
     expect(res).toEqual({ ok: false, error: 'Not allowed', code: 'VALIDATION' });
+  });
+});
+
+describe('signTransaction through the approval window (#252)', () => {
+  const user = Keypair.random();
+  const payment = () =>
+    new TransactionBuilder(new Account(user.publicKey(), '1'), {
+      fee: '100',
+      networkPassphrase: Networks.TESTNET,
+    })
+      .addOperation(Operation.payment({ destination: ADDRESS, asset: Asset.native(), amount: '1' }))
+      .setTimeout(0)
+      .build();
+
+  async function queued(xdr: string) {
+    status.address = user.publicKey();
+    await addGrant(SITE, user.publicKey(), 'TESTNET');
+    const p = port();
+    p.msg!({
+      id: 's1',
+      method: 'signTransaction',
+      params: { xdr, networkPassphrase: Networks.TESTNET },
+    });
+    await flush();
+    const next = await page({ type: 'WC_NEXT' });
+    expect(next.data).toMatchObject({ kind: 'sign', method: 'signTransaction', params: { xdr } });
+    return { p, entryId: (next.data as { entryId: string }).entryId };
+  }
+
+  it('hands the site the envelope the window signed, after checking it', async () => {
+    const tx = payment();
+    const { p, entryId } = await queued(tx.toXDR());
+    tx.sign(user);
+    expect(
+      await page({ type: 'WC_DECIDE', entryId, approve: true, result: { signedXdr: tx.toXDR() } }),
+    ).toEqual({
+      ok: true,
+      data: { remaining: 0 },
+    });
+    await flush();
+    expect(p.posted).toEqual([
+      { id: 's1', ok: true, result: { signedTxXdr: tx.toXDR(), signerAddress: user.publicKey() } },
+    ]);
+  });
+
+  it('refuses a signature by another key, and a changed transaction', async () => {
+    const tx = payment();
+    const { p, entryId } = await queued(tx.toXDR());
+    tx.sign(Keypair.random());
+    expect(
+      await page({ type: 'WC_DECIDE', entryId, approve: true, result: { signedXdr: tx.toXDR() } }),
+    ).toMatchObject({ ok: false });
+    await flush();
+    expect(p.posted).toEqual([
+      {
+        id: 's1',
+        ok: false,
+        error: { code: 'internal', message: 'Something went wrong in Lantern' },
+      },
+    ]);
+
+    const other = payment();
+    const second = await queued(other.toXDR());
+    const changed = new TransactionBuilder(new Account(user.publicKey(), '5'), {
+      fee: '100',
+      networkPassphrase: Networks.TESTNET,
+    })
+      .addOperation(
+        Operation.payment({ destination: ADDRESS, asset: Asset.native(), amount: '999' }),
+      )
+      .setTimeout(0)
+      .build();
+    changed.sign(user);
+    expect(
+      await page({
+        type: 'WC_DECIDE',
+        entryId: second.entryId,
+        approve: true,
+        result: { signedXdr: changed.toXDR() },
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: 'The signed transaction does not match the one reviewed.',
+    });
+  });
+
+  it('refuses when the site was disconnected while the user was reading', async () => {
+    const tx = payment();
+    const { p, entryId } = await queued(tx.toXDR());
+    await revokeAll();
+    tx.sign(user);
+    expect(
+      await page({ type: 'WC_DECIDE', entryId, approve: true, result: { signedXdr: tx.toXDR() } }),
+    ).toMatchObject({ ok: false });
+    await flush();
+    expect(p.posted).toEqual([
+      {
+        id: 's1',
+        ok: false,
+        error: { code: 'not_allowed', message: 'This site is not connected to Lantern' },
+      },
+    ]);
+  });
+
+  it('a rejection answers user_rejected', async () => {
+    const { p, entryId } = await queued(payment().toXDR());
+    await page({ type: 'WC_DECIDE', entryId, approve: false });
+    await flush();
+    expect(p.posted).toEqual([
+      {
+        id: 's1',
+        ok: false,
+        error: { code: 'user_rejected', message: 'User rejected the request' },
+      },
+    ]);
   });
 });
