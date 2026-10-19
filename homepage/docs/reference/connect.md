@@ -8,7 +8,7 @@ How a website connects to the Lantern wallet and asks it to sign. It covers the 
 
 | Piece | Status |
 |---|---|
-| Chrome extension: `window.lantern` page API, connect, `signTransaction` | **Built, not yet in a release.** It's behind a build flag while it finishes review. This page will name the first release that includes it. |
+| Chrome extension: `window.lantern` page API, connect, `signTransaction` | **Shipped in 0.7.0** (testnet builds). |
 | Stellar Wallets Kit module (kit 1.x and 2.x) | **Built.** One file you can copy in; see below. Not yet upstream in the kit. |
 | Android app, over WalletConnect v2 | **Planned.** Not in any build. |
 | Web app (`app.golantern.xyz`) | Takes no requests from websites, by design. |
@@ -16,7 +16,7 @@ How a website connects to the Lantern wallet and asks it to sign. It covers the 
 | Mainnet | Not supported. The first release connects on **Testnet only**. |
 | SEP-7 links | Not supported. Don't show Lantern for SEP-7. |
 
-Until a release ships it, nothing on this page works in an installed Lantern.
+Lantern 0.6.3 and earlier don't have any of this.
 
 ## Detection
 
@@ -27,6 +27,8 @@ if (window.lantern?.isLantern) {
   const { isConnected, apiVersion } = await window.lantern.isConnected(); // { isConnected: true, apiVersion: 1 }
 }
 ```
+
+If the user switched off **Let websites connect to Lantern** in Lantern's Settings, `isConnected()` answers `{ isConnected: false, apiVersion }` and every other call rejects with `not_allowed`. Treat Lantern as not installed.
 
 `apiVersion` is `1`. It changes only when a method or a response shape changes in a way that breaks callers. The extension's id is `iflpkjgolcbleombhldiibhojohjpnmd`, the same for every install.
 
@@ -83,7 +85,7 @@ How long a call waits before it rejects with `timeout`:
 | `code` | When | Suggested handling |
 |---|---|---|
 | `user_rejected` | The user said no, or closed Lantern's window. `message` is always `User rejected the request`. | Treat as cancelled. Don't retry on your own. |
-| `not_allowed` | The site isn't connected, or Lantern is on Mainnet. | Call `requestAccess()`. If that also fails with `not_allowed`, Lantern is on Mainnet: ask the user to switch to Testnet. |
+| `not_allowed` | The site isn't connected, Lantern is on Mainnet, or the user turned websites off in Lantern's Settings. | Call `requestAccess()`. If that also fails with `not_allowed`, show its `message`: it says whether to switch to Testnet or turn websites on. |
 | `account_mismatch` | `address` isn't the connected account. | Call `getAddress()` and rebuild the transaction. |
 | `network_mismatch` | The passphrase isn't Lantern's network. | Ask the user to switch networks in Lantern. |
 | `invalid_request` | Malformed call, undecodable XDR, fee bump, or not this account's transaction. | Fix the request. |
@@ -95,7 +97,7 @@ How long a call waits before it rejects with `timeout`:
 
 ## Stellar Wallets Kit
 
-Most Stellar dApps get their wallet list from [Stellar Wallets Kit](https://github.com/Creit-Tech/Stellar-Wallets-Kit). Lantern's module is a single file with no imports, MIT-licensed: [`lantern.module.ts`](https://github.com/kimerran/stellar-lantern/blob/main/packages/lantern-wallets-kit-module/src/lantern.module.ts) in Lantern's public repository. It's published there with the first release that includes connecting; until then, ask the Lantern team for a copy. Copy it into your app until it's upstream in the kit. It works with kit 1.x (tested on 1.9.5) and 2.x (typed against 2.7.0).
+Most Stellar dApps get their wallet list from [Stellar Wallets Kit](https://github.com/Creit-Tech/Stellar-Wallets-Kit). Lantern's module is a single file with no imports, MIT-licensed: [`lantern.module.ts`](https://github.com/kimerran/stellar-lantern/blob/main/packages/lantern-wallets-kit-module/src/lantern.module.ts) in Lantern's public repository. Copy it into your app until it's upstream in the kit. It works with kit 1.x (tested on 1.9.5) and 2.x (typed against 2.7.0).
 
 ```ts
 import { StellarWalletsKit, WalletNetwork, FreighterModule, FREIGHTER_ID } from '@creit.tech/stellar-wallets-kit';

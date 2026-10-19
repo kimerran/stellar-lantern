@@ -98,6 +98,8 @@ You'll install **both** eventually. Install your **main** platform now (either o
 6. Lantern appears in your extension list. Click the puzzle-piece icon in the toolbar and **pin** Lantern.
 7. Click the Lantern icon to open it.
 
+> **About Chrome's permission warning:** Chrome says Lantern can "read and change all your data on all websites". That's so websites can offer **Connect with Lantern**: a small script on each https page passes the site's requests to Lantern. It never reads the page, and Lantern asks you about every connection and signature. To turn it off, open **Settings → Connected sites** and switch off **Let websites connect to Lantern**.
+
 > **If Chrome shows an error:** make sure the folder you selected contains `manifest.json` directly inside it. If you unzipped into a folder-inside-a-folder, go one level deeper.
 
 ---

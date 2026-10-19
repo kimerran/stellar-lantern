@@ -33,6 +33,8 @@ export interface NetworkView {
 export interface WebConnectDeps {
   /** The vault's public address (known while locked too), or null with no wallet. */
   address(): Promise<string | null>;
+  /** False when the user turned off "Let websites connect to Lantern". */
+  enabled(): Promise<boolean>;
   network(): Promise<NetworkView>;
   findGrant(origin: string, address: string, network: NetworkId): Promise<Grant | null>;
   touchGrant(origin: string, address: string, network: NetworkId): Promise<void>;
@@ -45,6 +47,10 @@ export interface WebConnectDeps {
 
 /** The first release is testnet only (#247): mainnet needs its own sign-off. */
 export const TESTNET_ONLY_MESSAGE = 'Lantern connects to websites on Testnet only in this version.';
+
+/** The user turned websites off in Lantern's Settings (#247). */
+export const WEBSITES_OFF_MESSAGE =
+  "Lantern isn't taking requests from websites. You can turn this on in Lantern's Settings.";
 
 const fail = (
   req: WebConnectRequest,
@@ -62,6 +68,14 @@ export async function routeWebConnect(
   ctx: WebConnectContext,
   deps: WebConnectDeps,
 ): Promise<WebConnectResponse> {
+  if (!(await deps.enabled())) {
+    // Websites are off (#247): a wallet list (SWK's isAvailable) sees Lantern
+    // as not available, and anything else is refused at once rather than left
+    // to time out.
+    return req.method === 'isConnected'
+      ? done(req, { isConnected: false, apiVersion: WEB_CONNECT_API_VERSION })
+      : fail(req, 'not_allowed', WEBSITES_OFF_MESSAGE);
+  }
   if (req.method === 'isConnected') {
     // Freighter-compatible: "installed and answering". Whether this SITE may
     // read the address is requestAccess/getAddress's business.

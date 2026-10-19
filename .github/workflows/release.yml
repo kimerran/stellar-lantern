@@ -36,6 +36,7 @@ env:
   VITE_FEATURE_SCANNER_AI: 'true'      # #59 / #84 — the hosted explainer's sentence, served by the Lantern API; no key ships (the key stays server-side)
   VITE_FEATURE_TELEMETRY: 'true'       # #81 — opt-in usage analytics (#88); consent-gated in-app, default OFF for the user
   VITE_FEATURE_TELEMETRY_IDENTITY: 'true' # #100 — ALPHA ONLY: attaches the wallet address to telemetry. Set to 'false' before any store submission.
+  VITE_FEATURE_WEB_CONNECT: 'true'     # #246 / #303 — web pages reach the extension (window.lantern); Testnet only (router refuses Mainnet, #247). Adds content scripts on https pages, so Chrome warns "read and change all your data on all websites"
   # Telemetry ingest (a URL, not a secret): the Lantern API on Railway. Its
   # origin is also in manifest host_permissions. Change both together.
   VITE_TELEMETRY_INGEST_URL: 'https://lantern-api-production-3fad.up.railway.app/v1/telemetry'

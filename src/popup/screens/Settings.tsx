@@ -105,7 +105,7 @@ export function Settings({
         requests from web pages). */}
       {__FEATURE_WEB_CONNECT__ && !__WEB_BUILD__ && !isNativePlatform() && (
         <Section title="Connected sites">
-          <ConnectedSites />
+          <ConnectedSites websitesOff={!!settings.webConnectDisabled} />
         </Section>
       )}
 

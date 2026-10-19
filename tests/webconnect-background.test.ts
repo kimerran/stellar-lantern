@@ -36,7 +36,8 @@ const hooks: {
   onConnect?: Cb<[FakePort]>;
   windowRemoved?: Cb<[number]>;
   tabRemoved?: Cb<[number]>;
-} = {};
+  storageChanged: Cb<[Record<string, { newValue?: unknown }>, string]>[];
+} = { storageChanged: [] };
 const windowsCreated: Array<{ url: string; type: string }> = [];
 let nextWindowId = 100;
 
@@ -102,7 +103,11 @@ beforeAll(async () => {
       onRemoved: { addListener: (cb: Cb<[number]>) => (hooks.windowRemoved = cb) },
     },
     tabs: { onRemoved: { addListener: (cb: Cb<[number]>) => (hooks.tabRemoved = cb) } },
-    storage: { onChanged: { addListener: () => {} } },
+    storage: {
+      onChanged: {
+        addListener: (cb: (typeof hooks.storageChanged)[number]) => hooks.storageChanged.push(cb),
+      },
+    },
   };
   __setKV(memKV());
   await import('../src/background/index');
@@ -440,5 +445,43 @@ describe('signTransaction through the approval window (#252)', () => {
         error: { code: 'user_rejected', message: 'User rejected the request' },
       },
     ]);
+  });
+});
+
+describe('Let websites connect to Lantern (#247)', () => {
+  /** Write the settings and fire chrome.storage.onChanged, as the popup's setSettings does. */
+  async function setSettings(settings: Record<string, unknown>) {
+    const { getKV } = await import('@shared/kv');
+    const value = JSON.stringify({ network: 'TESTNET', autoLockMinutes: 15, ...settings });
+    await (await getKV()).set('lantern.settings', value);
+    for (const cb of hooks.storageChanged) cb({ 'lantern.settings': { newValue: value } }, 'local');
+  }
+
+  it('turned off: connected pages hear one revoke, then every request is refused', async () => {
+    await addGrant(SITE, ADDRESS, 'TESTNET', 1);
+    const p = port();
+    await setSettings({ webConnectDisabled: true });
+    expect(p.posted).toEqual([{ event: 'change', data: { reason: 'revoke' } }]);
+
+    p.msg!({ id: 'r1', method: 'isConnected', params: {} });
+    p.msg!({ id: 'r2', method: 'getAddress', params: {} });
+    await flush();
+    expect(p.posted.slice(1)).toEqual([
+      { id: 'r1', ok: true, result: { isConnected: false, apiVersion: 1 } },
+      { id: 'r2', ok: false, error: expect.objectContaining({ code: 'not_allowed' }) },
+    ]);
+    expect(windowsCreated).toEqual([]);
+
+    // While off, a network switch says nothing to pages.
+    await setSettings({ webConnectDisabled: true, network: 'PUBLIC' });
+    await flush();
+    expect(p.posted).toHaveLength(3);
+
+    // Back on: the kept grant answers again.
+    await setSettings({ webConnectDisabled: false });
+    p.msg!({ id: 'r3', method: 'getAddress', params: {} });
+    await flush();
+    expect(p.posted.at(-1)).toEqual({ id: 'r3', ok: true, result: { address: ADDRESS } });
+    await setSettings({});
   });
 });

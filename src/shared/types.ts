@@ -48,6 +48,10 @@ export interface Settings {
   analyticsConsent?: boolean;
   // The one-time analytics prompt after onboarding has been answered (#86).
   analyticsPromptSeen?: boolean;
+  // Settings → Connected sites → "Let websites connect to Lantern" turned OFF
+  // (#247). Unset means on. Off, Lantern answers web pages as if it weren't
+  // there: isConnected says false and every other call is refused.
+  webConnectDisabled?: boolean;
 }
 
 // A single asset balance for display.
