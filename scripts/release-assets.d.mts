@@ -1,6 +1,7 @@
 // Types for release-assets.mjs so the vitest suite (TypeScript) can import it.
 
 export const FLAG_NAMES: string[];
+export const EXTENSION_ID: string;
 
 export interface AssetNames {
   apk: string;

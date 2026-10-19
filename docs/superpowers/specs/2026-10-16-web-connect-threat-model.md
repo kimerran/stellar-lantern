@@ -90,7 +90,7 @@ Development builds add `http://localhost/*`; release builds don't.
 What it costs:
 - The manifest comment "minimal permissions" and the install guide have to say what the broader permission is for.
 - A future Chrome Web Store submission will get a longer review and needs a written justification.
-- A Settings switch, **Let websites detect Lantern** (on by default), turns the relay into a no-op for anyone who wants the old behaviour.
+- A Settings switch, **Let websites connect to Lantern** (on by default, #303), for anyone who wants the old behaviour. Off, Lantern answers every page as if it weren't installed: `isConnected` says false and every other call is refused with `not_allowed`, at once rather than after a timeout, so wallet lists don't stall. `window.lantern` itself is still defined (a MAIN-world script can't read Lantern's settings at `document_start`), so a page can still tell the extension is installed; it can't learn anything else or make a request.
 
 ## What Lantern will never do for a web page
 

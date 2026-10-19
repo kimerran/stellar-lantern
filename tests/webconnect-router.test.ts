@@ -27,6 +27,7 @@ import {
   answerWebConnect,
   routeWebConnect,
   TESTNET_ONLY_MESSAGE,
+  WEBSITES_OFF_MESSAGE,
   type WebConnectDeps,
 } from '@core/webconnect/router';
 import type { WebConnectRequest } from '@core/webconnect/protocol';
@@ -165,6 +166,7 @@ describe('routeWebConnect (#251)', () => {
   ): WebConnectDeps & { approve: ReturnType<typeof vi.fn> } {
     return {
       address: async () => A,
+      enabled: async () => true,
       network: async () => testnet,
       findGrant,
       touchGrant,
@@ -172,6 +174,26 @@ describe('routeWebConnect (#251)', () => {
       ...over,
     } as WebConnectDeps & { approve: ReturnType<typeof vi.fn> };
   }
+
+  it('with websites off (#247), says not connected and refuses everything else at once', async () => {
+    await addGrant(SITE, A, 'TESTNET', 1);
+    const d = deps({ enabled: async () => false });
+    expect(await routeWebConnect(req('isConnected'), ctx, d)).toEqual({
+      id: 'q1',
+      ok: true,
+      result: { isConnected: false, apiVersion: 1 },
+    });
+    for (const m of ['requestAccess', 'getAddress', 'getNetwork', 'signTransaction'] as const) {
+      expect(await routeWebConnect(req(m, { xdr: 'AAAA' }), ctx, d)).toEqual({
+        id: 'q1',
+        ok: false,
+        error: { code: 'not_allowed', message: WEBSITES_OFF_MESSAGE },
+      });
+    }
+    expect(d.approve).not.toHaveBeenCalled();
+    // The grant is kept, so turning websites back on restores the connection.
+    expect(await findGrant(SITE, A, 'TESTNET')).not.toBeNull();
+  });
 
   it('isConnected answers anyone, with the API version', async () => {
     expect(await routeWebConnect(req('isConnected'), { origin: OTHER }, deps())).toEqual({
@@ -315,6 +337,7 @@ describe('signTransaction (#252): checked before any window', () => {
   function deps() {
     return {
       address: async () => user.publicKey(),
+      enabled: async () => true,
       network: async () => testnet,
       findGrant,
       touchGrant,

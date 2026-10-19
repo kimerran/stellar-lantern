@@ -2,8 +2,12 @@ import { defineManifest } from '@crxjs/vite-plugin';
 import { version } from './package.json';
 import { EXTENSION_PUBLIC_KEY } from './src/shared/origin';
 
-// MV3 manifest. Minimal permissions per SPEC §8 / AGENT §5 (a web-connect
-// build also gets content scripts on https pages: manifest.webconnect.ts): only `storage`,
+// MV3 manifest. Minimal permissions per SPEC §8 / AGENT §5, with one exception:
+// a web-connect build (the release build since #303) also gets content scripts
+// on every https page (manifest.webconnect.ts), so dApps can find Lantern and
+// ask it to connect. That is what Chrome's "read and change all your data on
+// all websites" warning is for; the scripts never read the page (threat model:
+// docs/superpowers/specs/2026-10-16-web-connect-threat-model.md). Otherwise only `storage`,
 // and host access limited to the Stellar endpoints (Horizon, friendbot and the
 // testnet Soroban RPC the scanner simulates and screens against) plus ONE
 // origin of our own — the Lantern API on Railway, which the opt-in telemetry

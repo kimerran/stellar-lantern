@@ -43,6 +43,9 @@ interface PortEntry {
 
 const ports = new Map<number, PortEntry>();
 let nextPortId = 1;
+// Settings → "Let websites connect to Lantern" is off (#247); kept in step by
+// listenForWebConnect's settings listener.
+let websitesOff = false;
 const queue = new ApprovalQueue();
 const waiters = new Map<string, (res: WebConnectResponse) => void>();
 let approvalWindowId: number | null = null;
@@ -105,6 +108,7 @@ function rejectEntry(entry: PendingApproval): void {
 function depsFor(portId: number, tabId: number): WebConnectDeps {
   return {
     address: walletAddress,
+    enabled: async () => !(await getSettings()).webConnectDisabled,
     network: activeNetwork,
     findGrant,
     touchGrant: (o, a, n) => touchGrant(o, a, n),
@@ -135,6 +139,8 @@ function depsFor(portId: number, tabId: number): WebConnectDeps {
 
 /** Tell every page on these origins that something changed; they re-query. */
 function emitChange(reason: 'account' | 'network' | 'revoke', origins?: Set<string>): void {
+  // Websites are off: pages hear nothing from Lantern, not even that it changed.
+  if (websitesOff) return;
   for (const { port, origin } of ports.values()) {
     if (!origin || (origins && !origins.has(origin))) continue;
     try {
@@ -318,8 +324,18 @@ export function listenForWebConnect(): void {
   });
 
   let lastNetwork: NetworkId | null = null;
-  void getSettings().then((s) => (lastNetwork = s.network));
+  void getSettings().then((s) => {
+    lastNetwork = s.network;
+    websitesOff = !!s.webConnectDisabled;
+  });
   onSettingsChanged((s) => {
+    const off = !!s.webConnectDisabled;
+    if (off !== websitesOff) {
+      // Turning websites off tells connected pages once (as a revoke), so they
+      // re-query and get refused; after that they hear nothing.
+      if (off) emitChange('revoke', undefined);
+      websitesOff = off;
+    }
     if (s.network === lastNetwork) return;
     lastNetwork = s.network;
     void connectedOrigins().then((o) => emitChange('network', o));
@@ -335,4 +351,5 @@ export function __resetWebConnect(): void {
   opening = null;
   emptyAt = null;
   nextPortId = 1;
+  websitesOff = false;
 }
