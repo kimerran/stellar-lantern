@@ -133,6 +133,22 @@ export const MINI_APPS: MiniApp[] = [
     session: true,
     networks: ['TESTNET'],
   },
+  // HeyPay: pay any QR Ph merchant in the Philippines with a Stellar balance.
+  // Remote, with a session so its login survives (#260). Inside Lantern it
+  // signs each escrow deposit with `lantern:signXdr` (a Soroban contract call,
+  // reviewed as one) and submits it itself. Testnet-only for now; `verified`
+  // waits for device QA like Centient's.
+  {
+    id: 'heypay',
+    name: 'HeyPay',
+    tagline: 'Pay any QR Ph merchant with your Stellar balance.',
+    category: 'Payments',
+    icon: 'qr_code_scanner',
+    url: 'https://app.heypayfi.xyz/',
+    verified: false,
+    session: true,
+    networks: ['TESTNET'],
+  },
 ];
 
 const NETWORK_LABEL: Record<NetworkId, string> = { TESTNET: 'Testnet', PUBLIC: 'Mainnet' };
