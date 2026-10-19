@@ -492,6 +492,7 @@ export function effects(
   // 3c: everything neither 3a nor 3b decoded, reported raw and labelled —
   // plus what the simulation proved about balances, semantics or not.
   const unverified = unverifiedCalls(decoded, authTree);
+  const created = createdContracts(simulation.stateChanges);
   const observed = observedDeltas(
     simulation.stateChanges,
     tokenMetadata,
@@ -514,7 +515,30 @@ export function effects(
     observedNet: aggregate(observed),
     coverage: covered ? 'full' : 'partial',
     ...(fallbackSource ? { signing: signingRequirements(decoded, fallbackSource) } : {}),
+    ...(simulation.latestLedger !== undefined ? { latestLedger: simulation.latestLedger } : {}),
+    ...(created.length ? { createdContracts: created } : {}),
   };
+}
+
+// The contracts a simulation creates (#305): `created` state changes whose
+// key is a contract's instance entry. A fact from the ledger writes, not a
+// reading of the call's arguments. Unreadable keys are skipped.
+export function createdContracts(stateChanges: readonly StateChange[]): string[] {
+  const out: string[] = [];
+  for (const sc of stateChanges) {
+    if (sc.type !== 'created') continue;
+    try {
+      const key = XDR.LedgerKey.fromXDR(sc.key, 'base64');
+      if (key.switch().name !== 'contractData') continue;
+      const data = key.contractData();
+      if (data.key().switch().name !== 'scvLedgerKeyContractInstance') continue;
+      const id = Address.fromScAddress(data.contract()).toString();
+      if (!out.includes(id)) out.push(id);
+    } catch {
+      continue;
+    }
+  }
+  return out;
 }
 
 // ── Stage 4: Screen ──────────────────────────────────────────────────────────

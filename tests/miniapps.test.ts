@@ -77,6 +77,43 @@ describe('mini-app directory', () => {
     expect(networkChip(app!, 'TESTNET')).toBeNull();
   });
 
+  it('lists Paiflow as a remote https Payments app with a session (#290)', () => {
+    const app = findMiniApp('paiflow');
+    expect(app).toBeDefined();
+    expect(MINI_APPS.filter((a) => a.id === 'paiflow')).toHaveLength(1);
+    expect(isRemoteMiniApp(app!)).toBe(true);
+    expect(app!.url).toBe('https://beta.app.paiflow.xyz/');
+    expect(normalizeUrl(app!.url!)).toBe(app!.url);
+    // One origin only: the marketing host beta.paiflow.xyz is not the app.
+    expect(app!.origins).toBeUndefined();
+    expect(appOrigins(app!)).toEqual(['https://beta.app.paiflow.xyz']);
+    expect(app!.session).toBe(true);
+    expect(app!.category).toBe('Payments');
+    expect(app!.icon).toMatch(/^[a-z0-9_]+$/);
+    expect(app!.icon).not.toBe(findMiniApp('centient')!.icon);
+    expect(app!.verified).toBe(false);
+    expect(networkChip(app!, 'PUBLIC')).toBe('Testnet');
+    expect(networkChip(app!, 'TESTNET')).toBeNull();
+  });
+
+  it('lists HeyPay as a remote https Payments app with a session', () => {
+    const app = findMiniApp('heypay');
+    expect(app).toBeDefined();
+    expect(MINI_APPS.filter((a) => a.id === 'heypay')).toHaveLength(1);
+    expect(isRemoteMiniApp(app!)).toBe(true);
+    expect(app!.url).toBe('https://app.heypayfi.xyz/');
+    expect(appOrigins(app!)).toEqual(['https://app.heypayfi.xyz']);
+    expect(normalizeUrl(app!.url!)).toBe(app!.url);
+    expect(app!.session).toBe(true);
+    expect(app!.category).toBe('Payments');
+    expect(app!.icon).toMatch(/^[a-z0-9_]+$/); // a Material Symbols name, not a URL
+    // Not verified until device QA, like Centient.
+    expect(app!.verified).toBe(false);
+    // Testnet-only for now: a "Testnet" chip on mainnet, nothing on testnet.
+    expect(networkChip(app!, 'PUBLIC')).toBe('Testnet');
+    expect(networkChip(app!, 'TESTNET')).toBeNull();
+  });
+
   it('only remote apps keep a session', () => {
     for (const app of MINI_APPS.filter((a) => a.session)) expect(isRemoteMiniApp(app)).toBe(true);
   });

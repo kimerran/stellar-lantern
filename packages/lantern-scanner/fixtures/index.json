@@ -15,5 +15,14 @@
   "classic-payment-to-flagged",
   "classic-two-recipients-flagged",
   "classic-flagged-memo-injection",
-  "classic-signer-takeover"
+  "classic-signer-takeover",
+  "paiflow-splitter-distribute",
+  "paiflow-pipeline-deposit",
+  "paiflow-subscription-approve",
+  "paiflow-live-factory-deploy-pipeline",
+  "paiflow-live-deposit",
+  "paiflow-live-splitter-distribute",
+  "paiflow-live-streamer-top-up",
+  "paiflow-live-token-approve",
+  "paiflow-deploy-pipeline-fresh"
 ]

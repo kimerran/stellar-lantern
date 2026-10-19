@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { EXTENSION_ID as APP_EXTENSION_ID } from '@shared/origin';
 import {
+  EXTENSION_ID,
   FLAG_NAMES,
   assetNames,
   flagSet,
@@ -93,6 +95,24 @@ describe('release notes', () => {
     expect(notes).not.toContain('SOROSWAP');
     expect(notes).not.toContain('https://api.example');
     expect(flags.map((f) => f.name)).toEqual(FLAG_NAMES);
+  });
+
+  it('say what web connect covers only when the build has it (#303)', () => {
+    expect(notes).not.toContain('Connect with Lantern');
+    const withConnect = releaseNotes({
+      version: '0.1.0',
+      tag: 'v0.1.0-testnet.7',
+      sha: 'deadbeef',
+      runNumber: 7,
+      flags: flagSet({ VITE_FEATURE_WEB_CONNECT: 'true' }),
+      assets,
+      sums,
+    });
+    expect(withConnect).toContain('## Connect with Lantern (web connect)');
+    expect(withConnect).toContain('**Chrome extension: shipped, Testnet only.**');
+    expect(withConnect).toContain(`\`${APP_EXTENSION_ID}\``);
+    expect(withConnect).toContain('**Android over WalletConnect: planned**');
+    expect(EXTENSION_ID).toBe(APP_EXTENSION_ID);
   });
 
   it('list exactly the flags release.yml sets, in its order', () => {

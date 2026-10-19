@@ -199,6 +199,164 @@ exports[`verdict: corpus snapshots > nested-subinvocation 1`] = `
 }
 `;
 
+exports[`verdict: corpus snapshots > paiflow-deploy-pipeline-fresh 1`] = `
+{
+  "action": "warn",
+  "reasons": [
+    "medium:unverified_contract",
+  ],
+  "risk": "medium",
+  "signals": [
+    "ingest:simulated@simulation",
+    "auth:nested_invocations@auth.calls",
+    "effects:coverage_partial@effects.coverage",
+    "screen:clean@screen",
+    "effects:unverified_contract@unverified",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > paiflow-live-deposit 1`] = `
+{
+  "action": "warn",
+  "reasons": [
+    "medium:unverified_contract",
+  ],
+  "risk": "medium",
+  "signals": [
+    "ingest:simulated@simulation",
+    "auth:nested_invocations@auth.calls",
+    "effects:coverage_partial@effects.coverage",
+    "screen:clean@screen",
+    "effects:nested_outflow@deltas[0]",
+    "effects:unverified_contract@unverified",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > paiflow-live-factory-deploy-pipeline 1`] = `
+{
+  "action": "block_confirm",
+  "reasons": [
+    "high:simulation_reverted",
+    "medium:unverified_contract",
+  ],
+  "risk": "high",
+  "signals": [
+    "ingest:fail_closed@simulation",
+    "auth:flat@auth.calls",
+    "effects:coverage_partial@effects.coverage",
+    "screen:clean@screen",
+    "effects:unverified_contract@unverified",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > paiflow-live-splitter-distribute 1`] = `
+{
+  "action": "warn",
+  "reasons": [
+    "medium:unverified_contract",
+  ],
+  "risk": "medium",
+  "signals": [
+    "ingest:simulated@simulation",
+    "auth:nested_invocations@auth.calls",
+    "effects:coverage_partial@effects.coverage",
+    "screen:clean@screen",
+    "effects:nested_outflow@deltas[0]",
+    "effects:unverified_contract@unverified",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > paiflow-live-streamer-top-up 1`] = `
+{
+  "action": "warn",
+  "reasons": [
+    "medium:unverified_contract",
+  ],
+  "risk": "medium",
+  "signals": [
+    "ingest:simulated@simulation",
+    "auth:nested_invocations@auth.calls",
+    "effects:coverage_partial@effects.coverage",
+    "screen:clean@screen",
+    "effects:nested_outflow@deltas[0]",
+    "effects:unverified_contract@unverified",
+    "effects:observed_balance_changes@observed",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > paiflow-live-token-approve 1`] = `
+{
+  "action": "allow",
+  "reasons": [],
+  "risk": "low",
+  "signals": [
+    "ingest:simulated@simulation",
+    "auth:flat@auth.calls",
+    "effects:coverage_full@effects.coverage",
+    "screen:clean@screen",
+    "effects:allowance@approvals[0]",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > paiflow-pipeline-deposit 1`] = `
+{
+  "action": "warn",
+  "reasons": [
+    "medium:unverified_contract",
+  ],
+  "risk": "medium",
+  "signals": [
+    "ingest:simulated@simulation",
+    "auth:nested_invocations@auth.calls",
+    "effects:coverage_partial@effects.coverage",
+    "screen:clean@screen",
+    "effects:nested_outflow@deltas[0]",
+    "effects:unverified_contract@unverified",
+    "effects:observed_balance_changes@observed",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > paiflow-splitter-distribute 1`] = `
+{
+  "action": "warn",
+  "reasons": [
+    "medium:unverified_contract",
+  ],
+  "risk": "medium",
+  "signals": [
+    "ingest:simulated@simulation",
+    "auth:nested_invocations@auth.calls",
+    "effects:coverage_partial@effects.coverage",
+    "screen:clean@screen",
+    "effects:nested_outflow@deltas[0]",
+    "effects:unverified_contract@unverified",
+    "effects:observed_balance_changes@observed",
+  ],
+}
+`;
+
+exports[`verdict: corpus snapshots > paiflow-subscription-approve 1`] = `
+{
+  "action": "allow",
+  "reasons": [],
+  "risk": "low",
+  "signals": [
+    "ingest:simulated@simulation",
+    "auth:flat@auth.calls",
+    "effects:coverage_full@effects.coverage",
+    "screen:clean@screen",
+    "effects:allowance@approvals[0]",
+  ],
+}
+`;
+
 exports[`verdict: corpus snapshots > path-payment 1`] = `
 {
   "action": "allow",

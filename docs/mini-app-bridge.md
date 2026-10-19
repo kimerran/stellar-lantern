@@ -50,7 +50,7 @@ ignores any message it doesn't recognise, and anything without a `type`.
   no `allow-same-origin`, so your page has an opaque origin (`event.origin` of
   your own messages is `"null"`), and no cookies or storage that survive.
   Bundled first-party mini-apps load unsandboxed from Lantern's own origin.
-- **Session apps** (directory entries marked `session`, e.g. Centient) also get
+- **Session apps** (directory entries marked `session`: Centient and Paiflow) also get
   `allow-same-origin`, so they run at their real origin and can keep a login.
   Lantern never grants it to one of its own origins.
 - **An app's origins.** A directory entry's origins are its `url`'s origin plus

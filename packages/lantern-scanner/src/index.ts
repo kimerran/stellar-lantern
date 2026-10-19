@@ -139,6 +139,10 @@ export { verdict, ingestReason, type VerdictInput, type VerdictContext } from '.
 export {
   createHostedExplainer,
   explainRulesBased,
+  describeSimulatedMovement,
+  describeCreatedContracts,
+  describeAuthorisedTransfers,
+  describeRootApproval,
   buildPrompt,
   sanitise,
   contradictsVerdict,

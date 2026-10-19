@@ -3,6 +3,14 @@ import type { Request } from '@shared/messages';
 import { handle, lock } from '@core/session/handler';
 import { bootTelemetry } from '@core/telemetry';
 import { APP_VERSION } from '@shared/version';
+import { isExtensionSender } from '@core/webconnect/protocol';
+import {
+  afterWalletMessage,
+  connectedOrigins,
+  handleWebConnectPage,
+  isWebConnectPageRequest,
+  listenForWebConnect,
+} from './webconnect';
 
 // Telemetry (#87): the service worker signs and submits (tx_signed), so it
 // needs its own consent-gated sink. No session_start here — the popup owns
@@ -17,12 +25,40 @@ const telemetryReady: Promise<void> = __FEATURE_TELEMETRY__
   ? bootTelemetry({ appVersion: APP_VERSION, session: false, flushAt: 1 }).catch(() => undefined)
   : Promise.resolve();
 
+// Lantern's own pages only (#247/#248). A content script shares our extension
+// id but reports the web page's url, so it is refused here: web pages reach
+// Lantern through the web-connect port below, never this handler.
+const EXTENSION_BASE_URL = chrome.runtime.getURL('');
+
 // The service worker is now a thin transport: it routes chrome messages to the
 // shared in-process handler (which holds the unlocked session in worker memory).
-chrome.runtime.onMessage.addListener((req: Request, _sender, sendResponse) => {
-  telemetryReady.then(() => handle(req)).then(sendResponse);
+chrome.runtime.onMessage.addListener((req: Request, sender, sendResponse) => {
+  if (!isExtensionSender(sender, chrome.runtime.id, EXTENSION_BASE_URL)) {
+    sendResponse({ ok: false, error: 'Not allowed', code: 'VALIDATION' });
+    return false;
+  }
+  if (__FEATURE_WEB_CONNECT__ && isWebConnectPageRequest(req)) {
+    void handleWebConnectPage(req).then(sendResponse);
+    return true;
+  }
+  // A reset deletes every grant: note which sites were connected first, so
+  // only they hear about it (#251).
+  const before: Promise<Set<string> | undefined> =
+    __FEATURE_WEB_CONNECT__ && req.type === 'RESET_WALLET'
+      ? connectedOrigins()
+      : Promise.resolve(undefined);
+  const handled = before.then(() => telemetryReady.then(() => handle(req)));
+  handled.then(sendResponse);
+  // Tell connected sites when the account changed (#251).
+  if (__FEATURE_WEB_CONNECT__) {
+    void Promise.all([handled, before]).then(([res, origins]) => {
+      if (res.ok) void afterWalletMessage(req, origins);
+    });
+  }
   return true; // keep the message channel open for the async response
 });
+
+if (__FEATURE_WEB_CONNECT__) listenForWebConnect();
 
 // Lock on install/startup so a fresh browser session always requires unlock.
 chrome.runtime.onStartup.addListener(() => lock());

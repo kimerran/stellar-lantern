@@ -159,6 +159,19 @@ describe('an app with several origins (#279)', () => {
   });
 });
 
+describe('Paiflow session frame (#290)', () => {
+  it('gets allow-same-origin and talks to its one origin only', () => {
+    const app = findMiniApp('paiflow')!;
+    for (const self of SELVES) {
+      expect(remoteFrameSandbox(app.url!, true, self)).toBe(SESSION_SANDBOX);
+      expect(frameOrigins(app.url!, SESSION_SANDBOX, appOrigins(app), self)).toEqual(['https://beta.app.paiflow.xyz']);
+      expect(replyTargetOrigin(app.url!, SESSION_SANDBOX, appOrigins(app), 'https://beta.app.paiflow.xyz')).toBe(
+        'https://beta.app.paiflow.xyz',
+      );
+    }
+  });
+});
+
 describe('directory session apps (#260)', () => {
   it('every session app is a remote https app off Lantern’s origins', () => {
     for (const app of MINI_APPS.filter((a) => a.session)) {

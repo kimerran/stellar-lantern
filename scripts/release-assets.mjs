@@ -22,7 +22,12 @@ export const FLAG_NAMES = [
   'VITE_FEATURE_SCANNER_AI',
   'VITE_FEATURE_TELEMETRY',
   'VITE_FEATURE_TELEMETRY_IDENTITY',
+  'VITE_FEATURE_WEB_CONNECT',
 ];
+
+// The extension's pinned id (#284), the same for every install; mirrors
+// EXTENSION_ID in src/shared/origin.ts (a test checks).
+export const EXTENSION_ID = 'iflpkjgolcbleombhldiibhojohjpnmd';
 
 // The published names. Testnet is in the APK's name because that is what a
 // tester sees in their Downloads folder; the extension zip is network-agnostic
@@ -151,7 +156,7 @@ export function releaseNotes({ version, tag, sha, runNumber, flags, assets, sums
     '',
     '## Install',
     '',
-    `- **Android** — download \`${assets.apk}\` on the phone, open it from the notification or Downloads, allow installs from this source if asked, tap **Install**. It is debug-signed for sideloading.`,
+    `- **Android** — download \`${assets.apk}\` on the phone, open it from the notification or Downloads, allow installs from this source if asked, tap **Install**. It is signed with Lantern's release key, the same for every version, so an update installs over the last one.`,
     `- **Chrome / Edge / Brave** — download \`${assets.zip}\`, unzip it somewhere you will keep (not Downloads), open \`chrome://extensions\`, turn on **Developer mode**, **Load unpacked**, pick the unzipped folder (it has \`manifest.json\` at its top level). Updating from 0.6.2 or earlier: unzip into a new folder, then import your wallet with your recovery phrase (the extension's id changes once).`,
     '',
     '## Verify what you downloaded',
@@ -171,5 +176,15 @@ export function releaseNotes({ version, tag, sha, runNumber, flags, assets, sums
     '',
     `Telemetry is opt-in and off until you turn it on in **Settings → Privacy**${on.includes('VITE_FEATURE_TELEMETRY_IDENTITY') ? '; this alpha build attaches your public wallet address to usage data once you do.' : '.'}`,
     '',
+    ...(on.includes('VITE_FEATURE_WEB_CONNECT')
+      ? [
+          '## Connect with Lantern (web connect)',
+          '',
+          `- **Chrome extension: shipped, Testnet only.** Websites can ask the extension (id \`${EXTENSION_ID}\`) to connect and to sign a transaction they built; Lantern reviews every request in its own window and never submits. Chrome now warns that Lantern can "read and change all your data on all websites": that is the script that passes a site's requests to Lantern, and it never reads the page. **Settings → Connected sites** lists connected sites and has a switch to turn websites off.`,
+          '- **Android over WalletConnect: planned**, not in this build.',
+          '- **`signMessage`, `signAuthEntry` and Mainnet: not supported** in this build.',
+          '',
+        ]
+      : []),
   ].join('\n');
 }

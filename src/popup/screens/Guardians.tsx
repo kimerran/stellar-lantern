@@ -16,6 +16,7 @@ import {
 import { scanTx, type WalletScanInput } from '@core/scan/wallet';
 import type { ScanVerdict } from '@core/scan';
 import { useRecheck } from '../hooks/useRecheck';
+import { useScanReveal } from '../hooks/useScanReveal';
 import { RecheckNotice } from '../components/RecheckNotice';
 import { isNativePlatform } from '@shared/kv';
 import { formatAmount, truncateAddress } from '@shared/format';
@@ -58,7 +59,6 @@ export function Guardians({ address, network, onBack }: Props) {
   const [txHash, setTxHash] = useState<string | null>(null);
 
   const [verdict, setVerdict] = useState<ScanVerdict | null>(null);
-  const [scanning, setScanning] = useState(false);
   const [confirmText, setConfirmText] = useState('');
   const [scanInput, setScanInput] = useState<WalletScanInput | null>(null);
   // Re-simulate immediately before submit (#121, SOW §3.9).
@@ -94,12 +94,7 @@ export function Guardians({ address, network, onBack }: Props) {
   const editing = current?.isRecoveryEnabled === true;
 
   // Reveal the scan verdict after a short latency-shaped delay (mirrors Send).
-  useEffect(() => {
-    if (step !== 'review' || !verdict) return;
-    setScanning(true);
-    const t = setTimeout(() => setScanning(false), Math.min(verdict.latencyMs, 600));
-    return () => clearTimeout(t);
-  }, [step, verdict]);
+  const scanning = useScanReveal(step === 'review', verdict, scanInput);
 
   const filled = guardians.map((g) => g.trim()).filter(Boolean);
   // Threshold can never require more guardians than have been entered.

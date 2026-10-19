@@ -299,7 +299,12 @@ never addresses, keys, amounts, memos or the text of a message you check.
 model and the retention window are in [`docs/telemetry.md`](docs/telemetry.md);
 that document is the disclosure the Chrome Web Store listing points at. The
 extension's only host permission beyond the Stellar endpoints is our own API
-origin, used for this and for the scanner's explainer.
+origin, used for this and for the scanner's explainer. Separately, so that
+websites can offer **Connect with Lantern**, the extension runs a small script
+on https pages (Chrome words this as "read and change all your data on all
+websites"). It never reads the page; it only passes a site's connect and sign
+requests to Lantern, which asks you about each one. **Settings → Connected
+sites → Let websites connect to Lantern** turns it off.
 
 ## Security model
 
@@ -307,7 +312,7 @@ origin, used for this and for the scanner's explainer.
 - **No secret material** is ever logged, persisted in plaintext, or sent to the UI beyond the transient onboarding display of a freshly generated phrase. Public keys (`G…`) only in logs.
 - **Sign-only, never submit** paths (`SIGN_ONLY`) let guardians co-sign and let SEP-10 challenges be signed **without** broadcasting — a malicious anchor/app can't get a submitted transaction out of a signing prompt.
 - **Validate-before-sign** for anchors: the SEP-10 challenge is checked against the anchor's discovered `SIGNING_KEY` and expected domains before the signer is ever called.
-- Minimal permissions; Testnet vs Mainnet is always visually distinct.
+- Minimal permissions, apart from the web-connect script on https pages described under Privacy; Testnet vs Mainnet is always visually distinct.
 
 ## Roadmap
 

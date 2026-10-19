@@ -18,8 +18,19 @@
 //     So is one that claims the transaction was blocked, at any risk: the
 //     wallet is advise-and-gate and never blocks (#150).
 
-import type { Approval, AssetDelta, ExplainInput, Explainer, ScanAction } from './types';
+import type {
+  Approval,
+  AssetDelta,
+  DeepReadonly,
+  EffectSet,
+  ExplainInput,
+  Explainer,
+  NetDelta,
+  ScanAction,
+} from './types';
+import { assetKey } from './effects';
 import { explainTransaction } from './explainer';
+import { formatAmount, truncateAddress } from './format';
 import type { DecodedTx } from './types';
 
 export interface HostedExplainerOptions {
@@ -300,7 +311,188 @@ function createProxyExplainer(opts: HostedExplainerOptions): Explainer {
 // The deterministic fallback, as an Explainer. What ships when no model is
 // configured, and what every failure above degrades to.
 export const explainRulesBased: Explainer = async ({ effects }: ExplainInput) =>
+  describeRootApproval(effects) ??
   // explainTransaction only reads its input; the cast drops the readonly
   // wrapper the shipped signature predates, nothing else. The signing user
   // lets a multi-op sentence say which ops need *your* signature (#261).
-  explainTransaction(effects.source as DecodedTx | null, effects.signing?.user);
+  explainTransaction(
+    effects.source as DecodedTx | null,
+    effects.signing?.user,
+    describeContractCall(effects),
+  );
+
+// What the simulation and the auth tree say about an undecoded contract call,
+// in the order a reader needs it: contracts it creates (#305), money it moves
+// (#294), then a transfer you authorise that the net movement hides (#305).
+function describeContractCall(effects: DeepReadonly<EffectSet>): string | undefined {
+  const parts = [
+    describeCreatedContracts(effects),
+    describeSimulatedMovement(effects),
+    describeAuthorisedTransfers(effects),
+  ].filter((p): p is string => !!p);
+  return parts.length ? parts.join(' ') : undefined;
+}
+
+// A contract call that creates contracts says so, and how many (#305). From
+// the simulation's ledger writes (new contract instance entries), so it never
+// guesses from the call's arguments; who administers them isn't claimed.
+export function describeCreatedContracts(effects: DeepReadonly<EffectSet>): string | undefined {
+  if (!effects.effects.some((e) => e.kind === 'contract_call')) return undefined;
+  const n = effects.createdContracts?.length ?? 0;
+  if (n === 0) return undefined;
+  return `In the simulation, this creates ${n === 1 ? 'a new contract' : `${n} new contracts`}.`;
+}
+
+// A transfer out of your account that the auth tree decodes, named even when
+// the simulated net movement is zero (#305): a deposit whose funds come back
+// to you still has you authorise sending them first. Skipped per asset when
+// the movement sentence already says you send it, so nothing is said twice.
+export function describeAuthorisedTransfers(effects: DeepReadonly<EffectSet>): string | undefined {
+  if (!effects.effects.some((e) => e.kind === 'contract_call')) return undefined;
+  const me = effects.signing?.user ?? effects.source?.source;
+  if (!me) return undefined;
+  const shownOut = new Set(
+    effects.observedNet
+      .filter((n) => n.address === me && positive(n.out))
+      .map((n) => assetKey(n.asset)),
+  );
+  const parts: string[] = [];
+  const d = effects.deltas;
+  for (let i = 0; i < d.length; i++) {
+    const x = d[i]!;
+    if (x.source !== 'token' || x.direction !== 'out' || x.address !== me) continue;
+    if (shownOut.has(assetKey(x.asset))) continue;
+    // A token `transfer` records its two sides back to back (token.ts).
+    const next = d[i + 1];
+    const to =
+      next &&
+      next.source === 'token' &&
+      next.direction === 'in' &&
+      next.raw === x.raw &&
+      next.depth === x.depth &&
+      next.opIndex === x.opIndex
+        ? next.address
+        : undefined;
+    const bound = x.bound === 'max' ? 'up to ' : x.bound === 'min' ? 'at least ' : '';
+    const amount =
+      x.amount === null
+        ? `an amount of ${codeOf(x)} Lantern can’t size`
+        : `${bound}${formatAmount(x.amount)} ${codeOf(x)}`;
+    parts.push(`sending ${amount}${to ? ` to ${truncateAddress(to, 4, 4)}` : ''}`);
+  }
+  return parts.length ? `You authorise ${joinList(parts)}.` : undefined;
+}
+
+// Soroban closes a ledger about every 5 seconds.
+const SECONDS_PER_LEDGER = 5;
+
+// A transaction that is one token `approve` by the signing user, in words
+// (#294): who may spend, how much of what, and for about how long. The
+// generic sentence named the token contract ("calls “approve” on CDLZ…"),
+// which is the one address the user doesn't need. Undefined for anything
+// else, so the caller falls back to the generic wording.
+export function describeRootApproval(effects: DeepReadonly<EffectSet>): string | undefined {
+  const root = effects.effects.find((e) => e.kind === 'token_approve');
+  if (!root || effects.effects.length !== 1) return undefined;
+  // Anything else the auth tree decoded means the approve isn't the whole
+  // story: keep the generic, cautious sentence.
+  if (effects.approvals.length !== 1 || effects.deltas.length > 0 || effects.unverified.length > 0)
+    return undefined;
+  const me = effects.signing?.user ?? effects.source?.source;
+  const ap = effects.approvals.find((a) => a.depth === 0 && a.opIndex === root.opIndex);
+  if (!ap || ap.owner !== me) return undefined;
+  const spender = truncateAddress(ap.spender, 4, 4);
+  const code =
+    ap.asset.code ||
+    (ap.asset.contractId ? truncateAddress(ap.asset.contractId, 4, 4) : 'this token');
+  if (/^0+$/.test(ap.amount)) {
+    return `This removes ${spender}’s permission to spend your ${code}. Only continue if you trust it.`;
+  }
+  const what = ap.unlimited
+    ? `any amount of your ${code}`
+    : ap.amountScaled !== null
+      ? `up to ${formatAmount(ap.amountScaled)} ${code} from your account`
+      : `some of your ${code} (Lantern can’t read this token’s decimals, so the amount isn’t shown)`;
+  const lasts = durationUntil(ap.expirationLedger, effects.latestLedger);
+  return `This lets ${spender} spend ${what}${lasts ? ` ${lasts}` : ''}, without asking you again. Only continue if you trust it.`;
+}
+
+function durationUntil(
+  expirationLedger: number,
+  latestLedger: number | undefined,
+): string | undefined {
+  if (latestLedger === undefined || expirationLedger <= latestLedger) return undefined;
+  const hours = ((expirationLedger - latestLedger) * SECONDS_PER_LEDGER) / 3600;
+  if (hours < 1) return 'for less than an hour';
+  if (hours < 48) return `for about ${Math.round(hours)} hour${Math.round(hours) === 1 ? '' : 's'}`;
+  return `for about ${Math.round(hours / 24)} days`;
+}
+
+// Receivers named before the rest are summarised as "N more".
+const MAX_NAMED_RECEIVERS = 3;
+
+// What the simulation proved a contract call moves, as one sentence (#294).
+// Only for a root call the scanner could not decode (a coarse `contract_call`
+// row): there the unverified-contract reason tells the user to review the
+// balance changes, and this is the only place the review shows them. Decoded
+// token calls already say what they move. Built from `observedNet` — the
+// ledger entries the simulation would write — so it states facts, not a
+// reading of the contract's arguments. Undefined when there is nothing to say.
+export function describeSimulatedMovement(effects: DeepReadonly<EffectSet>): string | undefined {
+  const root = effects.effects.find((e) => e.kind === 'contract_call');
+  if (!root) return undefined;
+  const me = effects.signing?.user ?? effects.source?.source;
+  const shown = effects.observedNet.filter(
+    (n) => n.asset.decimals !== null && n.asset.decimals !== undefined,
+  );
+  const mine = shown.filter((n) => n.address === me);
+  const parts: string[] = [
+    ...mine.filter((n) => positive(n.out)).map((n) => `you send ${amountOf(n, 'out')}`),
+    ...mine.filter((n) => positive(n.in)).map((n) => `you receive ${amountOf(n, 'in')}`),
+  ];
+  // An outflow of yours in a token whose decimals are unknown can't be shown
+  // as an amount (base units would mislead), but it must not vanish either:
+  // without this, "you send 1 XLM" would read as everything you send.
+  const unsized = effects.observedNet.filter(
+    (n) =>
+      (n.asset.decimals === null || n.asset.decimals === undefined) &&
+      n.address === me &&
+      positive(n.out),
+  );
+  for (const n of unsized) {
+    const also = parts.length ? 'also ' : '';
+    parts.push(`you ${also}send an amount of ${codeOf(n)} Lantern can’t size`);
+  }
+  const receivers = shown
+    .filter((n) => n.address !== me && positive(n.in))
+    .sort((a, b) => Number(b.in) - Number(a.in));
+  const named = receivers
+    .slice(0, MAX_NAMED_RECEIVERS)
+    .map((n) => `${truncateAddress(n.address, 4, 4)} receives ${amountOf(n, 'in')}`);
+  const rest = receivers.length - named.length;
+  if (rest > 0)
+    named.push(`${rest} more ${rest === 1 ? 'account receives' : 'accounts receive'} funds`);
+  if (named.length) parts.push(joinList(named));
+  if (!parts.length) return undefined;
+  return `In the simulation, ${parts.join('; ')}.`;
+}
+
+function positive(amount: string): boolean {
+  return /[1-9]/.test(amount) && !amount.startsWith('-');
+}
+
+function amountOf(n: DeepReadonly<NetDelta>, side: 'in' | 'out'): string {
+  const bound = side === 'in' ? (n.inAtLeast ? 'at least ' : '') : n.outUpTo ? 'up to ' : '';
+  return `${bound}${formatAmount(side === 'in' ? n.in : n.out)} ${codeOf(n)}`;
+}
+
+function codeOf(n: DeepReadonly<Pick<NetDelta, 'asset'>>): string {
+  return (
+    n.asset.code || (n.asset.contractId ? truncateAddress(n.asset.contractId, 4, 4) : 'tokens')
+  );
+}
+
+function joinList(items: string[]): string {
+  if (items.length <= 1) return items.join('');
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}

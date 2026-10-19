@@ -1,4 +1,5 @@
 import '@shared/polyfills'; // must be first — sets Buffer/process/global before Stellar loads
+import { GRANTS_KEY } from '@core/webconnect/grants';
 import { track } from '@core/telemetry';
 import { Keypair, Horizon, TransactionBuilder } from '@stellar/stellar-sdk';
 import type { Request, Result, ResponseMap } from '@shared/messages';
@@ -249,8 +250,18 @@ async function dispatch(req: Request): Promise<Result<unknown>> {
       // leaves the wrapped key + KV enrolment flag behind as stale state (#127).
       // Fail-soft: a reset must still succeed if nothing is enrolled.
       await purgeBiometricEnrollment();
+      // Connected sites go with the wallet (#250).
+      await (await getKV()).remove(GRANTS_KEY);
       return ok<'RESET_WALLET'>({ ok: true });
     }
+
+    // Web connect is served by the extension's background worker
+    // (src/background/webconnect.ts), which answers these before this handler.
+    case 'WC_NEXT':
+    case 'WC_DECIDE':
+    case 'WC_GRANTS':
+    case 'WC_REVOKE':
+      return { ok: false, error: 'Not available here.', code: 'VALIDATION' };
   }
 }
 

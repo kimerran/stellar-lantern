@@ -35,6 +35,10 @@ const Guardians = lazy(() => import('./screens/Guardians').then((m) => ({ defaul
 const CashInOut = lazy(() => import('./screens/CashInOut').then((m) => ({ default: m.CashInOut })));
 const Earn = lazy(() => import('./screens/Earn').then((m) => ({ default: m.Earn })));
 const Receive = lazy(() => import('./screens/Receive').then((m) => ({ default: m.Receive })));
+// Web connect's approval window (#249): index.html?approve=1, extension only.
+const WebConnectApproval = lazy(() =>
+  import('./web-connect/WebConnectApproval').then((m) => ({ default: m.WebConnectApproval })),
+);
 
 function Splash() {
   return (
@@ -99,10 +103,25 @@ export function App() {
 
   if (!status || !settings || !network) return <Splash />;
 
+  // Web connect (#249): this page is Lantern's approval window. With no wallet
+  // it can only refuse; a locked wallet unlocks first (below), then the
+  // request shows. Never the passkey or onboarding screens.
+  const approveMode =
+    __FEATURE_WEB_CONNECT__ &&
+    !__WEB_BUILD__ &&
+    new URLSearchParams(window.location.search).has('approve');
+  if (approveMode && !status.initialized) {
+    return (
+      <Suspense fallback={<Splash />}>
+        <WebConnectApproval noWallet />
+      </Suspense>
+    );
+  }
+
   // Passkey smart account (#53) — a parallel, seed-phrase-free account mode.
   // It takes over the whole surface (no vault, no unlock — the passkey is the
   // signer). Flag-gated so store builds carry none of this.
-  if (__FEATURE_PASSKEY__) {
+  if (__FEATURE_PASSKEY__ && !approveMode) {
     if (passkeyAccount === undefined) return <Splash />;
     if (passkeyAccount) {
       return (
@@ -129,6 +148,14 @@ export function App() {
         biometricEnabled={status.biometricEnabled}
         biometricAvailable={status.biometricAvailable}
       />
+    );
+  }
+
+  if (approveMode) {
+    return (
+      <Suspense fallback={<Splash />}>
+        <WebConnectApproval />
+      </Suspense>
     );
   }
 

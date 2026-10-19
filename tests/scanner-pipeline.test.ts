@@ -97,6 +97,15 @@ const CORPUS = [
   'nested-subinvocation',
   'unknown-contract',
   'malformed-xdr',
+  'paiflow-splitter-distribute',
+  'paiflow-pipeline-deposit',
+  'paiflow-subscription-approve',
+  'paiflow-live-factory-deploy-pipeline',
+  'paiflow-live-deposit',
+  'paiflow-live-splitter-distribute',
+  'paiflow-live-streamer-top-up',
+  'paiflow-live-token-approve',
+  'paiflow-deploy-pipeline-fresh',
 ];
 
 describe('fixture corpus', () => {
@@ -118,6 +127,15 @@ describe('fixture corpus', () => {
         'archived-state',
         'deep-auth',
         'token-admin',
+        'paiflow-splitter-distribute',
+        'paiflow-pipeline-deposit',
+        'paiflow-subscription-approve',
+        'paiflow-live-factory-deploy-pipeline',
+        'paiflow-live-deposit',
+        'paiflow-live-splitter-distribute',
+        'paiflow-live-streamer-top-up',
+        'paiflow-live-token-approve',
+        'paiflow-deploy-pipeline-fresh',
       ];
       if (soroban.includes(name)) expect(f.simulation).not.toBeNull();
       else expect(f.simulation).toBeNull();

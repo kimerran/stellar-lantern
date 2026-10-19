@@ -9,6 +9,8 @@ import { Icon } from '../components/Icon';
 import { Input } from '../components/Input';
 import { NetworkBadge } from '../components/NetworkBadge';
 import { StorageStatus } from '../web/StorageStatus';
+import { ConnectedSites } from '../web-connect/ConnectedSites';
+import { isNativePlatform } from '@shared/kv';
 import { useToast } from '../components/Toast';
 import { CONSENT_COPY } from '@core/telemetry';
 
@@ -98,6 +100,14 @@ export function Settings({
         <Divider />
         <AutoLockRow value={settings.autoLockMinutes} onChange={setAutoLock} />
       </Section>
+
+      {/* Web connect (#250): extension only (Android and the web app take no
+        requests from web pages). */}
+      {__FEATURE_WEB_CONNECT__ && !__WEB_BUILD__ && !isNativePlatform() && (
+        <Section title="Connected sites">
+          <ConnectedSites websitesOff={!!settings.webConnectDisabled} />
+        </Section>
+      )}
 
       {/* Not in the web app: anchors live on their own domains, which its CSP
         doesn't allow (#238). */}
