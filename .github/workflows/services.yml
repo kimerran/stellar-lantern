@@ -13,12 +13,14 @@ on:
       - 'packages/lantern-scanner/**'
       - 'src/core/telemetry/**'
       - '.github/workflows/services.yml'
+      - '.node-version'
   push:
     branches: [develop]
     paths:
       - 'services/**'
       - 'packages/lantern-scanner/**'
       - 'src/core/telemetry/**'
+      - '.node-version'
   workflow_dispatch:
 
 concurrency:
@@ -41,7 +43,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .node-version
 
       - name: Use npm 11 (npm 10 rejects esbuild's optional openharmony package)
         working-directory: .

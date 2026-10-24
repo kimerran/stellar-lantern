@@ -1,7 +1,7 @@
 # Lantern API — the explainer proxy (services/lantern-api). Built from the
 # repo root so @lantern/scanner and @stellar/stellar-sdk resolve from the root
 # node_modules at runtime (the service bundle keeps packages external).
-FROM node:22-slim AS build
+FROM node:22.23.4-slim AS build
 WORKDIR /app
 # node:22's bundled npm 10 rejects esbuild 0.28's optional `openharmony`
 # platform package outright (EBADPLATFORM) instead of skipping it; npm 11
@@ -16,7 +16,7 @@ COPY src/core/telemetry src/core/telemetry
 COPY services/lantern-api services/lantern-api
 RUN cd services/lantern-api && npm ci --ignore-scripts && npm run build
 
-FROM node:22-slim
+FROM node:22.23.4-slim
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build /app/node_modules node_modules
