@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.{ts,tsx}\" \"packages/**/*.ts\"",
     "verify:flags": "node scripts/verify-flags-dce.mjs",
+    "check:node": "node scripts/check-node-version.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "icons": "node scripts/gen-icons.mjs",
