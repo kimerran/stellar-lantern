@@ -39,7 +39,7 @@
     "@capgo/capacitor-native-biometric": "^8.0.0",
     "@creit.tech/stellar-wallets-kit": "2.7.0",
     "@noble/hashes": "1.8.0",
-    "@stellar/stellar-sdk": "16.0.1",
+    "@stellar/stellar-sdk": "16.4.1",
     "bip39": "3.1.0",
     "qrcode": "^1.5.4",
     "react": "18.3.1",
