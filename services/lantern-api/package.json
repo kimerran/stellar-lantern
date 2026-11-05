@@ -6,7 +6,7 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.23.4 <23"
   },
   "scripts": {
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node22 --packages=external --define:__FEATURE_DEMO_AFFORDANCES__=false --alias:@lantern/scanner=../../packages/lantern-scanner/src/index.ts --alias:@lantern/telemetry-validate=../../src/core/telemetry/validate.ts --alias:@lantern/telemetry-report=../../src/core/telemetry/report.ts --outfile=dist/index.js",
@@ -16,8 +16,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@hono/node-server": "1.13.7",
-    "hono": "4.6.14",
+    "@hono/node-server": "1.19.17",
+    "hono": "4.13.13",
     "pg": "8.13.1"
   },
   "devDependencies": {
