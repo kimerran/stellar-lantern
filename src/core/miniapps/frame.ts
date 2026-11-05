@@ -19,6 +19,15 @@
 // a session app that later navigates its frame to Lantern's origin only loads
 // Lantern's own bundle there (Capacitor serves it, and the web app refuses to
 // start in a frame), never the app's script.
+//
+// On Android that last claim needs @capacitor/android >= 8.4.3
+// (GHSA-rvm3-566m-v7fv, #318). Through 8.4.2, WebViewLocalServer proxied any
+// request whose path starts with /_capacitor_http_interceptor_, document loads
+// included and whether or not CapacitorHttp was enabled. So a frame at
+// https://android.golantern.xyz/_capacitor_http_interceptor_?u=<remote URL>
+// ran remote script at our origin. 8.4.3 proxies only fetch/XHR, and only when
+// CapacitorHttp is enabled; we don't enable it (capacitor.config.ts). Keep the
+// three @capacitor packages at 8.4.3 or later.
 import { isLanternOrigin } from '@shared/origin';
 
 /** The sandbox every remote frame gets. Never includes `allow-same-origin`. */
